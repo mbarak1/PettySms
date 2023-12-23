@@ -64,6 +64,7 @@ class MpesaFragment : Fragment() {
     private lateinit var updateTextBox : TextView
     private lateinit var netSpendTextBox: TextView
     private lateinit var circularProgressDrawable: CircularProgressIndicator
+    private var rejectedSmsList = mutableListOf<MutableList<String>>()
     private val dataViewModel: DataViewModel by activityViewModels()
 
     private var all_mpesa_transactions= mutableListOf<MpesaTransaction>()
@@ -363,7 +364,9 @@ class MpesaFragment : Fragment() {
 
         var transactionCount = db_helper?.getCountAllTransactions()!! ?: 0
 
-        var progressPercentage = transactionCount.toDouble() / totalSMS.toDouble() * 100
+        var rejectedSmsCount = db_helper?.getCountAllRejectedSms()!! ?: 0
+
+        var progressPercentage = (transactionCount.toDouble() + rejectedSmsCount.toDouble()) / totalSMS.toDouble() * 100
 
         println("Values Zake:" + progressPercentage.roundToInt() )
 
@@ -552,6 +555,8 @@ class MpesaFragment : Fragment() {
 
             var totalWork = msg_str[0].size
 
+            println("lines zake ni: " + msg_str[2][0])
+
             requireActivity().runOnUiThread {
 
 
@@ -586,6 +591,8 @@ class MpesaFragment : Fragment() {
 
                 if (msg_txt.contains("Your account balance was:")) {
                     message_is_not_balance = false
+                    var rejectedList = mutableListOf<String>(msg_str[2][i], msg_txt)
+                    rejectedSmsList.add(rejectedList)
                 }
 
                 if (itHasMpesaCode(msg_txt) && message_is_not_balance) {
@@ -616,7 +623,6 @@ class MpesaFragment : Fragment() {
                     }
                     else if(msg_txt.contains("reversed") || msg_txt.contains("Reversal")){
                         transaction_type = "reverse"
-                        println(msg_txt)
                     }
                     else if (msg_txt.contains("received") && msg_txt.contains("from")){
                         transaction_type = "receival"
@@ -719,6 +725,9 @@ class MpesaFragment : Fragment() {
                                 ).show()
                             }
 
+                            var rejectedList = mutableListOf<String>(msg_str[2][i], msg_txt)
+                            rejectedSmsList.add(rejectedList)
+
                             continue
 
                         }
@@ -731,6 +740,8 @@ class MpesaFragment : Fragment() {
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
+                            var rejectedList = mutableListOf<String>(msg_str[2][i], msg_txt)
+                            rejectedSmsList.add(rejectedList)
                         continue
 
                     }
@@ -752,6 +763,9 @@ class MpesaFragment : Fragment() {
                                 ).show()
                             }
 
+                            var rejectedList = mutableListOf<String>(msg_str[2][i], msg_txt)
+                            rejectedSmsList.add(rejectedList)
+
                             continue
 
                         } else {
@@ -769,6 +783,8 @@ class MpesaFragment : Fragment() {
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
+                        var rejectedList = mutableListOf<String>(msg_str[2][i], msg_txt)
+                        rejectedSmsList.add(rejectedList)
                         continue
 
                     }
@@ -811,6 +827,10 @@ class MpesaFragment : Fragment() {
 
 //                    binding.smsSize.text =
   //                      msg_arr[0] + " - " + msg_date + " - " + transaction_date + " - " + mpesa_transaction.recipient?.name + " - cool - " + recipient?.name + " - " + recipient?.phone_no + " - " + transaction_type + " - " + msg_txt + " - " + msg_arr[7] + " - " + mpesa_balance + " - " + balance_string + " - " + transaction_cost + " - " + transaction_cost_string + " - " + amount_string + " - " + amount + " - " + paybill_account + " - " + mpesa_depositor + " - " + mpesa_transaction.mpesa_code + " - " + msg_str.size + " - " + msg_str[0].size + " - " + msg_str[2].size + " - " + msg_str[1].size
+                }
+                else{
+                    var rejectedList = mutableListOf<String>(msg_str[2][i], msg_txt)
+                    rejectedSmsList.add(rejectedList)
                 }
             }
         }
@@ -855,6 +875,7 @@ class MpesaFragment : Fragment() {
         // Show the ProgressBar
         progressBar.visibility = View.VISIBLE
         progressBar.startAnimation(fadeInAnimation)
+        val dateFrmt = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
 
         requireActivity().runOnUiThread {
             Toast.makeText(
@@ -893,6 +914,34 @@ class MpesaFragment : Fragment() {
 
         progressBar.startAnimation(verticalShrinkAnimation)
         progressBar.visibility = View.INVISIBLE
+
+        progressBar.visibility = View.VISIBLE
+        progressBar.startAnimation(fadeInAnimation)
+
+        i = 0
+
+        progressBar.progress = i
+
+        if (db != null) {
+            for (rejectedMessage in rejectedSmsList) {
+                i++
+                val dateObjct = Date(rejectedMessage[0].toLong())
+                var msg_date = dateFrmt.format(dateObjct)
+                db_helper?.insertRejectedSMS(msg_date, rejectedMessage[1].toString())
+
+                val currentProgress = (i * 100 / convertedTransactions.size)
+
+
+                progressBar.progress = currentProgress
+            }
+        }
+
+        progressBar.startAnimation(verticalShrinkAnimation)
+        progressBar.visibility = View.INVISIBLE
+
+
+
+
 
         all_mpesa_transactions = db_helper?.getThisMonthMpesaTransactions()!!
 

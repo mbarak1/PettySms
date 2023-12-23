@@ -61,6 +61,19 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
     }
 
+    fun insertRejectedSMS(date: String, smsBody: String) {
+        val db = writableDatabase
+        val contentValues = ContentValues()
+
+        contentValues.put(COL_REJECTED_MESSAGES_DATE, date)
+        contentValues.put(COL_REJECTED_MESSAGES_SMS_BODY, smsBody)
+
+        db.insert(TABLE_REJECTED_SMS, null, contentValues)
+        db.close()
+    }
+
+
+
     fun createInitialTables(db: SQLiteDatabase){
         val SQL_CREATE_ENTRIES = "CREATE TABLE IF NOT EXISTS $TABLE_TRANSACTIONS" + " (" +
                 COL_TRANSACTIONS_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -84,7 +97,17 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 COL_TRANSACTIONS_SENDER_PHONE_NO + " TEXT," +
                 COL_TRANSACTIONS_DESCRIPTION + " TEXT" + // Removed the trailing comma
                 ")"
+
+        val SQL_CREATE_ENTRIES_REJECTED_SMS = "CREATE TABLE IF NOT EXISTS $TABLE_REJECTED_SMS" +
+                " (" +
+                "$COL_REJECTED_MESSAGES_ID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "$COL_REJECTED_MESSAGES_DATE TEXT, " +
+                "$COL_REJECTED_MESSAGES_SMS_BODY TEXT" +
+                ")"
+
         db.execSQL(SQL_CREATE_ENTRIES)
+        db.execSQL(SQL_CREATE_ENTRIES_REJECTED_SMS)
+
     }
 
     fun getAllMpesaTransactions(): MutableList<MpesaTransaction> {
@@ -219,40 +242,66 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
     }
 
+    fun getCountAllRejectedSms(): Int {
+        val countQuery = "SELECT COUNT(*) FROM $TABLE_REJECTED_SMS"
+
+        val db = readableDatabase
+        val cursor = db.rawQuery(countQuery, null)
+
+        var rejectedSmsCount = 0
+
+        if (cursor.moveToFirst()) {
+            rejectedSmsCount = cursor.getInt(0)
+        }
+
+        cursor.close()
+        db.close()
+
+        return rejectedSmsCount
+
+    }
+
 
 
         companion object {
         // If you change the database schema, you must increment the database version.
-        const val DATABASE_VERSION = 2
-        const val DATABASE_NAME = "PettySms.db"
-        const val TABLE_TRANSACTIONS = "transactions"
-        const val COL_TRANSACTIONS_ID = "id"
-        const val COL_TRANSACTIONS_MPESA_CODE = "mpesa_code"
-        const val COL_TRANSACTIONS_MESSAGE_DATE = "message_date"
-        const val COL_TRANSACTIONS_TRANSACTION_DATE = "transaction_date"
-        const val COL_TRANSACTIONS_RECEPIENT_NAME = "recepient_name"
-        const val COL_TRANSACTIONS_RECEPIENT_NO = "recepient_no"
-        const val COL_TRANSACTIONS_AMOUNT = "amount"
-        const val COL_TRANSACTIONS_ACCOUNT_NO = "account_no"
-        const val COL_TRANSACTIONS_COMPANY_OWNER = "company_owner"
-        const val COL_TRANSACTIONS_TRANSACTION_TYPE = "transaction_type"
-        const val COL_TRANSACTIONS_USER = "user"
-        const val COL_TRANSACTIONS_PAYMENT_MODE = "payment_mode"
-        const val COL_TRANSACTIONS_DESCRIPTION = "description"
-        const val COL_TRANSACTIONS_MPESA_BALANCE = "mpesa_balance"
-        const val COL_TRANSACTIONS_TRANSACTION_COST = "transaction_cost"
-        const val COL_TRANSACTIONS_MPESA_DEPOSITOR = "mpesa_depositor"
-        const val COL_TRANSACTIONS_SMS_TEXT = "sms_text"
-        const val COL_TRANSACTIONS_PAYBILL_ACCOUNT = "paybill_account"
-        const val COL_TRANSACTIONS_SENDER_NAME = "sender_name"
-        const val COL_TRANSACTIONS_SENDER_PHONE_NO = "sender_phone_no"
+            const val DATABASE_VERSION = 2
+            const val DATABASE_NAME = "PettySms.db"
+            const val TABLE_TRANSACTIONS = "transactions"
+            const val COL_TRANSACTIONS_ID = "id"
+            const val COL_TRANSACTIONS_MPESA_CODE = "mpesa_code"
+            const val COL_TRANSACTIONS_MESSAGE_DATE = "message_date"
+            const val COL_TRANSACTIONS_TRANSACTION_DATE = "transaction_date"
+            const val COL_TRANSACTIONS_RECEPIENT_NAME = "recepient_name"
+            const val COL_TRANSACTIONS_RECEPIENT_NO = "recepient_no"
+            const val COL_TRANSACTIONS_AMOUNT = "amount"
+            const val COL_TRANSACTIONS_ACCOUNT_NO = "account_no"
+            const val COL_TRANSACTIONS_COMPANY_OWNER = "company_owner"
+            const val COL_TRANSACTIONS_TRANSACTION_TYPE = "transaction_type"
+            const val COL_TRANSACTIONS_USER = "user"
+            const val COL_TRANSACTIONS_PAYMENT_MODE = "payment_mode"
+            const val COL_TRANSACTIONS_DESCRIPTION = "description"
+            const val COL_TRANSACTIONS_MPESA_BALANCE = "mpesa_balance"
+            const val COL_TRANSACTIONS_TRANSACTION_COST = "transaction_cost"
+            const val COL_TRANSACTIONS_MPESA_DEPOSITOR = "mpesa_depositor"
+            const val COL_TRANSACTIONS_SMS_TEXT = "sms_text"
+            const val COL_TRANSACTIONS_PAYBILL_ACCOUNT = "paybill_account"
+            const val COL_TRANSACTIONS_SENDER_NAME = "sender_name"
+            const val COL_TRANSACTIONS_SENDER_PHONE_NO = "sender_phone_no"
+
+            //REJECTED SMS TABLE VARIABLES
+
+            const val TABLE_REJECTED_SMS = "rejected_sms"
+            const val COL_REJECTED_MESSAGES_ID = "id"
+            const val COL_REJECTED_MESSAGES_DATE = "date"
+            const val COL_REJECTED_MESSAGES_SMS_BODY = "sms_body"
 
 
 
         fun dropAllTables(db: SQLiteDatabase) {
 
             // List all the table names you want to drop
-            val tableNames = arrayOf(TABLE_TRANSACTIONS)
+            val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS)
 
             for (tableName in tableNames) {
                 db.execSQL("DROP TABLE IF EXISTS $tableName;")
