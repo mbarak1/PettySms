@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import java.sql.SQLException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -105,8 +106,18 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 "$COL_REJECTED_MESSAGES_SMS_BODY TEXT" +
                 ")"
 
+        val SQL_CREATE_ENTRIES_SEARCH_HISTORY = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY" + "(" +
+                "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "$COL_SEARCH_HISTORY_QUERY TEXT," +
+                "$COL_TIMESTAMP INTEGER" +
+            ")"
+        .trimIndent()
+
+
         db.execSQL(SQL_CREATE_ENTRIES)
         db.execSQL(SQL_CREATE_ENTRIES_REJECTED_SMS)
+        db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY)
+
 
     }
 
@@ -150,6 +161,41 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         """
 
         return getTransactionsFromQuery(query)
+    }
+
+    fun addToSearchHistory(query: String) {
+        val db = writableDatabase
+        val contentValues = ContentValues().apply {
+            put(COL_SEARCH_HISTORY_QUERY, query)
+            put(COL_TIMESTAMP, System.currentTimeMillis())
+        }
+        db.insert(TABLE_SEARCH_HISTORY, null, contentValues)
+        db.close()
+    }
+
+    fun getSearchHistory(): MutableList<String> {
+        val db = readableDatabase
+        val cursor = db.query(
+            TABLE_SEARCH_HISTORY,
+            arrayOf(COL_SEARCH_HISTORY_QUERY),
+            null,
+            null,
+            null,
+            null,
+            "$COL_TIMESTAMP DESC"
+        )
+
+        val searchHistory = mutableListOf<String>()
+        with(cursor) {
+            while (moveToNext()) {
+                val query = getString(getColumnIndexOrThrow(COL_SEARCH_HISTORY_QUERY))
+                searchHistory.add(query)
+            }
+        }
+        cursor.close()
+        db.close()
+
+        return searchHistory
     }
 
     @SuppressLint("Range")
@@ -260,6 +306,19 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         return rejectedSmsCount
 
     }
+    fun clearSearchHistory() {
+        val db = writableDatabase
+
+        try {
+            // Clear the search history table
+            db.execSQL("DELETE FROM $TABLE_SEARCH_HISTORY")
+        } catch (e: SQLException) {
+            // Handle exceptions, if any
+            e.printStackTrace()
+        } finally {
+            db.close()
+        }
+    }
 
 
 
@@ -296,9 +355,16 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_REJECTED_MESSAGES_DATE = "date"
             const val COL_REJECTED_MESSAGES_SMS_BODY = "sms_body"
 
+            //SEARCH HISTORY TABLE VARIABLES
+
+            const val COL_SEARCH_HISTORY_ID = "id"
+            const val COL_SEARCH_HISTORY_QUERY = "query"
+            const val TABLE_SEARCH_HISTORY = "search_history"
+            const val COL_TIMESTAMP = "timestamp" // Add this line
 
 
-        fun dropAllTables(db: SQLiteDatabase) {
+
+            fun dropAllTables(db: SQLiteDatabase) {
 
             // List all the table names you want to drop
             val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS)

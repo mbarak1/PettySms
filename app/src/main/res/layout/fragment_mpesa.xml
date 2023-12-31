@@ -290,6 +290,19 @@
                 app:layout_constraintTop_toBottomOf="@+id/horizontalScrollView" />
 
             <TextView
+                android:id="@+id/view_all_link"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="View All"
+                android:textColor="?attr/colorPrimary"
+                android:autoLink="web"
+                android:clickable="true"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.902"
+                app:layout_constraintStart_toEndOf="@+id/textView2"
+                app:layout_constraintTop_toBottomOf="@+id/horizontalScrollView" />
+
+            <TextView
                 android:id="@+id/no_transactions_message"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

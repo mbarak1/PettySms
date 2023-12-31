@@ -10,6 +10,10 @@
     <string name="sync">Sync</string>
     <string name="mpesa">M-Pesa</string>
     <string name="mpesa_tool">M-Pesa Centre</string>
+    <string name="searchbar_hint">Search Transactions</string>
+    <string name="sort">Sort</string>
+    <string name="filter">Filter</string>
+
 
     <string name="lorem_ipsum">
         Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam in scelerisque sem. Mauris
@@ -62,4 +66,7 @@
     <string name="attachment_summary_on">Automatically download attachments for incoming emails
     </string>
     <string name="attachment_summary_off">Only download attachments when manually requested</string>
+    <string name="title_activity_view_all_transactions">ViewAllTransactionsActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
 </resources>

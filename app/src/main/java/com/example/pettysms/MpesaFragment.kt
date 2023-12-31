@@ -1,6 +1,7 @@
 package com.example.pettysms
 
 import android.content.ContentResolver
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
@@ -63,6 +64,7 @@ class MpesaFragment : Fragment() {
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var updateTextBox : TextView
     private lateinit var netSpendTextBox: TextView
+    private lateinit var viewAlLink: TextView
     private lateinit var circularProgressDrawable: CircularProgressIndicator
     private var rejectedSmsList = mutableListOf<MutableList<String>>()
     private val dataViewModel: DataViewModel by activityViewModels()
@@ -102,6 +104,7 @@ class MpesaFragment : Fragment() {
         updateTextBox = binding.transactionsThisMonth
         netSpendTextBox= binding.netSpendThisMonth
         circularProgressDrawable = binding.circularProgress
+        viewAlLink = binding.viewAllLink
         //constraintLayout.loadSkeleton { balance_text }
         //mpesa_balance_label.loadSkeleton()
         /*balance_text.loadSkeleton()
@@ -278,6 +281,23 @@ class MpesaFragment : Fragment() {
             no_transactions_textbox.visibility = View.VISIBLE
         }else{
             no_transactions_textbox.visibility = View.INVISIBLE
+        }
+
+        viewAlLink.setOnClickListener{
+            Toast.makeText(
+                activity?.baseContext,
+                "Just need to setup an intent to the new activity",
+                Toast.LENGTH_SHORT
+            ).show()
+            // Create an Intent to start SecondActivity
+            val intent = Intent(activity, ViewAllTransactionsActivity::class.java)
+
+            // Optionally, you can pass data to the second activity using extras
+            intent.putExtra("key", "value")
+
+            // Start the second activity
+            startActivity(intent)
+
         }
 
         // Get the current month and year programmatically

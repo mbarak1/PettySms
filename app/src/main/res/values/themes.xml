@@ -7,6 +7,10 @@
 
     </style>
 
+    <style name="PopupMenuStyle" parent="@android:style/Widget.PopupMenu">
+        <item name="android:popupBackground">?attr/popupMenuBackground</item> <!-- Set the background color -->
+    </style>
+
     <style name="Theme.PettySMS" parent="Base.Theme.PettySMS" />
 
 </resources>
