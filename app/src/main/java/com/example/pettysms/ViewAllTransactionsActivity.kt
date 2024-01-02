@@ -22,6 +22,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.ViewUtils
+import androidx.core.content.ContextCompat
 import androidx.core.view.marginTop
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -134,7 +135,7 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
             showHistoryitems("")
         }
         searchView.editText.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == KeyEvent.KEYCODE_ENTER) {
                 val query = searchView.text.toString()
                 if (!query.isNullOrBlank()) {
                     performSearch(query)
@@ -280,10 +281,10 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
     private fun showHistoryitems(query: String){
 
         // Create an instance of SearchHistoryAdapter with the click listener
-        val historyAdapter = SearchHistoryAdapter(searchHistory) { query ->
+        val historyAdapter = SearchHistoryAdapter(searchHistory) { clickedQuery ->
             // Handle the click event, for example, update the search view text
-            searchView.setText(query)
-
+            searchView.setText(clickedQuery)
+            hideKeyboard()
         }
 
         // Assuming you have a reference to the view
@@ -299,6 +300,10 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
         myView.layoutParams = layoutParams
         binding.searchHistoryLabel.visibility = View.VISIBLE
         binding.historyLayout.visibility = View.VISIBLE
+
+        // Clear the existing adapter data
+        binding.searchHistoryRecycler.adapter = null
+
         // Update the RecyclerView with search history
         binding.searchHistoryRecycler.apply {
             layoutManager = LinearLayoutManager(context)
@@ -384,10 +389,17 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
     private fun loadSearchHistoryDb() {
         val allSearchHistory = db_helper?.getSearchHistory() ?: emptyList()
 
-        if (allSearchHistory.isNotEmpty()) {
-            // Create a mutable copy of the search history
-            searchHistory = allSearchHistory.take(5).toMutableList()
-        }
+        // Create a set to store unique search history items
+        val uniqueSearchHistorySet = mutableSetOf<String>()
+
+        // Add all items to the set to ensure uniqueness
+        uniqueSearchHistorySet.addAll(allSearchHistory)
+
+        // Convert the set to a list (preserving order of insertion)
+        searchHistory = uniqueSearchHistorySet.toList() as MutableList<String>
+
+        // Take the first 5 items from the list
+        searchHistory = searchHistory.take(5).toMutableList()
     }
 
     /*private fun swipeRefreshFunction() {

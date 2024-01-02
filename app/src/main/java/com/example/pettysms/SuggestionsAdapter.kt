@@ -2,10 +2,13 @@ package com.example.pettysms
 
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.os.Handler
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.BackgroundColorSpan
 import android.text.style.StyleSpan
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +17,7 @@ import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import xyz.schwaab.avvylib.AvatarView
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -21,7 +25,9 @@ class SuggestionsAdapter(
     private val suggestions: List<MpesaTransaction>,
     private val query: String,
     private val onSuggestionClick: (MpesaTransaction) -> Unit
+
 ) : RecyclerView.Adapter<SuggestionsAdapter.ViewHolder>() {
+    private val handler: Handler = Handler()
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val cardView: CardView = itemView.findViewById(R.id.card_transaction)
@@ -30,6 +36,7 @@ class SuggestionsAdapter(
         val dateTextView: TextView = itemView.findViewById(R.id.transactionDateTextView)
         val color_frame: FrameLayout = itemView.findViewById(R.id.card_color)
         val rounded_text: TextView = itemView.findViewById(R.id.roundedTextView)
+        val avatarView: AvatarView = itemView.findViewById(R.id.avatar_view)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -41,17 +48,45 @@ class SuggestionsAdapter(
         val suggestion = suggestions[position]
         holder.titleTextView.text = suggestion.recipient?.name?.let { capitalizeEachWord(it) }
         holder.amountTextView.text = removeDecimal(suggestion.amount.toString()) + "/-"
-        holder.dateTextView.text = suggestion.transaction_date?.let { formatDate(it) }
+
+        holder.dateTextView.text = suggestion.transaction_date?.takeIf { it.isNotEmpty() }
+            ?.let { formatDate(it) }
+            ?: suggestion.msg_date?.let { formatDate(it) } ?: "Unknown Date"
+
         // Highlight the search query in the titleTextView
         holder.titleTextView.text = highlightSearchQuery(
             suggestion.recipient?.name?.let { capitalizeEachWord(it) }.orEmpty(),
             query
         )
+        holder.avatarView.apply {
+            text = suggestion.recipient?.name?.let { capitalizeEachWord(it) }
+            animationOrchestrator = CrazyOrchestrator.create()
+            isAnimating = false
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            maxWidth = 60
+            maxHeight = 60
+        }
+
         if (suggestion.transaction_type == "topup"){
             val context = holder.color_frame.context
             val color = ContextCompat.getColor(context, R.color.aqua_color)
             holder.color_frame.setBackgroundColor(color)
             holder.rounded_text.text = "Topup"
+
+            // Retrieve colorPrimary from the theme
+            // Replace 'context.theme' with your actual context theme
+            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
+            val colorPrimary = typedArray.getColor(0, 0)
+            typedArray.recycle()
+
+            setGradientBackground(holder.color_frame, colorPrimary, color)
+
+            holder.avatarView.apply {
+                highlightBorderColorEnd = color
+                isAnimating = true
+            }
+
+            stopAnimating(5000, holder.avatarView)
 
             holder.amountTextView.text = "-" + holder.amountTextView.text
 
@@ -65,6 +100,21 @@ class SuggestionsAdapter(
             val color = ContextCompat.getColor(context, R.color.orange_color)
             holder.color_frame.setBackgroundColor(color)
             holder.rounded_text.text = "Send Money"
+
+            // Retrieve colorPrimary from the theme
+            // Replace 'context.theme' with your actual context theme
+            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
+            val colorPrimary = typedArray.getColor(0, 0)
+            typedArray.recycle()
+
+            setGradientBackground(holder.color_frame, colorPrimary, color)
+
+            holder.avatarView.apply {
+                highlightBorderColorEnd = color
+                isAnimating = true
+            }
+
+            stopAnimating(5000, holder.avatarView)
 
             holder.amountTextView.text = "-" + holder.amountTextView.text
 
@@ -86,6 +136,22 @@ class SuggestionsAdapter(
             holder.color_frame.setBackgroundColor(color)
             holder.rounded_text.text = "Deposit"
 
+            // Retrieve colorPrimary from the theme
+            // Replace 'context.theme' with your actual context theme
+            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
+            val colorPrimary = typedArray.getColor(0, 0)
+            typedArray.recycle()
+
+            setGradientBackground(holder.color_frame, colorPrimary, color)
+
+            holder.avatarView.apply {
+                text = suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }
+                highlightBorderColorEnd = color
+                isAnimating = true
+            }
+
+            stopAnimating(5000, holder.avatarView)
+
             holder.amountTextView.text = "+" + holder.amountTextView.text
 
             val context3 = holder.color_frame.context
@@ -100,6 +166,21 @@ class SuggestionsAdapter(
             holder.color_frame.setBackgroundColor(color)
             holder.rounded_text.text = "Paybill"
 
+            // Retrieve colorPrimary from the theme
+            // Replace 'context.theme' with your actual context theme
+            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
+            val colorPrimary = typedArray.getColor(0, 0)
+            typedArray.recycle()
+
+            setGradientBackground(holder.color_frame, colorPrimary, color)
+
+            holder.avatarView.apply {
+                highlightBorderColorEnd = color
+                isAnimating = true
+            }
+
+            stopAnimating(5000, holder.avatarView)
+
             holder.amountTextView.text = "-" + holder.amountTextView.text
 
             val context3 = holder.color_frame.context
@@ -112,6 +193,21 @@ class SuggestionsAdapter(
             val color = ContextCompat.getColor(context, R.color.purple_color)
             holder.color_frame.setBackgroundColor(color)
             holder.rounded_text.text = "Till No."
+
+            // Retrieve colorPrimary from the theme
+            // Replace 'context.theme' with your actual context theme
+            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
+            val colorPrimary = typedArray.getColor(0, 0)
+            typedArray.recycle()
+
+            setGradientBackground(holder.color_frame, colorPrimary, color)
+
+            holder.avatarView.apply {
+                highlightBorderColorEnd = color
+                isAnimating = true
+            }
+
+            stopAnimating(5000, holder.avatarView)
 
             holder.amountTextView.text = "-" + holder.amountTextView.text
 
@@ -131,6 +227,22 @@ class SuggestionsAdapter(
             val color = ContextCompat.getColor(context, R.color.pink_color)
             holder.color_frame.setBackgroundColor(color)
             holder.rounded_text.text = "Receival"
+
+            // Retrieve colorPrimary from the theme
+            // Replace 'context.theme' with your actual context theme
+            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
+            val colorPrimary = typedArray.getColor(0, 0)
+            typedArray.recycle()
+
+            setGradientBackground(holder.color_frame, colorPrimary, color)
+
+            holder.avatarView.apply {
+                text = suggestion.sender?.name?.let { capitalizeEachWord(it) }
+                highlightBorderColorEnd = color
+                isAnimating = true
+            }
+
+            stopAnimating(5000, holder.avatarView)
 
             holder.amountTextView.text = "+" + holder.amountTextView.text
 
@@ -152,6 +264,22 @@ class SuggestionsAdapter(
             holder.color_frame.setBackgroundColor(color)
             holder.rounded_text.text = "Withdraw"
 
+            // Retrieve colorPrimary from the theme
+            // Replace 'context.theme' with your actual context theme
+            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
+            val colorPrimary = typedArray.getColor(0, 0)
+            typedArray.recycle()
+
+            setGradientBackground(holder.color_frame, colorPrimary, color)
+
+            holder.avatarView.apply {
+                text = suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }
+                highlightBorderColorEnd = color
+                isAnimating = true
+            }
+
+            stopAnimating(5000, holder.avatarView)
+
             holder.amountTextView.text = "-" + holder.amountTextView.text
 
             val context3 = holder.color_frame.context
@@ -171,6 +299,22 @@ class SuggestionsAdapter(
             holder.color_frame.setBackgroundColor(color)
             holder.rounded_text.text = "Reverse"
 
+            // Retrieve colorPrimary from the theme
+            // Replace 'context.theme' with your actual context theme
+            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
+            val colorPrimary = typedArray.getColor(0, 0)
+            typedArray.recycle()
+
+            setGradientBackground(holder.color_frame, colorPrimary, color)
+
+            holder.avatarView.apply {
+                text = suggestion.recipient?.name?.let { capitalizeEachWord(it) }
+                highlightBorderColorEnd = color
+                isAnimating = true
+            }
+
+            stopAnimating(5000, holder.avatarView)
+
             holder.amountTextView.text = "+" + holder.amountTextView.text
 
             val context3 = holder.color_frame.context
@@ -188,7 +332,9 @@ class SuggestionsAdapter(
 
         // Highlight the search query in the dateTextView
         holder.dateTextView.text = highlightSearchQuery(
-            suggestion.transaction_date?.let { formatDate(it) }.orEmpty(),
+            suggestion.transaction_date?.takeIf { it.isNotEmpty() }?.let { formatDate(it) }
+                ?: suggestion.msg_date?.takeIf { it.isNotEmpty() }?.let { formatDate(it) }
+                ?: "Unknown Date",
             query
         )
 
@@ -264,6 +410,38 @@ class SuggestionsAdapter(
         }
 
         return spannableString
+    }
+
+    fun stopAnimating(timeLimit: Long, avatarView: AvatarView){
+
+        // Create a Runnable that will be executed after the time limit
+        val timeoutRunnable = Runnable {
+            // Perform actions when the time limit is reached
+            // For example, show a message, close an activity, etc.
+            avatarView.apply {
+                isAnimating = false
+            }
+
+        }
+
+        // Schedule the Runnable to be executed after the time limit
+        handler.postDelayed(timeoutRunnable, timeLimit.toLong())
+    }
+
+    // Helper method to set a gradient background
+    private fun setGradientBackground(view: View, startColor: Int, endColor: Int) {
+        val gradientDrawable = GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(startColor, endColor)
+        )
+
+        gradientDrawable.cornerRadius = 5f // Adjust the corner radius as needed
+        // Set the angle (0 is left to right, 90 is top to bottom)
+        gradientDrawable.gradientType = GradientDrawable.LINEAR_GRADIENT
+        gradientDrawable.orientation = GradientDrawable.Orientation.TOP_BOTTOM
+
+        // Set the background to the GradientDrawable
+        view.background = gradientDrawable
     }
 }
 
