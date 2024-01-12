@@ -32,6 +32,21 @@ class HomeFragment : Fragment() {
         _binding!!.textviewFirst.setText(this.id.toString())
         val actionbar = binding.root.findViewById<Toolbar>(R.id.toolbar1)
         actionbar.setTitle("Hi" + " Mbarak")
+        val buttonDropTables = binding.buttonDropTables
+        var db_helper = this.activity?.applicationContext?.let { DbHelper(it) }
+        var db = db_helper?.writableDatabase
+        buttonDropTables.setOnClickListener {
+            if (db != null) {
+                DbHelper.dropAllTables(db!!)
+                activity?.finishAffinity()
+            } else {
+                var db_helper = this.activity?.applicationContext?.let { DbHelper(it) }
+                var db = db_helper?.writableDatabase
+                DbHelper.dropAllTables(db!!)
+                activity?.finishAffinity()
+            }
+        }
+
         (activity as AppCompatActivity).setSupportActionBar(actionbar)
         return binding.root
 

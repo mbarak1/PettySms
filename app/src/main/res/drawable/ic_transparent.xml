@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/drawable/ic_transparent.xml -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- This item represents a transparent layer -->
+    <item
+        android:drawable="@android:color/transparent"
+        android:width="24dp"
+        android:height="24dp" />
+</layer-list>

@@ -1,10 +1,16 @@
 package com.example.pettysms
 
 import android.Manifest
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.app.job.JobInfo
+import android.app.job.JobScheduler
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
+import android.telephony.SmsMessage
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -14,6 +20,7 @@ import androidx.navigation.Navigation
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
+import androidx.navigation.ui.setupActionBarWithNavController
 import com.example.pettysms.databinding.ActivityMainBinding
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.color.DynamicColors
@@ -26,7 +33,10 @@ class MainActivity : AppCompatActivity() {
     private val SMS_SEND_PERMISSION_CODE = 125
     private val SMS_RECEIVE_PERMISSION_CODE = 126
     private val SMS_READ_PERMISSION_CODE = 127
+    private val REQUEST_SMS_PERMISSION = 123
     private var check_fragment = "home"
+    private var isServiceScheduled = false
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -44,11 +54,27 @@ class MainActivity : AppCompatActivity() {
 
         //DynamicColors.isDynamicColorAvailable()
 
+        // Check and request runtime permissions
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECEIVE_SMS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // Request the permission
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.RECEIVE_SMS),
+                REQUEST_SMS_PERMISSION
+            )
+        }
 
 
 
 
-        bottomNav.setOnItemSelectedListener { item ->
+
+
+
+    bottomNav.setOnItemSelectedListener { item ->
             when(item.itemId){
                 R.id.page_1 -> {
                     check_fragment = "home"
@@ -106,11 +132,45 @@ class MainActivity : AppCompatActivity() {
 
         bottomNav.setOnItemReselectedListener {}
 
+
+        val dbHelper = DbHelper(this)
+        val db = dbHelper.readableDatabase
+
+        println("balla gani:" + dbHelper.hasTables(db))
+
+        if (dbHelper.hasTables(db) && !isServiceScheduled) {
+            println("ola cela")
+            scheduleJob()
+            isServiceScheduled = true
+        }
+
         setContentView(binding.root)
 
 
 
+
+
+
     }
+
+    private fun scheduleJob() {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val alarmIntent = Intent(this, AlarmReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(this, 0, alarmIntent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+
+        // Set the alarm to trigger every minute
+        alarmManager.setRepeating(
+            AlarmManager.RTC_WAKEUP,
+            System.currentTimeMillis(),
+            60 * 1000,  // 1 minute interval
+            pendingIntent
+        )
+    }
+
+
+
+
 
     /*override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -140,10 +200,16 @@ class MainActivity : AppCompatActivity() {
                 || super.onSupportNavigateUp()
     }
 
-    override fun onStart() {
-        DynamicColors.applyToActivitiesIfAvailable(this.application)
-        super.onStart()
+    override fun onResume() {
+        val dbHelper = DbHelper(this)
+        val db = dbHelper.readableDatabase
 
+        if (dbHelper.hasTables(db) && !isServiceScheduled) {
+            println("ole celuza")
+            scheduleJob()
+            isServiceScheduled = true
+        }
+        super.onResume()
     }
 
     // Function to check and request permission.

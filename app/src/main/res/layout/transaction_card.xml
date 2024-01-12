@@ -14,97 +14,102 @@
     app:cardUseCompatPadding="true">
 
     <!-- Your transaction card content goes here -->
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="100dp"
+        android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <FrameLayout
+        <View
             android:id="@+id/card_color"
-            android:layout_width="15dp"
-            android:layout_height="match_parent"
-            android:layout_gravity="end"
+            android:layout_width="12dp"
+            android:layout_height="0dp"
             android:background="?attr/colorPrimary"
-            android:clipChildren="true" />
+            android:clipChildren="true"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <xyz.schwaab.avvylib.AvatarView
             android:id="@+id/avatar_view"
-            android:layout_width="70dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginLeft="12dp"
-            android:layout_height="70dp"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="24dp"
             app:avvy_border_color="@android:color/darker_gray"
             app:avvy_border_highlight_color="?attr/colorPrimary"
             app:avvy_border_highlight_color_end="#3088ff"
             app:avvy_border_thickness="2dp"
             app:avvy_border_thickness_highlight="3dp"
+            app:avvy_circle_background_color="?attr/colorBackgroundFloating"
             app:avvy_distance_to_border="2dp"
             app:avvy_highlighted="true"
             app:avvy_loading_arches="5"
-            app:avvy_text_size="25sp"
+            app:avvy_loading_arches_degree_area="90"
             app:avvy_text_color="?attr/colorAccent"
-            app:avvy_circle_background_color="?attr/colorBackgroundFloating"
-            app:avvy_loading_arches_degree_area="90"/>
+            app:avvy_text_size="25sp"
+            app:layout_constraintStart_toEndOf="@+id/card_color"
+            app:layout_constraintTop_toTopOf="parent" />
 
-        <LinearLayout
-            android:layout_width="184dp"
-            android:layout_height="match_parent"
-            android:layout_marginLeft="3dp"
-            android:orientation="vertical"
-            android:padding="16dp">
+        <TextView
+            android:id="@+id/transactionTitleTextView"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Title"
+            android:textSize="18sp"
+            android:maxLines="2"
+            app:layout_constraintStart_toEndOf="@+id/avatar_view"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/transactionTitleTextView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="@font/roboto_light"
-                android:maxLines="1"
-                android:text="Transaction Title"
-                android:textSize="18sp" />
+        <TextView
+            android:id="@+id/roundedTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="@font/roboto_light"
+            android:paddingTop="5dp"
+            android:paddingRight="5dp"
+            android:paddingBottom="3dp"
+            android:text="Your Text"
+            android:textSize="12sp"
+            app:layout_constraintStart_toStartOf="@+id/transactionTitleTextView"
+            app:layout_constraintTop_toBottomOf="@+id/transactionTitleTextView" />
 
-            <TextView
-                android:id="@+id/roundedTextView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/roboto_light"
-                android:paddingTop="5dp"
-                android:paddingRight="5dp"
-                android:paddingBottom="3dp"
-                android:text="Your Text"
-                android:textSize="12sp" />
+        <TextView
+            android:id="@+id/transactionDateTextView"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="16dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/roboto_light"
+            android:inputType="none"
+            android:maxLines="2"
+            android:text="Transaction Date"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="@+id/transactionTitleTextView"
+            app:layout_constraintStart_toStartOf="@+id/roundedTextView"
+            app:layout_constraintTop_toBottomOf="@+id/roundedTextView" />
 
-            <TextView
-                android:id="@+id/transactionDateTextView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:fontFamily="@font/roboto_light"
-                android:text="Transaction Date"
-                android:textSize="12sp" />
+        <TextView
+            android:id="@+id/transactionAmountTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="16dp"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Amount"
+            android:textAlignment="center"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="20sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toEndOf="@+id/roundedTextView"
+            app:layout_constraintTop_toBottomOf="@+id/transactionTitleTextView" />
 
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/transactionAmountTextView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="35dp"
-                android:layout_marginRight="10dp"
-                android:fontFamily="@font/roboto_light"
-                android:text="Transaction Amount"
-                android:textAlignment="center"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="17sp" />
-
-
-        </LinearLayout>
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </com.google.android.material.card.MaterialCardView>

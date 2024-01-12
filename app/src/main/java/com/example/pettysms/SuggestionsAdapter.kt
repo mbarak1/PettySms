@@ -34,7 +34,7 @@ class SuggestionsAdapter(
         val titleTextView: TextView = itemView.findViewById(R.id.transactionTitleTextView)
         val amountTextView: TextView = itemView.findViewById(R.id.transactionAmountTextView)
         val dateTextView: TextView = itemView.findViewById(R.id.transactionDateTextView)
-        val color_frame: FrameLayout = itemView.findViewById(R.id.card_color)
+        val color_frame: View = itemView.findViewById(R.id.card_color)
         val rounded_text: TextView = itemView.findViewById(R.id.roundedTextView)
         val avatarView: AvatarView = itemView.findViewById(R.id.avatar_view)
     }

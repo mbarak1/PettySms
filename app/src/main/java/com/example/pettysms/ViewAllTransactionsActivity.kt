@@ -390,16 +390,10 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
         val allSearchHistory = db_helper?.getSearchHistory() ?: emptyList()
 
         // Create a set to store unique search history items
-        val uniqueSearchHistorySet = mutableSetOf<String>()
+        val uniqueSearchHistorySet = allSearchHistory.toMutableSet()
 
-        // Add all items to the set to ensure uniqueness
-        uniqueSearchHistorySet.addAll(allSearchHistory)
-
-        // Convert the set to a list (preserving order of insertion)
-        searchHistory = uniqueSearchHistorySet.toList() as MutableList<String>
-
-        // Take the first 5 items from the list
-        searchHistory = searchHistory.take(5).toMutableList()
+        // Take the first 5 items from the set and convert it to a mutable list
+        searchHistory = uniqueSearchHistorySet.take(5).toMutableList()
     }
 
     /*private fun swipeRefreshFunction() {

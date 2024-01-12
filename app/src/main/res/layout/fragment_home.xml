@@ -47,10 +47,11 @@
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
+        android:id="@+id/nestedScrollView"
         android:layout_width="match_parent"
+
+
         android:layout_height="match_parent"
-
-
         app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">
 
         <androidx.core.widget.NestedScrollView
@@ -89,6 +90,14 @@
         </androidx.core.widget.NestedScrollView>
 
     </androidx.core.widget.NestedScrollView>
+
+    <Button
+        android:id="@+id/button_drop_tables"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Drop All Tables"
+        app:layout_anchor="@+id/nestedScrollView"
+        app:layout_anchorGravity="center" />
 
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

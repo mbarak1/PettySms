@@ -1,4 +1,5 @@
 <resources>
     <dimen name="fab_margin">27dp</dimen>
     <dimen name="icon_large">30dp</dimen>
+    <dimen name="balanceCardMarginTop">105dp</dimen>
 </resources>

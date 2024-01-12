@@ -3,6 +3,7 @@ package com.example.pettysms
 import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import java.sql.SQLException
@@ -64,14 +65,50 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
     fun insertRejectedSMS(date: String, smsBody: String) {
         val db = writableDatabase
-        val contentValues = ContentValues()
 
-        contentValues.put(COL_REJECTED_MESSAGES_DATE, date)
-        contentValues.put(COL_REJECTED_MESSAGES_SMS_BODY, smsBody)
+        // Utilize INSERT OR IGNORE to automatically ignore if the record already exists
+        val contentValues = ContentValues().apply {
+            put(COL_REJECTED_MESSAGES_DATE, date)
+            put(COL_REJECTED_MESSAGES_SMS_BODY, smsBody)
+        }
 
-        db.insert(TABLE_REJECTED_SMS, null, contentValues)
+        db.insertWithOnConflict(
+            TABLE_REJECTED_SMS,
+            null,
+            contentValues,
+            SQLiteDatabase.CONFLICT_IGNORE
+        )
+
         db.close()
     }
+
+    fun isSmsExists(db: SQLiteDatabase, smsBody: String, smsDate: Long): Boolean {
+        val selection = "$COL_ALL_SMS_BODY = ? AND $COL_TIMESTAMP_ALL_SMS = ?"
+        val selectionArgs = arrayOf(smsBody, smsDate.toString())
+
+        var cursor: Cursor? = null
+
+        try {
+            // Use the provided database if open; otherwise, create a new one
+            val database = if (db.isOpen) db else writableDatabase
+
+            cursor = database.query(
+                TABLE_ALL_SMS,
+                arrayOf(COL_ALL_SMS_ID),
+                selection,
+                selectionArgs,
+                null,
+                null,
+                null
+            )
+
+            return cursor.count > 0
+        } finally {
+            // Close only the cursor; the database will be closed outside the loop
+            cursor?.close()
+        }
+    }
+
 
 
 
@@ -99,12 +136,12 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 COL_TRANSACTIONS_DESCRIPTION + " TEXT" + // Removed the trailing comma
                 ")"
 
-        val SQL_CREATE_ENTRIES_REJECTED_SMS = "CREATE TABLE IF NOT EXISTS $TABLE_REJECTED_SMS" +
-                " (" +
-                "$COL_REJECTED_MESSAGES_ID INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                "$COL_REJECTED_MESSAGES_DATE TEXT, " +
-                "$COL_REJECTED_MESSAGES_SMS_BODY TEXT" +
-                ")"
+        val SQL_CREATE_ENTRIES_REJECTED_SMS = "CREATE TABLE IF NOT EXISTS $TABLE_REJECTED_SMS" + "(" +
+                "$COL_REJECTED_MESSAGES_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "$COL_REJECTED_MESSAGES_DATE TEXT," +
+                "$COL_REJECTED_MESSAGES_SMS_BODY TEXT," +
+                // Other columns...
+                "UNIQUE($COL_REJECTED_MESSAGES_DATE, $COL_REJECTED_MESSAGES_SMS_BODY))".trimIndent()
 
         val SQL_CREATE_ENTRIES_SEARCH_HISTORY = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY" + "(" +
                 "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -113,10 +150,20 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             ")"
         .trimIndent()
 
+        val SQL_CREATE_ENTRIES_ALL_SMS =
+            "CREATE TABLE IF NOT EXISTS $TABLE_ALL_SMS" + "(" +
+                    "$COL_ALL_SMS_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "$COL_ALL_SMS_UNIQUE_ID INTEGER," +  // New column for storing SMS ID
+                    "$COL_ALL_SMS_BODY TEXT," +
+                    "$COL_TIMESTAMP_ALL_SMS INTEGER" +
+                    ")".trimIndent()
 
+
+        db.execSQL(SQL_CREATE_ENTRIES_ALL_SMS)
         db.execSQL(SQL_CREATE_ENTRIES)
         db.execSQL(SQL_CREATE_ENTRIES_REJECTED_SMS)
         db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY)
+
 
 
     }
@@ -171,6 +218,44 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         }
         db.insert(TABLE_SEARCH_HISTORY, null, contentValues)
         db.close()
+    }
+
+    fun insertSms(smsId: Long, smsBody: String, timestamp: Long): Long {
+        val db = writableDatabase
+
+        println("wazimu")
+
+        return try {
+            // Utilize INSERT OR IGNORE to automatically ignore if the record already exists
+            val contentValues = ContentValues().apply {
+                put(COL_ALL_SMS_UNIQUE_ID, smsId)
+                put(COL_ALL_SMS_BODY, smsBody)
+                put(COL_TIMESTAMP_ALL_SMS, timestamp)
+            }
+
+            println("Mambo vp")
+
+
+            db.beginTransaction()
+            try {
+                // Insert the values and ignore if the combination already exists
+                val rowId = db.insertWithOnConflict(
+                    TABLE_ALL_SMS,
+                    null,
+                    contentValues,
+                    SQLiteDatabase.CONFLICT_IGNORE
+                )
+
+                println("Mambo")
+
+                db.setTransactionSuccessful()
+                rowId
+            } finally {
+                db.endTransaction()
+            }
+        } finally {
+            db.close()
+        }
     }
 
     fun getSearchHistory(): MutableList<String> {
@@ -320,6 +405,13 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         }
     }
 
+    fun hasTables(db: SQLiteDatabase): Boolean {
+        val cursor = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null)
+        val hasTables = cursor.count > 0
+        cursor.close()
+        return hasTables
+    }
+
 
 
         companion object {
@@ -362,12 +454,20 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val TABLE_SEARCH_HISTORY = "search_history"
             const val COL_TIMESTAMP = "timestamp" // Add this line
 
+            //ALL SMS TABLE VARIABLES
+
+            const val COL_ALL_SMS_ID = "id"
+            const val COL_ALL_SMS_BODY = "sms_body"
+            const val TABLE_ALL_SMS = "all_sms"
+            const val COL_ALL_SMS_UNIQUE_ID = "sms_unique_id"
+            const val COL_TIMESTAMP_ALL_SMS = "timestamp" // Add this line
+
 
 
             fun dropAllTables(db: SQLiteDatabase) {
 
             // List all the table names you want to drop
-            val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS)
+            val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS, TABLE_ALL_SMS, TABLE_SEARCH_HISTORY)
 
             for (tableName in tableNames) {
                 db.execSQL("DROP TABLE IF EXISTS $tableName;")

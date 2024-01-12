@@ -22,6 +22,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.app.ActivityCompat.finishAffinity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -50,7 +51,10 @@ import kotlin.math.roundToInt
 /**
  * A simple [Fragment] subclass as the second destination in the navigation.
  */
-class MpesaFragment : Fragment() {
+interface RefreshRecyclerViewCallback {
+    fun onRefresh()
+}
+class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
     private var _binding: FragmentMpesaBinding? = null
     private lateinit var progressBar: ProgressBar
@@ -61,19 +65,21 @@ class MpesaFragment : Fragment() {
     private lateinit var handler: Handler
     private lateinit var verticalShrinkAnimation: Animation
     private lateinit var fadeInAnimation: Animation
-    private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var updateTextBox : TextView
     private lateinit var netSpendTextBox: TextView
     private lateinit var viewAlLink: TextView
     private lateinit var circularProgressDrawable: CircularProgressIndicator
+    private lateinit var bigResult: MpesaTransaction.Companion.MpesaTransactionResult
     private var rejectedSmsList = mutableListOf<MutableList<String>>()
     private val dataViewModel: DataViewModel by activityViewModels()
+
 
     private var all_mpesa_transactions= mutableListOf<MpesaTransaction>()
 
 
     var db_helper = this.activity?.applicationContext?.let { DbHelper(it) }
     var db = db_helper?.writableDatabase
+
 
 
 
@@ -115,6 +121,8 @@ class MpesaFragment : Fragment() {
         updateTextBox.loadSkeleton()
         netSpendTextBox.loadSkeleton()*/
 
+        CallbackSingleton.refreshCallback = this
+
 
 
 
@@ -127,38 +135,8 @@ class MpesaFragment : Fragment() {
         verticalShrinkAnimation = AnimationUtils.loadAnimation(activity, R.anim.vertical_shrink)
         fadeInAnimation = AnimationUtils.loadAnimation(activity, R.anim.fade_in)
 
-
-        swipeRefreshLayout = binding.root.findViewById(R.id.swipeRefreshLayout)
-
-        // Set a listener to handle the refresh action
-        swipeRefreshLayout.setOnRefreshListener {
-
-            swipeRefreshFunction()
-        }
-
-        // Customize the refresh indicator colors
-        swipeRefreshLayout.setColorSchemeResources(
-            R.color.aqua_color,
-            android.R.color.holo_green_light,
-            R.color.orange_color,
-            R.color.red_color,
-            R.color.pink_color,
-            R.color.purple_color,
-            R.color.yellow_color
-        )
-
-
         return binding.root
 
-    }
-
-    private fun swipeRefreshFunction() {
-        Handler(Looper.getMainLooper()).postDelayed({
-            // Update your data here
-
-            // Stop the refresh animation
-            swipeRefreshLayout.isRefreshing = false
-        }, 2000) // Simulate a delay
     }
 
     override fun onPrepareOptionsMenu(menu: Menu) {
@@ -204,6 +182,7 @@ class MpesaFragment : Fragment() {
 
         /*if (db != null) {
             DbHelper.dropAllTables(db!!)
+            activity?.finishAffinity()
         }*/
 
         if (db != null) {
@@ -239,7 +218,6 @@ class MpesaFragment : Fragment() {
                     all_mpesa_transactions = db_helper?.getThisMonthMpesaTransactions()!!
                     saveArrayToViewModel(all_mpesa_transactions)
                 }
-                println("ndo hii: " + all_mpesa_transactions.size)
 
 
 
@@ -254,13 +232,15 @@ class MpesaFragment : Fragment() {
             msg_str = getAllSmsFromProvider()
             all_mpesa_transactions=startConversionTask(msg_str)
             //balance_text.text = all_mpesa_transactions.first().mpesa_balance.toString()
-            if (db != null) {
+            if (db?.isOpen == true) {
+                db_helper?.createInitialTables(db!!)
+            }
+            else{
+                db_helper = this.activity?.applicationContext?.let { DbHelper(it) }
+                db = db_helper?.writableDatabase
                 db_helper?.createInitialTables(db!!)
             }
         }
-
-        println("Error in: " + msg_str?.get(0)?.get(8814))
-
 
     }
 
@@ -307,8 +287,6 @@ class MpesaFragment : Fragment() {
         val currentDate = Calendar.getInstance().time
 
 
-        println(currentMonth)
-
         // Define the date format
         val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
 
@@ -319,7 +297,6 @@ class MpesaFragment : Fragment() {
         }.toMutableList()
 
         if(!transactions_today.isNullOrEmpty()){
-            println("Size yake ni: " + transactions_today.first()?.sms_text)
         }
 
         val totalExpensesThisMonth = all_mpesa_transactions
@@ -388,7 +365,12 @@ class MpesaFragment : Fragment() {
 
         var progressPercentage = (transactionCount.toDouble() + rejectedSmsCount.toDouble()) / totalSMS.toDouble() * 100
 
-        println("Values Zake:" + progressPercentage.roundToInt() )
+        println("Values Zake:" + totalSMS.toInt() )
+        println("Values Zake:" + transactionCount.toInt() )
+        println("Values Zake:" + rejectedSmsCount.toInt() )
+
+
+
 
         circularProgressDrawable.setProgress(progressPercentage.toDouble(), 100.00)
 
@@ -439,12 +421,14 @@ class MpesaFragment : Fragment() {
         val lstSms: MutableList<String> = ArrayList()
         val lstRcvr: MutableList<String> = ArrayList()
         var lstDate: MutableList<String> = ArrayList()
+        var lstId: MutableList<String> = ArrayList()
+
 
         val cr: ContentResolver = requireActivity().contentResolver
         if(ContextCompat.checkSelfPermission(requireContext(), "android.permission.READ_SMS") == PackageManager.PERMISSION_GRANTED) {
             val c = cr.query(
                 Telephony.Sms.Inbox.CONTENT_URI,
-                arrayOf(Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.ADDRESS,Telephony.Sms.Inbox.DATE),  // Select body text
+                arrayOf(Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.ADDRESS,Telephony.Sms.Inbox.DATE,Telephony.Sms.Inbox._ID),  // Select body text
                 Telephony.Sms.ADDRESS + " = ?",
                 arrayOf("MPESA"),
                 Telephony.Sms.Inbox.DEFAULT_SORT_ORDER
@@ -455,6 +439,7 @@ class MpesaFragment : Fragment() {
                     lstSms.add(c.getString(0))
                     lstRcvr.add(c.getString(1))
                     lstDate.add(c.getString(2))
+                    lstId.add(c.getString(3))
                     c.moveToNext()
                 }
             } else {
@@ -465,7 +450,57 @@ class MpesaFragment : Fragment() {
         sms.add(lstSms)
         sms.add(lstRcvr)
         sms.add(lstDate)
+        sms.add(lstId)
+        println("Hodi: " + sms[0].first() + " " + sms[1].first() +" " + sms[2].first() + " " + sms[3].first())
+        addAllSmsToDb(sms)
+        println("size ya maana: " + sms.size)
         return sms
+    }
+
+    private fun addAllSmsToDb(sms: ArrayList<MutableList<String>>) {
+        // Check if the database is open
+        if (db?.isOpen == true) {
+            val tableExists = doesTableExist("all_sms", db!!)
+
+            if (!tableExists) {
+                // If the table does not exist, create it
+                db_helper?.createInitialTables(db!!)
+            }
+
+            // Begin the transaction
+            db?.beginTransaction()
+
+            try {
+                // Insert SMS into the database
+                doInsert(sms)
+                // Mark the transaction as successful if it reaches this point
+                db?.setTransactionSuccessful()
+            } finally {
+                // End the transaction (either commit or rollback)
+                db?.endTransaction()
+            }
+        }
+    }
+
+    private fun doInsert(sms: ArrayList<MutableList<String>>) {
+        println("mambo ni: " + sms[0].indices)
+        for (i in sms[0].indices) {
+            val smsBody = sms[0][i]
+            val timestamp = sms[2][i].toLong()
+            val smsUniqueId = sms[3][i].toLong()
+
+            // Insert the SMS into the database
+            insertSmsIntoDb(smsUniqueId, smsBody, timestamp)
+        }
+    }
+
+
+    private fun insertSmsIntoDb(uniqueId: Long, smsBody: String, timestamp: Long) {
+        // Check if the database is open before inserting
+        if (db?.isOpen == true) {
+            // Assuming you have a method insertSms in your DbHelper class
+            db_helper?.insertSms(uniqueId, smsBody, timestamp)
+        }
     }
 
     fun doesTableExist(tableName: String, db: SQLiteDatabase): Boolean {
@@ -732,7 +767,8 @@ class MpesaFragment : Fragment() {
 
 
                         if (provisional_mpesa_balance.isNullOrEmpty() == false){
-                            mpesa_balance = extractDoubleFromInput(provisional_mpesa_balance)!!
+                            println("Hebu" + provisional_mpesa_balance.toString())
+                            mpesa_balance = extractDoubleFromInput(provisional_mpesa_balance) ?: 0.00
 
                         }
                         else{
@@ -869,7 +905,8 @@ class MpesaFragment : Fragment() {
 
         // Start the task in a Coroutine
         var task = GlobalScope.launch(Dispatchers.IO) {
-            result = convertSmstoMpesaTransactions(msg_str)
+            bigResult = MpesaTransaction.convertSmstoMpesaTransactions(msg_str = msg_str, progressBar)
+            result = bigResult.transactionsList
 
             withContext(Dispatchers.Main) {
                 // Hide the ProgressBar with vertical shrink transition
@@ -943,7 +980,7 @@ class MpesaFragment : Fragment() {
         progressBar.progress = i
 
         if (db != null) {
-            for (rejectedMessage in rejectedSmsList) {
+            for (rejectedMessage in bigResult.rejectedSmsList) {
                 i++
                 val dateObjct = Date(rejectedMessage[0].toLong())
                 var msg_date = dateFrmt.format(dateObjct)
@@ -976,6 +1013,25 @@ class MpesaFragment : Fragment() {
         }
 
     }
+    override fun onRefresh() {
+        // This method will be called when you need to refresh the RecyclerViews
+        all_mpesa_transactions = db_helper?.getThisMonthMpesaTransactions()!!
+        requireActivity().runOnUiThread {
+            updateTransactionThisMonth(all_mpesa_transactions)
+
+        }
+
+
+        // If you have an instance of ViewAllTransactionsActivity, call its refresh method
+        // Example:
+        // val viewAllTransactionsActivity = supportFragmentManager.findFragmentByTag(ViewAllTransactionsActivity::class.java.simpleName) as? ViewAllTransactionsActivity
+        // viewAllTransactionsActivity?.refreshRecyclerView()
+    }
+
+    object CallbackSingleton {
+        var refreshCallback: RefreshRecyclerViewCallback? = null
+    }
+
 
 
 

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- custom_notification_layout.xml -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <!-- Your custom notification content layout -->
+        <ImageView
+            android:id="@+id/notificationIcon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@mipmap/ic_p_logo_round"
+            android:contentDescription="@null" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+
+        <TextView
+            android:id="@+id/notificationTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MPESA Notification"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginStart="16dp"/>
+
+        <TextView
+            android:id="@+id/notificationText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Your notification text here"
+            android:layout_marginTop="4dp"
+            android:textSize="14sp"
+            android:layout_marginStart="16dp"/>
+    </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>
