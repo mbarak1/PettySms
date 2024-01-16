@@ -34,7 +34,7 @@
             android:layout_width="80dp"
             android:layout_height="80dp"
             android:layout_marginStart="16dp"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="-30dp"
             app:avvy_border_color="@android:color/darker_gray"
             app:avvy_border_highlight_color="?attr/colorPrimary"
             app:avvy_border_highlight_color_end="#3088ff"
@@ -48,7 +48,7 @@
             app:avvy_text_color="?attr/colorAccent"
             app:avvy_text_size="25sp"
             app:layout_constraintStart_toEndOf="@+id/card_color"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="@+id/guideline" />
 
         <TextView
             android:id="@+id/transactionTitleTextView"
@@ -94,12 +94,18 @@
             app:layout_constraintStart_toStartOf="@+id/roundedTextView"
             app:layout_constraintTop_toBottomOf="@+id/roundedTextView" />
 
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/guideline"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.43" />
+
         <TextView
             android:id="@+id/transactionAmountTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:layout_marginEnd="16dp"
+            android:layout_marginEnd="15dp"
             android:fontFamily="@font/roboto_light"
             android:text="Transaction Amount"
             android:textAlignment="center"
@@ -108,7 +114,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="1.0"
             app:layout_constraintStart_toEndOf="@+id/roundedTextView"
-            app:layout_constraintTop_toBottomOf="@+id/transactionTitleTextView" />
+            app:layout_constraintTop_toTopOf="@+id/guideline" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

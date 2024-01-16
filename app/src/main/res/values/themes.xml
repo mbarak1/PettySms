@@ -17,4 +17,13 @@
 
     <style name="Theme.PettySMS" parent="Base.Theme.PettySMS" />
 
+    <style name="Theme.FullScreenDialog" parent="Theme.MaterialComponents.Light.Dialog">
+        <item name="colorPrimaryDark">?attr/colorPrimaryDark</item>
+        <item name="colorAccent">?attr/colorAccent</item>
+        <item name="colorPrimary">?attr/colorPrimary</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="actionMenuTextColor">?attr/colorAccent</item>
+    </style>
+
 </resources>

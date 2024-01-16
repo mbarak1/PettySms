@@ -170,7 +170,14 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
     fun getAllMpesaTransactions(): MutableList<MpesaTransaction> {
 
-        val query = "SELECT * FROM ${TABLE_TRANSACTIONS}"
+        val query = """
+        SELECT *
+        FROM $TABLE_TRANSACTIONS
+        ORDER BY
+        substr($COL_TRANSACTIONS_TRANSACTION_DATE, 7, 4) || '-' || substr($COL_TRANSACTIONS_TRANSACTION_DATE, 4, 2) || '-' || substr($COL_TRANSACTIONS_TRANSACTION_DATE, 1, 2)
+        || ' ' ||
+        substr($COL_TRANSACTIONS_TRANSACTION_DATE, 12, 8) DESC
+        """
         return getTransactionsFromQuery(query)
 
     }

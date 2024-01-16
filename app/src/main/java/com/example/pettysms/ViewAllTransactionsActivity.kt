@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.ViewUtils
 import androidx.core.content.ContextCompat
 import androidx.core.view.marginTop
+import androidx.fragment.app.FragmentTransaction
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -75,7 +76,7 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
             when (menuItem.itemId) {
                 R.id.search_bar_options -> {
                     // Handle the "Settings" menu item click
-                    showSecondaryMenu()
+                    showDialog()
                     //showSecondaryMenu(menuItem)
                     true
                 }
@@ -138,7 +139,6 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
             if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == KeyEvent.KEYCODE_ENTER) {
                 val query = searchView.text.toString()
                 if (!query.isNullOrBlank()) {
-                    performSearch(query)
                     addToSearchHistory(query)
                     hideKeyboard()
                 }
@@ -463,6 +463,11 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
     private fun hideNoResultsMessage() {
         // Remove the TextView from the root layout
         noResultsTextView.visibility = View.GONE // Hide the view
+    }
+
+    fun showDialog() {
+        val dialog = SortFilterDialogFragment()
+        dialog.show(supportFragmentManager, "SortFilterDialogFragment")
     }
 
 

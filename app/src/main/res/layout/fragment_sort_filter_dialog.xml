@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    app:layout_behavior="@string/appbar_scrolling_view_behavior">
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="0dp"
+        android:layout_marginRight="0dp"
+        android:paddingRight="10dp"
+        android:fitsSystemWindows="true"
+        android:background="@color/colorTransparent">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar_sort_and_filter"
+            android:layout_width="match_parent"
+            android:layout_height="?android:attr/actionBarSize"
+            app:contentInsetStartWithNavigation="0dp"
+            app:menu="@menu/menu_sort_filter"
+            app:navigationIcon="@drawable/baseline_close_24">
+
+        </androidx.appcompat.widget.Toolbar>
+    </com.google.android.material.appbar.AppBarLayout>
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp">
+
+    <TextView
+        android:id="@+id/textSortBy"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sort By:"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chipGroupSort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:selectionRequired="true"
+        app:checkedChip="@id/chipDateAll"
+        android:layout_gravity="start">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipDateAll"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Date"/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipTransactor"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Transactor"/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipAmount"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Amount"/>
+
+        <!-- Add more chips for date options -->
+
+    </com.google.android.material.chip.ChipGroup>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?android:attr/dividerVertical"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"/>
+
+    <TextView
+        android:id="@+id/text_transaction_type"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Transaction Type:"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chipGroupTransactionType"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:layout_gravity="start">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipSendmoney"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Send Money"/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipDeposit"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Deposit"/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipPaybill"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Paybill"/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipTill"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Till No."/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipReversal"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Reversal"/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipReceival"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Receival"/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipWithdrawal"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Withdrawal"/>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipTopup"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Topup"/>
+
+        <!-- Add more chips for date options -->
+
+    </com.google.android.material.chip.ChipGroup>
+
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?android:attr/dividerVertical"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"/>
+
+    <TextView
+        android:id="@+id/textDateRange"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Date Range:"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/radioGroup"
+            android:checkedButton="@+id/radio_button_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <RadioButton
+                android:id="@+id/radio_any_time"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="Any Time"/>
+            <RadioButton
+                android:id="@+id/radio_today"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="Today"/>
+            <RadioButton
+                android:id="@+id/radio_this_week"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="This Week"/>
+            <RadioButton
+                android:id="@+id/radio_this_month"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="This Month"/>
+            <RadioButton
+                android:id="@+id/radio_last_month"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:enabled="true"
+                android:text="Last Month"/>
+            <RadioButton
+                android:id="@+id/radio_last_six_months"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:enabled="true"
+                android:text="Last Six Months"/>
+
+        </RadioGroup>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="10dp">
+            <TextView
+                android:id="@+id/customRangeLink"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select Custom Range"
+                android:textColor="?attr/colorPrimary"
+                android:clickable="true"
+                android:onClick="onCustomRangeLinkClicked"/>
+        </LinearLayout>
+
+        <!-- Add EditText or other UI elements for entering date range -->
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?android:attr/dividerVertical"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"/>
+
+    <Button
+        android:id="@+id/btnResetAll"
+        style="@style/Widget.Material3.Button.TonalButton.Icon"
+        app:icon="@drawable/baseline_refresh_24"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Reset All"
+        android:layout_gravity="right"
+        android:layout_marginTop="10dp"/>
+    </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>
