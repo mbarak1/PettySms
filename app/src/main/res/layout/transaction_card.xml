@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     style="?attr/materialCardViewElevatedStyle"
@@ -7,17 +7,12 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginLeft="8dp"
-    android:layout_marginTop="-3dp"
+    android:layout_marginTop="5dp"
+    android:layout_marginBottom="5dp"
     android:layout_marginRight="8dp"
     android:clickable="true"
-    app:cardBackgroundColor="?attr/colorBackgroundFloating"
     app:cardUseCompatPadding="true">
 
-    <!-- Your transaction card content goes here -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
 
         <View
             android:id="@+id/card_color"
@@ -27,6 +22,7 @@
             android:clipChildren="true"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
+            android:visibility="gone"
             app:layout_constraintTop_toTopOf="parent" />
 
         <xyz.schwaab.avvylib.AvatarView
@@ -40,7 +36,6 @@
             app:avvy_border_highlight_color_end="#3088ff"
             app:avvy_border_thickness="2dp"
             app:avvy_border_thickness_highlight="3dp"
-            app:avvy_circle_background_color="?attr/colorBackgroundFloating"
             app:avvy_distance_to_border="2dp"
             app:avvy_highlighted="true"
             app:avvy_loading_arches="5"
@@ -58,6 +53,8 @@
             android:layout_marginTop="16dp"
             android:fontFamily="@font/roboto_light"
             android:text="Transaction Title"
+            android:textColor="?attr/colorPrimary"
+            android:textFontWeight="600"
             android:textSize="18sp"
             android:maxLines="2"
             app:layout_constraintStart_toEndOf="@+id/avatar_view"
@@ -112,10 +109,7 @@
             android:textColor="?attr/colorPrimary"
             android:textSize="20sp"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="1.0"
-            app:layout_constraintStart_toEndOf="@+id/roundedTextView"
             app:layout_constraintTop_toTopOf="@+id/guideline" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
 
-</com.google.android.material.card.MaterialCardView>
+</androidx.constraintlayout.widget.ConstraintLayout>

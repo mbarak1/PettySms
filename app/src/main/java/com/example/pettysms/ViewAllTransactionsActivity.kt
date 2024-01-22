@@ -363,6 +363,18 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
 
         recyclerView.layoutManager = LinearLayoutManager(applicationContext)
         recyclerView.adapter = adapter
+
+        // Get reference to your empty message TextView
+        val emptyMessage: TextView = binding.emptyMessage
+
+        // Check the dataset size and toggle visibility accordingly
+        if (adapter.itemCount == 0) {
+            recyclerView.visibility = View.GONE
+            emptyMessage.visibility = View.VISIBLE
+        } else {
+            recyclerView.visibility = View.VISIBLE
+            emptyMessage.visibility = View.GONE
+        }
     }
 
 

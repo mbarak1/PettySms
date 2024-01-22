@@ -2,6 +2,7 @@ package com.example.pettysms
 
 import android.app.Dialog
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -19,6 +20,7 @@ import com.example.pettysms.databinding.FragmentSortFilterDialogBinding
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.datepicker.MaterialDatePicker
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.text.SimpleDateFormat
 import java.util.ArrayList
 import java.util.Locale
@@ -171,20 +173,33 @@ class SortFilterDialogFragment : DialogFragment() {
         resetButton.setOnClickListener {
             // Handle reset all button click
             // Iterate through each chip in the ChipGroup and set checked state to false
-            for (i in 0 until chipGroupTransactionType.childCount) {
-                val chip = chipGroupTransactionType.getChildAt(i) as Chip
-                chip.isChecked = false
-            }
 
-            // Iterate through each chip in the ChipGroup
-            for (i in 0 until chipGroupSort.childCount) {
-                val chip = chipGroupSort.getChildAt(i) as Chip
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Warning")
+                .setMessage("Are you sure you want to reset your sort and filter criteria?")
+                .setIcon(R.drawable.baseline_warning_amber_white_24dp) // Center align the message
+                .setNegativeButton("Dismiss") { dialog, which ->
+                    // Respond to negative button press
+                }
+                .setPositiveButton("Confirm") { dialog, which ->
+                    // Respond to positive button press
+                    for (i in 0 until chipGroupTransactionType.childCount) {
+                        val chip = chipGroupTransactionType.getChildAt(i) as Chip
+                        chip.isChecked = false
+                    }
 
-                // Check if the current chip is the one to keep selected
-                chip.isChecked = chip == chipDate
-            }
+                    // Iterate through each chip in the ChipGroup
+                    for (i in 0 until chipGroupSort.childCount) {
+                        val chip = chipGroupSort.getChildAt(i) as Chip
 
-            radioGroup?.check(defaultRadioButtonId)
+                        // Check if the current chip is the one to keep selected
+                        chip.isChecked = chip == chipDate
+                    }
+
+                    radioGroup?.check(defaultRadioButtonId)
+                }
+                .show()
+
         }
 
         setHasOptionsMenu(true)

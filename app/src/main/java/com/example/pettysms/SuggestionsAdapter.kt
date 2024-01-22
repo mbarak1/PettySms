@@ -30,7 +30,7 @@ class SuggestionsAdapter(
     private val handler: Handler = Handler()
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val cardView: CardView = itemView.findViewById(R.id.card_transaction)
+        //val cardView: CardView = itemView.findViewById(R.id.card_transaction)
         val titleTextView: TextView = itemView.findViewById(R.id.transactionTitleTextView)
         val amountTextView: TextView = itemView.findViewById(R.id.transactionAmountTextView)
         val dateTextView: TextView = itemView.findViewById(R.id.transactionDateTextView)
@@ -344,10 +344,6 @@ class SuggestionsAdapter(
             query
         )
 
-
-        holder.cardView.setOnClickListener {
-            onSuggestionClick(suggestion)
-        }
     }
 
     override fun getItemCount(): Int {
