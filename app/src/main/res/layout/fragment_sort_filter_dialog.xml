@@ -51,11 +51,11 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
         app:selectionRequired="true"
-        app:checkedChip="@id/chipDateAll"
+        app:checkedChip="@+id/chipDateAll"
         android:layout_gravity="start">
 
         <com.google.android.material.chip.Chip
-            android:id="@+id/chipDateAll"
+            android:id="@+id/chipDate"
             style="@style/Widget.Material3.Chip.Filter"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -135,7 +135,7 @@
             style="@style/Widget.Material3.Chip.Filter"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Reversal"/>
+            android:text="Reverse"/>
 
         <com.google.android.material.chip.Chip
             android:id="@+id/chipReceival"

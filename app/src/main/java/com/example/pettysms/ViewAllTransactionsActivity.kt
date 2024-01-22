@@ -4,8 +4,6 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
@@ -18,17 +16,11 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.ViewUtils
-import androidx.core.content.ContextCompat
-import androidx.core.view.marginTop
-import androidx.fragment.app.FragmentTransaction
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.pettysms.databinding.ActivityViewAllTransactionsBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.search.SearchBar
@@ -37,10 +29,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.Serializable
+import java.text.ParseException
 import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
-class ViewAllTransactionsActivity : AppCompatActivity() {
+class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragment.OnApplyClickListener {
     private lateinit var searchBar: SearchBar
     private lateinit var searchView: SearchView
     private lateinit var binding: ActivityViewAllTransactionsBinding
@@ -55,6 +52,8 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
     private var db_helper: DbHelper? = null
     private var db: SQLiteDatabase? = null
     private var searchHistory = mutableListOf<String>()
+    private var keyValueMapToFilterAndSortFragment = mutableMapOf<String, MutableList<String>>()
+
 
 
 
@@ -76,7 +75,7 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
             when (menuItem.itemId) {
                 R.id.search_bar_options -> {
                     // Handle the "Settings" menu item click
-                    showDialog()
+                    showDialog(keyValueMapToFilterAndSortFragment)
                     //showSecondaryMenu(menuItem)
                     true
                 }
@@ -312,11 +311,7 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadTransactions() {
-
-        db_helper = DbHelper(this)
-        db = db_helper?.writableDatabase
-
+    private fun createLoadingDialog(): AlertDialog {
         // Create a custom view for the loading dialog
         val customView = LayoutInflater.from(this).inflate(R.layout.loading_dialog, null)
         loadingText = customView.findViewById(R.id.loading_text)
@@ -326,6 +321,18 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
             .setView(customView)
             .setCancelable(false)
             .create()
+
+        return loadingDialog
+    }
+
+
+    private fun loadTransactions() {
+
+        db_helper = DbHelper(this)
+        db = db_helper?.writableDatabase
+
+        // Create a custom view for the loading dialog
+        val loadingDialog = createLoadingDialog()
 
         loadingDialog.show()
 
@@ -338,11 +345,7 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
             // Perform background tasks, such as loading transactions from the database
             allMpesaTransactions = db_helper?.getAllMpesaTransactions() ?: mutableListOf()
 
-            val recyclerView: RecyclerView = binding.recyclerView
-            val adapter = MpesaTransactionAdapter(allMpesaTransactions)
-
-            recyclerView.layoutManager = LinearLayoutManager(applicationContext)
-            recyclerView.adapter = adapter
+            updateMainRecyclerView(allMpesaTransactions)
 
 
 
@@ -353,6 +356,15 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
             loadingDialog.dismiss()
         }
     }
+
+    private fun updateMainRecyclerView(transactions: MutableList<MpesaTransaction>){
+        val recyclerView: RecyclerView = binding.recyclerView
+        val adapter = MpesaTransactionAdapter(transactions)
+
+        recyclerView.layoutManager = LinearLayoutManager(applicationContext)
+        recyclerView.adapter = adapter
+    }
+
 
 
     private fun showSecondaryMenu() {
@@ -465,15 +477,330 @@ class ViewAllTransactionsActivity : AppCompatActivity() {
         noResultsTextView.visibility = View.GONE // Hide the view
     }
 
-    fun showDialog() {
+    fun showDialog(mapToSend: MutableMap<String, MutableList<String>>) {
         val dialog = SortFilterDialogFragment()
+
+        // Create a Bundle and add the MutableMap as an argument
+        if(!keyValueMapToFilterAndSortFragment.isNullOrEmpty()){
+            val args = Bundle()
+            args.putSerializable("yourMapKey", mapToSend as Serializable)
+            dialog.arguments = args
+        }
+
+        dialog.setOnApplyClickListener(this)
         dialog.show(supportFragmentManager, "SortFilterDialogFragment")
+
     }
 
+    override fun onApplyClick(keyValueMap: Map<String, List<String>>) {
+        // Apply custom sorting based on the selected criteria
+        var allMpesaTransactionsToSortAndFilter = allMpesaTransactions
+        println("In the beginning: " + allMpesaTransactions.first().sms_text)
+        val sortCriteria = keyValueMap["sort"] ?: mutableListOf()
+        var filterTransactionTypes = keyValueMap["transaction_type"] ?: mutableListOf()
+        var dateRange = keyValueMap["date"] ?: mutableListOf()
+
+        filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Send Money", "send_money")
+        filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Deposit", "deposit")
+        filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Paybill", "paybill")
+        filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Till No.", "till")
+        filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Reverse", "reverse")
+        filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Receival", "receival")
+        filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Withdrawal", "withdraw")
+        filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Topup", "topup")
 
 
+        println("mafilter: " + dateRange)
+
+        //filterTransactionsByTypes(allMpesaTransactionsToSortAndFilter, filterTransactionTypes)
+        val loadingDialog = createLoadingDialog()
+
+        loadingDialog.show()
+
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.Default) {
+                    // Simulate a delay for demonstration purposes
+                    delay(10)
+
+                    if (!filterTransactionTypes.isNullOrEmpty()) {
+                        filterTransactionTypes?.let { types ->
+                            allMpesaTransactionsToSortAndFilter =
+                                allMpesaTransactionsToSortAndFilter.filter { it.transaction_type in types }
+                                    .toMutableList()
+                        }
+                    }
+
+                    allMpesaTransactionsToSortAndFilter =
+                        filterByDate(allMpesaTransactionsToSortAndFilter, dateRange)
+
+                    allMpesaTransactionsToSortAndFilter = sortTransactionsByPermutations(allMpesaTransactionsToSortAndFilter, sortCriteria).toMutableList()
+                }
+
+                withContext(Dispatchers.Main) {
+                    updateMainRecyclerView(allMpesaTransactionsToSortAndFilter)
+                    loadingDialog.dismiss()
+                    keyValueMapToFilterAndSortFragment = keyValueMap as MutableMap<String, MutableList<String>>
+                }
+            } catch (e: Exception) {
+                // Handle exceptions if necessary
+            }
+        }
 
 
+    }
 
+    private fun filterByDate(
+        allMpesaTransactionsToSortAndFilter: MutableList<MpesaTransaction>,
+        dateRange: List<String>
+    ): MutableList<MpesaTransaction> {
+        var allTransactions = allMpesaTransactionsToSortAndFilter
+        var startDate = ""
+        var endDate = ""
+        if (dateRange.first().toString() == "Any Time"){
+            return allTransactions
+        }
+        else if (dateRange.first().toString() == "Today"){
+            startDate = getCurrentDateInString()
+            endDate = getCurrentDateInString()
+        }
+        else if (dateRange.first().toString() == "This Week"){
+            startDate = getStartOfWeek()
+            endDate = getCurrentDateInString()
+        }
+        else if (dateRange.first().toString() == "This Month"){
+            startDate = getStartOfMonth()
+            endDate = getCurrentDateInString()
+        }
+        else if (dateRange.first().toString() == "Last Month"){
+            startDate = getLastMonthDates().first
+            endDate = getLastMonthDates().second
+        }
+        else if (dateRange.first().toString() == "Last Six Months") {
+            startDate = getStartOfLastSixMonths()
+            endDate = getCurrentDateInString()
+                //println("StartDate six m: " + startDate + "EndDateDate six m: " + endDate )
+        }
+        else{
+            startDate = extractCustomDatesFromString(dateRange.first().toString())?.first.toString()
+            endDate = extractCustomDatesFromString(dateRange.first().toString())?.second.toString()
+            println("StartDate CUSTOM: " + startDate + "EndDateDate CUSTOM: " + endDate )
+
+        }
+
+        val filteredTransactions = allTransactions.filter { transaction ->
+            var transactionDate = transaction.transaction_date
+            if (transactionDate.isNullOrEmpty() || transactionDate.toString() == ""){
+                transactionDate = transaction.msg_date
+            }
+            // Check if the transaction date is within the specified range
+            isDateInRange(transactionDate.toString(), startDate, endDate)
+        }
+
+        /*startDate?.let { start ->
+            endDate?.let { end ->
+                allTransactions =
+                    allTransactions.filter { ((it.transaction_date ?: it.msg_date)!!) in start..end }.toMutableList()
+            }
+        }*/
+
+        return filteredTransactions.toMutableList()
+
+    }
+
+    // Function to check if a date is within a given date range
+    fun isDateInRange(date: String, startDate: String, endDate: String): Boolean {
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val transactionDate = dateFormat.parse(date)
+        val startDateParsed = dateFormat.parse(startDate)
+        val endDateParsed = dateFormat.parse(endDate)
+
+        return transactionDate in startDateParsed..endDateParsed
+    }
+
+    fun getCurrentDateInString(): String {
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val currentDate = Date(System.currentTimeMillis())
+        return dateFormat.format(currentDate)
+    }
+
+    fun getStartOfWeek(): String {
+        val calendar = Calendar.getInstance()
+
+        // Set the calendar to the current date
+        calendar.time = Date()
+
+        // Set the calendar to the beginning of the week
+        calendar.set(Calendar.DAY_OF_WEEK, calendar.firstDayOfWeek)
+
+        // Format the date as "dd/MM/yyyy"
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        return dateFormat.format(calendar.time)
+    }
+    fun getStartOfMonth(): String {
+        val calendar = Calendar.getInstance()
+
+        // Set the calendar to the current date
+        calendar.time = Date()
+
+        // Set the calendar to the beginning of the month
+        calendar.set(Calendar.DAY_OF_MONTH, 1)
+
+        // Format the date as "dd/MM/yyyy"
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        return dateFormat.format(calendar.time)
+    }
+
+    fun getLastMonthDates(): Pair<String, String> {
+        val calendar = Calendar.getInstance()
+
+        // Set the calendar to the current date
+        calendar.time = Date()
+
+        // Move to the first day of the current month
+        calendar.set(Calendar.DAY_OF_MONTH, 1)
+
+        // Move to the previous month
+        calendar.add(Calendar.MONTH, -1)
+
+        // Get the first day of the last month
+        val startOfMonth = calendar.time
+
+        // Move to the last day of the last month
+        calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
+        val endOfMonth = calendar.time
+
+        // Format the dates as "dd/MM/yyyy"
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val startDate = dateFormat.format(startOfMonth)
+        val endDate = dateFormat.format(endOfMonth)
+
+        return Pair(startDate, endDate)
+    }
+
+    fun getStartOfLastSixMonths(): String {
+        val calendar = Calendar.getInstance()
+        calendar.time = Date()
+
+        // Subtract six months from the current date
+        calendar.add(Calendar.MONTH, -6)
+
+        // Set the day of the month to the first day (1)
+        calendar.set(Calendar.DAY_OF_MONTH, 1)
+
+        // Format the date as "dd/MM/yyyy"
+        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        return dateFormat.format(calendar.time)
+    }
+    fun extractCustomDatesFromString(dateRange: String): Pair<String, String>? {
+        // Split the date range string using the hyphen separator
+        val dateParts = dateRange.split(" - ")
+
+        // Ensure that the string has two parts
+        if (dateParts.size == 2) {
+            return Pair(dateParts.first(), dateParts.last())
+        }
+
+        // Return null if parsing is unsuccessful or the input is invalid
+        return null
+    }
+
+    fun replaceStringElement(list: List<String>, stringToReplace: String, replacement: String): List<String> {
+        return list.map { if (it == stringToReplace) replacement else it }
+    }
+
+    fun sortTransactionsByPermutations(transactions: MutableList<MpesaTransaction>, sortCriteria: List<String>): List<MpesaTransaction> {
+        return transactions.sortedWith(Comparator { obj1, obj2 ->
+            for (criteria in sortCriteria) {
+                val result = when (criteria) {
+                    "Date" -> {
+                        //println("sort by date")
+                        val date1 = parseDate(obj1.transaction_date) ?: parseDate(obj1.msg_date)
+                        val date2 = parseDate(obj2.transaction_date) ?: parseDate(obj2.msg_date)
+                        compareValues(date2, date1) // Compare dates in descending order
+                    }
+                    "Amount" -> {
+                        //println("sort by amount")
+                        compareValues(obj2.amount ?: 0.0, obj1.amount ?: 0.0)
+                    } // Compare amounts
+                    "Transactor" -> {
+                        //println("sort by transactor")
+                        compareValues("${obj1.recipient?.name}${obj1.sender?.name}${obj1.mpesa_depositor}",
+                            "${obj2.recipient?.name}${obj2.sender?.name}${obj2.mpesa_depositor}")
+                    }
+                    // add other criteria as needed
+                    else -> 0 // default to 0 if criteria is not recognized
+                }
+
+                if (result != 0) {
+                    return@Comparator result
+                }
+            }
+
+            return@Comparator 0 // default to 0 if all criteria are equal
+        })
+
+        /*
+        val comparators = generateAllPermutations(sortCriteria)
+            .map { permutation ->
+                compareBy<MpesaTransaction> { transaction ->
+                    for (criteria in permutation) {
+                        when (criteria) {
+                            "Date" -> {
+                                println("sort by date")
+                                val date1 = parseDate(transaction.transaction_date) ?: parseDate(transaction.msg_date)
+                                val date2 = parseDate(transaction.transaction_date) ?: parseDate(transaction.msg_date)
+                                if (date1 != null && date2 != null) {
+                                    compareValues(date1, date2) // Compare dates in descending order
+                                } else {
+                                    0 // Default comparison if any date is null
+                                }
+                            }
+                            "Amount" -> -transaction.amount!! // Reverse the order for "Amount"
+                            "Transactor" -> "${transaction.recipient?.name}${transaction.sender?.name}${transaction.mpesa_depositor}"
+                            // Add more criteria as needed
+                            else -> null // Handle other cases
+                        }?.let { return@compareBy it }
+                    }
+                    0 // Default comparison if all criteria are null
+                }
+            }
+
+        transactions.sortWith(comparators.reduce { acc, comparator -> acc.then(comparator) })
+
+         */
+    }
+
+// Rest of the code remains the same...
+
+    // Add this function to handle date parsing with null check
+    fun parseDate(dateString: String?): Date? {
+        if (!dateString.isNullOrBlank()) {
+            try {
+                val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+                return dateFormat.parse(dateString)
+            } catch (e: ParseException) {
+                // Handle parse exception
+            }
+        }
+        return null
+    }
+
+    fun generateAllPermutations(criteria: List<String>): List<List<String>> {
+        val result = mutableListOf<List<String>>()
+
+        fun generate(current: List<String>, remaining: List<String>) {
+            if (remaining.isEmpty()) {
+                result.add(current.toList())
+            } else {
+                for (i in remaining.indices) {
+                    generate(current + remaining[i], remaining.subList(0, i) + remaining.subList(i + 1, remaining.size))
+                }
+            }
+        }
+
+        generate(emptyList(), criteria)
+        return result
+    }
 
 }

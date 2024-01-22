@@ -4,5 +4,7 @@
     <item
         android:id="@+id/menuApply"
         android:title="Apply"
+        android:iconTint="?attr/colorPrimary"
+        android:icon="@drawable/baseline_check_24"
         app:showAsAction="always"/>
 </menu>
