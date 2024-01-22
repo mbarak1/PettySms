@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     style="?attr/materialCardViewElevatedStyle"
@@ -7,12 +8,20 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginLeft="8dp"
-    android:layout_marginTop="5dp"
-    android:layout_marginBottom="5dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="4dp"
     android:layout_marginRight="8dp"
     android:clickable="true"
+    app:cardBackgroundColor="@android:color/transparent"
+    app:cardElevation="0dp"
     app:cardUseCompatPadding="true">
 
+    <!-- Your transaction card content goes here -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingBottom="10dp">
 
         <View
             android:id="@+id/card_color"
@@ -20,17 +29,17 @@
             android:layout_height="0dp"
             android:background="?attr/colorPrimary"
             android:clipChildren="true"
+            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            android:visibility="gone"
             app:layout_constraintTop_toTopOf="parent" />
 
         <xyz.schwaab.avvylib.AvatarView
             android:id="@+id/avatar_view"
             android:layout_width="80dp"
             android:layout_height="80dp"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="-30dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginTop="-15dp"
             app:avvy_border_color="@android:color/darker_gray"
             app:avvy_border_highlight_color="?attr/colorPrimary"
             app:avvy_border_highlight_color_end="#3088ff"
@@ -49,21 +58,22 @@
             android:id="@+id/transactionTitleTextView"
             android:layout_width="160dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="-10dp"
             android:fontFamily="@font/roboto_light"
+            android:maxLines="2"
             android:text="Transaction Title"
             android:textColor="?attr/colorPrimary"
             android:textFontWeight="600"
             android:textSize="18sp"
-            android:maxLines="2"
             app:layout_constraintStart_toEndOf="@+id/avatar_view"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="@+id/guideline" />
 
         <TextView
             android:id="@+id/roundedTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="13dp"
             android:layout_marginTop="12dp"
             android:fontFamily="@font/roboto_light"
             android:paddingTop="5dp"
@@ -71,45 +81,48 @@
             android:paddingBottom="3dp"
             android:text="Your Text"
             android:textSize="12sp"
-            app:layout_constraintStart_toStartOf="@+id/transactionTitleTextView"
+            app:layout_constraintStart_toEndOf="@+id/avatar_view"
             app:layout_constraintTop_toBottomOf="@+id/transactionTitleTextView" />
 
         <TextView
             android:id="@+id/transactionDateTextView"
             android:layout_width="160dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="16dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginEnd="6dp"
             android:ellipsize="end"
             android:fontFamily="@font/roboto_light"
             android:inputType="none"
             android:maxLines="2"
             android:text="Transaction Date"
+            android:textAlignment="textEnd"
             android:textSize="12sp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="@+id/transactionTitleTextView"
-            app:layout_constraintStart_toStartOf="@+id/roundedTextView"
-            app:layout_constraintTop_toBottomOf="@+id/roundedTextView" />
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toEndOf="@+id/roundedTextView"
+            app:layout_constraintTop_toTopOf="@+id/roundedTextView" />
 
         <androidx.constraintlayout.widget.Guideline
             android:id="@+id/guideline"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="horizontal"
-            app:layout_constraintGuide_percent="0.43" />
+            app:layout_constraintGuide_percent="0.3" />
 
         <TextView
             android:id="@+id/transactionAmountTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="15dp"
+            android:layout_marginStart="35dp"
             android:fontFamily="@font/roboto_light"
             android:text="Transaction Amount"
-            android:textAlignment="center"
+            android:textAlignment="textEnd"
             android:textColor="?attr/colorPrimary"
             android:textSize="20sp"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/guideline" />
+            app:layout_constraintStart_toEndOf="@+id/transactionTitleTextView"
+            app:layout_constraintTop_toTopOf="@+id/transactionTitleTextView" />
 
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>
