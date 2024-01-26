@@ -53,6 +53,8 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         contentValues.put(COL_TRANSACTIONS_DESCRIPTION, mpesaTransaction.description)
         contentValues.put(COL_TRANSACTIONS_SENDER_NAME, mpesaTransaction.sender?.name)
         contentValues.put(COL_TRANSACTIONS_SENDER_PHONE_NO, mpesaTransaction.sender?.phone_no)
+        contentValues.put(COL_TRANSACTIONS_IS_DELETED, if (mpesaTransaction.isDeleted == true) 1 else 0)
+
 
 
 
@@ -133,7 +135,9 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 COL_TRANSACTIONS_PAYBILL_ACCOUNT + " TEXT," +
                 COL_TRANSACTIONS_SENDER_NAME + " TEXT," +
                 COL_TRANSACTIONS_SENDER_PHONE_NO + " TEXT," +
-                COL_TRANSACTIONS_DESCRIPTION + " TEXT" + // Removed the trailing comma
+                COL_TRANSACTIONS_DESCRIPTION + " TEXT," +
+                COL_TRANSACTIONS_IS_DELETED + " INTEGER" + // Removed the trailing comma
+// Removed the trailing comma
                 ")"
 
         val SQL_CREATE_ENTRIES_REJECTED_SMS = "CREATE TABLE IF NOT EXISTS $TABLE_REJECTED_SMS" + "(" +
@@ -261,7 +265,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 db.endTransaction()
             }
         } finally {
-            db.close()
+            //db.close()
         }
     }
 
@@ -333,6 +337,8 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                     COL_TRANSACTIONS_SENDER_NAME))
                 val sender_phone_no = cursor.getString(cursor.getColumnIndex(
                     COL_TRANSACTIONS_SENDER_PHONE_NO))
+                val is_deleted = cursor.getString(cursor.getColumnIndex(
+                    COL_TRANSACTIONS_IS_DELETED))
 
                 val transaction = MpesaTransaction(id = id, mpesa_code = mpesa_code, msg_date = msg_date, transaction_date = transaction_date,
                     account = Account(
@@ -349,7 +355,8 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                     sms_text = sms_text,
                     paybill_acount = paybill_account,
                     description = description,
-                    sender = Sender(sender_name,sender_phone_no)
+                    sender = Sender(sender_name,sender_phone_no),
+                    isDeleted = if (is_deleted.toInt() == 1) true else false
                 )
                 transactions.add(transaction)
             } while (cursor.moveToNext())
@@ -446,6 +453,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_TRANSACTIONS_PAYBILL_ACCOUNT = "paybill_account"
             const val COL_TRANSACTIONS_SENDER_NAME = "sender_name"
             const val COL_TRANSACTIONS_SENDER_PHONE_NO = "sender_phone_no"
+            const val COL_TRANSACTIONS_IS_DELETED = "is_deleted"
 
             //REJECTED SMS TABLE VARIABLES
 

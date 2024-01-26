@@ -83,7 +83,7 @@ class SuggestionsAdapter(
 
             holder.avatarView.apply {
                 highlightBorderColorEnd = color
-                isAnimating = true
+                isAnimating = false
             }
 
             stopAnimating(5000, holder.avatarView)
@@ -111,7 +111,7 @@ class SuggestionsAdapter(
 
             holder.avatarView.apply {
                 highlightBorderColorEnd = color
-                isAnimating = true
+                isAnimating = false
             }
 
             stopAnimating(5000, holder.avatarView)
@@ -147,7 +147,7 @@ class SuggestionsAdapter(
             holder.avatarView.apply {
                 text = suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }
                 highlightBorderColorEnd = color
-                isAnimating = true
+                isAnimating = false
             }
 
             stopAnimating(5000, holder.avatarView)
@@ -176,7 +176,7 @@ class SuggestionsAdapter(
 
             holder.avatarView.apply {
                 highlightBorderColorEnd = color
-                isAnimating = true
+                isAnimating = false
             }
 
             stopAnimating(5000, holder.avatarView)
@@ -204,10 +204,10 @@ class SuggestionsAdapter(
 
             holder.avatarView.apply {
                 highlightBorderColorEnd = color
-                isAnimating = true
+                isAnimating = false
             }
 
-            stopAnimating(5000, holder.avatarView)
+            //stopAnimating(5000, holder.avatarView)
 
             holder.amountTextView.text = "-" + holder.amountTextView.text
 

@@ -52,6 +52,7 @@ class HomeFragment : Fragment() {
 
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onPrepareOptionsMenu(menu: Menu) {
         activity?.menuInflater?.inflate(R.menu.menu_home, menu)
 

@@ -50,8 +50,37 @@
                 android:layout_height="wrap_content"
                 android:contentDescription="This search bar provides search functionality that is used to search transactions"
                 android:hint="@string/searchbar_hint"
-                app:backgroundTint="?attr/colorPrimary"
+                app:backgroundTint="?attr/colorSurfaceContainer"
                 app:menu="@menu/search_bar_menu" />
+
+            <LinearLayout
+            android:id="@+id/select_all_layout_view_all_transactions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-25dp"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            android:background="?attr/colorSurfaceContainer">
+
+            <CheckBox
+                android:id="@+id/checkbox_select_all_items"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginStart="12dp"
+                android:drawablePadding="16dp"
+                >
+            </CheckBox>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:textColor="?attr/colorPrimary"
+                android:text="@string/label_select_all"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp">
+
+            </TextView>
+
+        </LinearLayout>
 
         </com.google.android.material.appbar.AppBarLayout>
 
@@ -60,13 +89,13 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:hint="@string/searchbar_hint"
-            app:backgroundTint="?attr/colorPrimary"
+            app:backgroundTint="?attr/colorSurfaceContainer"
             app:layout_anchor="@id/search_bar">
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical">
+
 
                 <LinearLayout
                     android:id="@+id/history_layout"

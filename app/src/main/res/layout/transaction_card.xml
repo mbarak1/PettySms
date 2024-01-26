@@ -21,7 +21,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingBottom="10dp">
+        android:paddingBottom="10dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="4dp">
 
         <View
             android:id="@+id/card_color"
@@ -36,10 +38,10 @@
 
         <xyz.schwaab.avvylib.AvatarView
             android:id="@+id/avatar_view"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
             android:layout_marginStart="2dp"
-            android:layout_marginTop="-15dp"
+            android:layout_marginTop="-10dp"
             app:avvy_border_color="@android:color/darker_gray"
             app:avvy_border_highlight_color="?attr/colorPrimary"
             app:avvy_border_highlight_color_end="#3088ff"
@@ -50,7 +52,7 @@
             app:avvy_loading_arches="5"
             app:avvy_loading_arches_degree_area="90"
             app:avvy_text_color="?attr/colorAccent"
-            app:avvy_text_size="25sp"
+            app:avvy_text_size="20sp"
             app:layout_constraintStart_toEndOf="@+id/card_color"
             app:layout_constraintTop_toTopOf="@+id/guideline" />
 
@@ -58,8 +60,8 @@
             android:id="@+id/transactionTitleTextView"
             android:layout_width="160dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="-10dp"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="-9dp"
             android:fontFamily="@font/roboto_light"
             android:maxLines="2"
             android:text="Transaction Title"
@@ -73,8 +75,8 @@
             android:id="@+id/roundedTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="13dp"
-            android:layout_marginTop="12dp"
+            android:layout_marginStart="15dp"
+            android:layout_marginTop="8dp"
             android:fontFamily="@font/roboto_light"
             android:paddingTop="5dp"
             android:paddingRight="5dp"

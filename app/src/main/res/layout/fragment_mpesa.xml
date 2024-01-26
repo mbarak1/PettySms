@@ -5,7 +5,8 @@
     android:id="@+id/coordinator_layout_appbar"
     android:scrollbars="vertical"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appbar"
@@ -21,7 +22,37 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:menu="@menu/menu_mpesa"></androidx.appcompat.widget.Toolbar>
+            app:menu="@menu/menu_mpesa">
+
+        </androidx.appcompat.widget.Toolbar>
+        <LinearLayout
+            android:id="@+id/select_all_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-5dp"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            android:background="?attr/colorSurfaceContainer">
+
+            <CheckBox
+                android:id="@+id/checkbox_select_all_items"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginStart="12dp"
+                android:drawablePadding="16dp"
+>
+            </CheckBox>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:textColor="?attr/colorPrimary"
+                android:text="@string/label_select_all"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp">
+
+            </TextView>
+
+        </LinearLayout>
 
         <ProgressBar
             android:id="@+id/progressBar2"

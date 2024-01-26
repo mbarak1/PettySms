@@ -1,20 +1,50 @@
 package com.example.pettysms
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.TextView
+import androidx.appcompat.view.ActionMode
+import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.color.MaterialColors
 import xyz.schwaab.avvylib.AvatarView
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class MpesaTransactionAdapter(private val mpesaTransactions: List<MpesaTransaction>): RecyclerView.Adapter<MpesaTransactionAdapter.TransactionViewHolder>() {
+
+class MpesaTransactionAdapter(private val context: Context, private val mpesaTransactions: MutableList<MpesaTransaction>, private val itemClickListener: OnItemClickListener
+): RecyclerView.Adapter<MpesaTransactionAdapter.TransactionViewHolder>() {
+    private var colorAvatar: Int = 0
     private val handler = Handler()
+    private var actionMode: ActionMode? = null
+    private var isInActionMode = false
+    private var selectedItems = mutableListOf<Int>()
+    // Filtered list that only contains transactions with isDeleted = false
+    private val filteredList: List<MpesaTransaction> = mpesaTransactions.filter { !it.isDeleted }
+    private val selectedTransactions = HashSet<Int>()
+    private var removedTrasactions = HashSet<Int>()
+    private var rotatedTransactions = HashSet<Int>()
+
+    interface OnItemClickListener {
+        fun onItemClick(transactionId: Int?)
+        fun onItemLongClick(transactionId: Int?)
+    }
+
+
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TransactionViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.transaction_card, parent, false)
@@ -22,268 +52,185 @@ class MpesaTransactionAdapter(private val mpesaTransactions: List<MpesaTransacti
     }
 
 
-    override fun onBindViewHolder(holder: TransactionViewHolder, position: Int) {
-        val transaction = mpesaTransactions[position]
 
-        holder.avatarView.apply {
-            text = transaction.recipient?.name?.let { capitalizeEachWord(it) }
-            animationOrchestrator = CrazyOrchestrator.create()
-            isAnimating = false
+
+    override fun onBindViewHolder(holder: TransactionViewHolder, position: Int) {
+        val transaction = filteredList[position]
+
+
+        holder.itemView.setOnClickListener {
+            itemClickListener.onItemClick(transaction.id)
+            true
         }
 
+        holder.itemView.setOnLongClickListener {
+            itemClickListener.onItemLongClick(transaction.id)
+            println("from adapter position" + transaction.id)
+            true
+        }
 
+        println("actionmode: " + isInActionMode)
+        println("contains: " + selectedTransactions.contains(transaction.id))
+        println("removal: " + removedTrasactions.contains(transaction.id))
+        println("hash set :" + selectedTransactions.toString())
+        println("transaction_id: " + transaction.id)
 
-        holder.titleTextView.text = transaction.recipient?.name?.let { capitalizeEachWord(it) }
-        holder.amountTextView.text = removeDecimal(transaction.amount.toString()) + "/-"
+        setAvatarView(holder, getTitleTextByTransactionType(transaction), getColorAvatar(context, transaction.transaction_type!!))
+        val isPositiveAmount =
+            transaction.transaction_type == "deposit" || transaction.transaction_type == "receival"
+        val formattedAmount =
+            formatAmountWithColor(transaction?.amount!!, isPositiveAmount, context)
+        holder.amountTextView.text = formattedAmount
+        holder.rounded_text.text = transaction.transaction_type?.let { capitalizeEachWord(it) }
+        holder.titleTextView.text = getTitleTextByTransactionType(transaction)
         holder.dateTextView.text = transaction.transaction_date?.takeIf { it.isNotEmpty() }
             ?.let { formatDate(it) }
             ?: transaction.msg_date?.let { formatDate(it) } ?: "Unknown Date"
 
-        if (transaction.transaction_type == "topup"){
-            val context = holder.color_frame.context
-            val color = ContextCompat.getColor(context, R.color.aqua_color)
-            holder.color_frame.setBackgroundColor(color)
-            holder.rounded_text.text = "Topup"
-            // Retrieve colorPrimary from the theme
-            // Replace 'context.theme' with your actual context theme
-            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
-            val colorPrimary = typedArray.getColor(0, 0)
-            typedArray.recycle()
-
-            setGradientBackground(holder.color_frame, colorPrimary, color)
-
-
-            holder.amountTextView.text = "-" + holder.amountTextView.text
-
+        if (selectedTransactions.contains(transaction.id)){
+            val colorSurfaceVariant = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorPrimaryInverse)
+            val colorSurface = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorPrimary)
+            val drawableResourceId = R.drawable.ic_check_new // Replace with your actual small-sized drawable resource ID
+            val smallDrawable: Drawable? = ContextCompat.getDrawable(context, drawableResourceId)
+            println("rotated: " + holder.rotated)
             holder.avatarView.apply {
-                highlightBorderColorEnd = color
                 isAnimating = true
+                avatarBackgroundColor = colorSurfaceVariant
+                highlightBorderColor = colorSurfaceVariant
+                highlightBorderColorEnd = colorSurfaceVariant
+                highlightedBorderThickness = 0
+                borderThickness = 0
+                isHighlighted = false
+                distanceToBorder = 0
+                setImageDrawable(smallDrawable)
+
+                // Create a fade-in animation
+                val fadeIn = ObjectAnimator.ofFloat(this, View.ALPHA, 0f, 1f)
+                fadeIn.duration = 10 // Adjust duration as needed
+
+                // Start the fade-in animation
+                fadeIn.start()
+
+                // Set isAnimating to false after starting the animation
+                isAnimating = false
+
             }
+            if (!rotatedTransactions.contains(transaction.id)) {
+                holder.avatarView.animate().rotationY(180f).setDuration(500).withLayer().start()
+                rotatedTransactions.add(transaction.id!!)
 
-            stopAnimating(5000, holder.avatarView)
 
-            val context3 = holder.color_frame.context
-            val color3 = ContextCompat.getColor(context3, R.color.red_color)
-            holder.amountTextView.setTextColor(color3)
 
-        }
-        else if (transaction.transaction_type == "send_money"){
-            val context = holder.color_frame.context
-            val color = ContextCompat.getColor(context, R.color.orange_color)
-            holder.color_frame.setBackgroundColor(color)
-            holder.rounded_text.text = "Send Money"
+            }
+            else{
+                holder.avatarView.rotationY = 180f
 
-            // Retrieve colorPrimary from the theme
-            // Replace 'context.theme' with your actual context theme
-            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
-            val colorPrimary = typedArray.getColor(0, 0)
-            typedArray.recycle()
-
-            setGradientBackground(holder.color_frame, colorPrimary, color)
-
+            }
+            val backgroundColor = MaterialColors.getColor(holder.itemView.context, com.google.android.material.R.attr.colorSurfaceContainer,"")
+            holder.cardView.setCardBackgroundColor(backgroundColor)
+        }else{
             holder.avatarView.apply {
-                highlightBorderColorEnd = color
-                isAnimating = true
+                text = getTitleTextByTransactionType(transaction)
+                highlightBorderColorEnd = getColorAvatar(context, transaction.transaction_type!!)
+                isAnimating = false
+                avatarBackgroundColor = android.R.color.transparent
+                highlightBorderColor = MaterialColors.getColor(
+                    holder.itemView.context,
+                    com.google.android.material.R.attr.colorPrimary,
+                    ""
+                )
+                highlightedBorderThickness = 10
+                isHighlighted = true
+                borderThickness = 10
+                // Create a fade-in animation
+                val fadeIn = ObjectAnimator.ofFloat(this, View.ALPHA, 0f, 1f)
+                fadeIn.duration = 200 // Adjust duration as needed
+                setImageDrawable(null)
+
+                // Start the fade-in animation
+                fadeIn.start()
+
+
+
+
+                //stopAnimating(5000, holder.avatarView)
             }
+            val isPositiveAmount =
+                transaction.transaction_type == "deposit" || transaction.transaction_type == "receival"
+            val formattedAmount =
+                formatAmountWithColor(transaction?.amount!!, isPositiveAmount, context)
+            holder.amountTextView.text = formattedAmount
+            holder.rounded_text.text = transaction.transaction_type?.let { capitalizeEachWord(it) }
+            holder.titleTextView.text = getTitleTextByTransactionType(transaction)
+            holder.dateTextView.text = transaction.transaction_date?.takeIf { it.isNotEmpty() }
+                ?.let { formatDate(it) }
+                ?: transaction.msg_date?.let { formatDate(it) } ?: "Unknown Date"
+            val backgroundColor = Color.TRANSPARENT
+            holder.cardView.setCardBackgroundColor(backgroundColor)
 
-            stopAnimating(5000, holder.avatarView)
-
-            holder.amountTextView.text = "-" + holder.amountTextView.text
-
-            val context3 = holder.color_frame.context
-            val color3 = ContextCompat.getColor(context3, R.color.red_color)
-            holder.amountTextView.setTextColor(color3)
-
-
-        }
-        else if (transaction.transaction_type == "deposit"){
-            val context = holder.color_frame.context
-            holder.titleTextView.text = transaction.mpesa_depositor?.let { capitalizeEachWord(it) }
-            val color = ContextCompat.getColor(context, R.color.light_green_color)
-            holder.color_frame.setBackgroundColor(color)
-            holder.rounded_text.text = "Deposit"
-
-            // Retrieve colorPrimary from the theme
-            // Replace 'context.theme' with your actual context theme
-            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
-            val colorPrimary = typedArray.getColor(0, 0)
-            typedArray.recycle()
-
-            setGradientBackground(holder.color_frame, colorPrimary, color)
-
-            holder.avatarView.apply {
-                text = transaction.mpesa_depositor?.let { capitalizeEachWord(it) }
-                highlightBorderColorEnd = color
-                isAnimating = true
+            if (rotatedTransactions.contains(transaction.id)){
+                holder.avatarView.animate().rotationY(-360f).setDuration(500).withLayer().start()
+                rotatedTransactions.remove(transaction.id)
+            }else{
+                if (holder.avatarView.rotationY == 180f) {
+                    holder.avatarView.rotationY = 0f
+                }
             }
-
-            stopAnimating(5000, holder.avatarView)
-
-            holder.amountTextView.text = "+" + holder.amountTextView.text
-
-            val context3 = holder.color_frame.context
-            val color3 = ContextCompat.getColor(context3, android.R.color.holo_green_light)
-            holder.amountTextView.setTextColor(color3)
-
-
-        }
-        else if (transaction.transaction_type == "paybill"){
-            val context = holder.color_frame.context
-            val color = ContextCompat.getColor(context, R.color.yellow_color)
-            holder.color_frame.setBackgroundColor(color)
-            holder.rounded_text.text = "Paybill"
-
-            // Retrieve colorPrimary from the theme
-            // Replace 'context.theme' with your actual context theme
-            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
-            val colorPrimary = typedArray.getColor(0, 0)
-            typedArray.recycle()
-
-            setGradientBackground(holder.color_frame, colorPrimary, color)
-
-            holder.avatarView.apply {
-                highlightBorderColorEnd = color
-                isAnimating = true
-            }
-
-            stopAnimating(5000, holder.avatarView)
-
-            holder.amountTextView.text = "-" + holder.amountTextView.text
-
-            val context3 = holder.color_frame.context
-            val color3 = ContextCompat.getColor(context3, R.color.red_color)
-            holder.amountTextView.setTextColor(color3)
-
-        }
-        else if (transaction.transaction_type == "till"){
-            val context = holder.color_frame.context
-            val color = ContextCompat.getColor(context, R.color.purple_color)
-            holder.color_frame.setBackgroundColor(color)
-            holder.rounded_text.text = "Till No."
-
-            // Retrieve colorPrimary from the theme
-            // Replace 'context.theme' with your actual context theme
-            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
-            val colorPrimary = typedArray.getColor(0, 0)
-            typedArray.recycle()
-
-            setGradientBackground(holder.color_frame, colorPrimary, color)
-
-            holder.avatarView.apply {
-                highlightBorderColorEnd = color
-                isAnimating = true
-            }
-
-            stopAnimating(5000, holder.avatarView)
-
-            holder.amountTextView.text = "-" + holder.amountTextView.text
-
-            val context3 = holder.color_frame.context
-            val color3 = ContextCompat.getColor(context3, R.color.red_color)
-            holder.amountTextView.setTextColor(color3)
-
-
-        }
-        else if (transaction.transaction_type == "receival"){
-            val context = holder.color_frame.context
-            holder.titleTextView.text = transaction.sender?.name?.let { capitalizeEachWord(it) }
-            val color = ContextCompat.getColor(context, R.color.pink_color)
-            holder.color_frame.setBackgroundColor(color)
-            holder.rounded_text.text = "Receival"
-
-            // Retrieve colorPrimary from the theme
-            // Replace 'context.theme' with your actual context theme
-            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
-            val colorPrimary = typedArray.getColor(0, 0)
-            typedArray.recycle()
-
-            setGradientBackground(holder.color_frame, colorPrimary, color)
-
-            holder.avatarView.apply {
-                text = transaction.sender?.name?.let { capitalizeEachWord(it) }
-                highlightBorderColorEnd = color
-                isAnimating = true
-            }
-
-            stopAnimating(5000, holder.avatarView)
-
-            holder.amountTextView.text = "+" + holder.amountTextView.text
-
-            val context3 = holder.color_frame.context
-            val color3 = ContextCompat.getColor(context3, android.R.color.holo_green_light)
-            holder.amountTextView.setTextColor(color3)
-
-
         }
 
-        else if (transaction.transaction_type == "withdraw"){
-            val context = holder.color_frame.context
-            holder.titleTextView.text = transaction.mpesa_depositor?.let { capitalizeEachWord(it) }
-            val color = ContextCompat.getColor(context, R.color.brown_color)
-            holder.color_frame.setBackgroundColor(color)
-            holder.rounded_text.text = "Withdraw"
+    }
+    fun formatAmountWithColor(amount: Double, isPositive: Boolean, context: Context): CharSequence {
+        val formattedAmount = amount
 
-            // Retrieve colorPrimary from the theme
-            // Replace 'context.theme' with your actual context theme
-            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
-            val colorPrimary = typedArray.getColor(0, 0)
-            typedArray.recycle()
-
-            setGradientBackground(holder.color_frame, colorPrimary, color)
-
-            holder.avatarView.apply {
-                text = transaction.mpesa_depositor?.let { capitalizeEachWord(it) }
-                highlightBorderColorEnd = color
-                isAnimating = true
-            }
-
-            stopAnimating(5000, holder.avatarView)
-
-            holder.amountTextView.text = "-" + holder.amountTextView.text
-
-            val context3 = holder.color_frame.context
-            val color3 = ContextCompat.getColor(context3, R.color.red_color)
-            holder.amountTextView.setTextColor(color3)
-
-
+        val textColor = if (isPositive) {
+            ContextCompat.getColor(context, android.R.color.holo_green_light)
+        } else {
+            ContextCompat.getColor(context, R.color.red_color)
         }
-        else if (transaction.transaction_type == "reverse"){
-            val context = holder.color_frame.context
-            holder.titleTextView.text = transaction.recipient?.name?.let { capitalizeEachWord(it) }
-            val color = ContextCompat.getColor(context, R.color.grey_color)
-            holder.color_frame.setBackgroundColor(color)
-            holder.rounded_text.text = "Reverse"
 
-            // Retrieve colorPrimary from the theme
-            // Replace 'context.theme' with your actual context theme
-            val typedArray = context.theme.obtainStyledAttributes(intArrayOf(com.google.android.material.R.attr.colorPrimary))
-            val colorPrimary = typedArray.getColor(0, 0)
-            typedArray.recycle()
+        val spannableString = SpannableString("$formattedAmount/-")
+        spannableString.setSpan(ForegroundColorSpan(textColor), 0, spannableString.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-            setGradientBackground(holder.color_frame, colorPrimary, color)
-
-            holder.avatarView.apply {
-                text = transaction.recipient?.name?.let { capitalizeEachWord(it) }
-                highlightBorderColorEnd = color
-                isAnimating = true
-            }
-
-            stopAnimating(5000, holder.avatarView)
-
-            holder.amountTextView.text = "+" + holder.amountTextView.text
-
-            val context3 = holder.color_frame.context
-            val color3 = ContextCompat.getColor(context3, android.R.color.holo_green_light)
-            holder.amountTextView.setTextColor(color3)
-
-
+        return spannableString
+    }
+    fun setAvatarView(holder: TransactionViewHolder, text: String?, color: Int) {
+        holder.avatarView.apply {
+            this.text = text
+            highlightBorderColorEnd = color
+            isAnimating = true
         }
+        stopAnimating(5000, holder.avatarView)
     }
 
-    override fun getItemCount(): Int {
-        return mpesaTransactions.size
+    fun getTitleTextByTransactionType(transaction: MpesaTransaction): String {
+        return when (transaction.transaction_type) {
+            "topup", "send_money", "paybill", "till", "withdraw", "reverse" -> {
+                transaction.recipient?.name?.let { capitalizeEachWord(it) } ?: ""
+            }
+            "deposit" -> {
+                transaction.mpesa_depositor?.let { capitalizeEachWord(it) } ?: ""
+            }
+            "receival" -> {
+                transaction.sender?.name?.let { capitalizeEachWord(it) } ?: ""
+            }
+            else -> ""
+        }
     }
-
+    fun getColorAvatar(context: Context, transactionType: String): Int {
+        return when (transactionType) {
+            "topup" -> R.color.aqua_color
+            "send_money" -> R.color.orange_color
+            "deposit" -> R.color.light_green_color
+            "paybill" -> R.color.yellow_color
+            "till" -> R.color.purple_color
+            "receival" -> R.color.pink_color
+            "withdraw" -> R.color.brown_color
+            "reverse" -> R.color.grey_color
+            else -> android.R.color.black // Default color for unknown type
+        }.let {
+            ContextCompat.getColor(context, it)
+        }
+    }
     fun capitalizeEachWord(input: String): String? {
         val words = input.split(" ".toRegex()).dropLastWhile { it.isEmpty() }
             .toTypedArray()
@@ -318,9 +265,13 @@ class MpesaTransactionAdapter(private val mpesaTransactions: List<MpesaTransacti
         val color_frame: View = itemView.findViewById(R.id.card_color)
         val rounded_text: TextView = itemView.findViewById(R.id.roundedTextView)
         val avatarView: AvatarView = itemView.findViewById(R.id.avatar_view)
-
+        val cardView: CardView = itemView.findViewById(R.id.card_transaction)
+        var rotated = false
+        // Get the RecyclerView reference from the itemView
 
     }
+
+
 
     fun stopAnimating(timeLimit: Long, avatarView: AvatarView){
 
@@ -353,5 +304,50 @@ class MpesaTransactionAdapter(private val mpesaTransactions: List<MpesaTransacti
         // Set the background to the GradientDrawable
         view.background = gradientDrawable
     }
+
+    override fun getItemCount(): Int {
+        return filteredList.size
+    }
+
+    override fun getItemId(position: Int): Long {
+        return filteredList[position].hashCode().toLong()
+    }
+
+    fun setSelectedTransactions(selected: Set<Int>) {
+        selectedTransactions.clear()
+        selectedTransactions.addAll(selected)
+        //notifyDataSetChanged()
+    }
+
+
+
+    fun clearSelection() {
+        selectedTransactions.clear()
+        rotatedTransactions.clear()
+        notifyDataSetChanged()
+    }
+
+    fun reinitializeAdapter() {
+        //Update the dataset with new transactions
+        clearSelection()
+        notifyDataSetChanged()
+
+
+
+        // Notify the adapter that the dataset has changed
+    }
+    fun setActionModeStatus(b: Boolean) {
+        this.isInActionMode = b
+        println("cool")
+    }
+
+    fun setRemovedtransactions(removedTransactions: HashSet<Int>) {
+        removedTransactions.clear()
+        removedTransactions.addAll(removedTransactions)
+
+        notifyDataSetChanged()
+
+    }
+
 
 }

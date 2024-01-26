@@ -1,10 +1,13 @@
 package com.example.pettysms
 
+import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -16,36 +19,34 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.Toolbar
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.core.app.ActivityCompat.finishAffinity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.swiperefreshlayout.widget.CircularProgressDrawable
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import androidx.vectordrawable.graphics.drawable.ArgbEvaluator
 import antonkozyriatskyi.circularprogressindicator.CircularProgressIndicator
 import com.example.pettysms.databinding.FragmentMpesaBinding
-import com.google.android.material.snackbar.Snackbar
-import koleton.api.hideSkeleton
-import koleton.api.loadSkeleton
+import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.color.MaterialColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
-import java.time.LocalDate
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.regex.Pattern
-import kotlin.math.roundToInt
 
 
 /**
@@ -53,6 +54,9 @@ import kotlin.math.roundToInt
  */
 interface RefreshRecyclerViewCallback {
     fun onRefresh()
+}
+interface OnActionModeInteraction {
+    fun onDestroyActionMode()
 }
 class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
@@ -65,11 +69,22 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     private lateinit var handler: Handler
     private lateinit var verticalShrinkAnimation: Animation
     private lateinit var fadeInAnimation: Animation
+    private lateinit var fadeOutAnimation: Animation
+    private lateinit var fadeInselectLayoutAnimation: Animation
     private lateinit var updateTextBox : TextView
     private lateinit var netSpendTextBox: TextView
     private lateinit var viewAlLink: TextView
+    private lateinit var appBar: AppBarLayout
     private lateinit var circularProgressDrawable: CircularProgressIndicator
     private lateinit var bigResult: MpesaTransaction.Companion.MpesaTransactionResult
+    private lateinit var layoutSelectAll: LinearLayout
+    private lateinit var adapter: MpesaTransactionAdapter
+
+
+    private var actionMode: ActionMode? = null
+
+
+    private val selectedTransactions = HashSet<Int>()
     private var rejectedSmsList = mutableListOf<MutableList<String>>()
     private val dataViewModel: DataViewModel by activityViewModels()
 
@@ -111,6 +126,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         netSpendTextBox= binding.netSpendThisMonth
         circularProgressDrawable = binding.circularProgress
         viewAlLink = binding.viewAllLink
+        appBar = binding.appbar
+        layoutSelectAll = binding.selectAllLayout
         //constraintLayout.loadSkeleton { balance_text }
         //mpesa_balance_label.loadSkeleton()
         /*balance_text.loadSkeleton()
@@ -134,6 +151,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
         verticalShrinkAnimation = AnimationUtils.loadAnimation(activity, R.anim.vertical_shrink)
         fadeInAnimation = AnimationUtils.loadAnimation(activity, R.anim.fade_in)
+        fadeInselectLayoutAnimation = AnimationUtils.loadAnimation(activity, R.anim.fade_in_select_all_layout)
+        fadeOutAnimation = AnimationUtils.loadAnimation(activity, R.anim.fade_out)
 
         return binding.root
 
@@ -150,6 +169,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         //super.onPrepareOptionsMenu(menu)
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         // Handle action bar item clicks here. The action bar will
         // automatically handle clicks on the Home/Up button, so long
@@ -314,7 +334,31 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         netSpendTextBox.text = netSpendThisMonth.toString()
 
         val recyclerView: RecyclerView = binding.transactionsRecycler
-        val adapter = MpesaTransactionAdapter(all_mpesa_transactions)
+        adapter = MpesaTransactionAdapter(requireContext(),all_mpesa_transactions, object : MpesaTransactionAdapter.OnItemClickListener{
+
+            override fun onItemClick(transactionId: Int?) {
+                if (actionMode != null) {
+                    toggleSelection(transactionId)
+                }
+            }
+
+            override fun onItemLongClick(transactionId: Int?) {
+                val context = view?.context
+                if (context is AppCompatActivity) {
+                    if (actionMode == null) {
+                        actionMode = context.startSupportActionMode(actionModeCallback)!!
+                        //println("hello")
+                        toggleSelection(transactionId)
+                    }
+                    else{
+                        actionMode!!.finish()
+                    }
+
+                }
+            }
+        } )
+
+
 
         if(all_mpesa_transactions.isNullOrEmpty()){
             var latest_mpesa_transaction = mutableListOf<MpesaTransaction>()
@@ -342,6 +386,129 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
 
     }
+
+    private fun toggleSelection(transactionId: Int?) {
+        if (selectedTransactions.contains(transactionId)) {
+            selectedTransactions.remove(transactionId)
+            println("removed")
+        } else {
+            if (transactionId != null) {
+                println("added")
+                selectedTransactions.add(transactionId)
+            }
+        }
+
+        updateActionModeTitle()
+
+        // Notify the adapter about the change
+        adapter.setSelectedTransactions(selectedTransactions)
+    }
+
+    private fun deleteSelectedTransactions() {
+        // Handle the deletion of selected transactions
+        // Update your data source or perform other actions
+        // ...
+        clearSelection()
+    }
+
+    private fun clearSelection() {
+        selectedTransactions.clear()
+        adapter.clearSelection()
+    }
+
+    private fun updateActionModeTitle() {
+        actionMode?.title = "${selectedTransactions.size} selected"
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun changeStatusBarColorWithAnimation(colorResId: Int) {
+        val activity = requireActivity() as? FragmentActivity ?: return
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            // Retrieve the color from the color resource ID
+            val newStatusBarColor = MaterialColors.getColor(requireContext(), colorResId,"")
+
+            // Get the current status bar color
+            val currentStatusBarColor = activity.window.statusBarColor
+
+            // Create a ValueAnimator to animate the color change
+            val colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentStatusBarColor, newStatusBarColor)
+            colorAnimator.addUpdateListener { animator ->
+                val animatedColor = animator.animatedValue as Int
+                // Set the animated color to the status bar
+                activity.window.statusBarColor = animatedColor
+            }
+
+            // Set up animation duration
+            colorAnimator.duration = 490 // Adjust the duration as needed
+
+            // Start the color animation
+            colorAnimator.start()
+
+            // For a light status bar, you may need to adjust the system UI visibility
+            if (isColorLight(newStatusBarColor)) {
+                activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            } else {
+                activity.window.decorView.systemUiVisibility = 0
+            }
+        }
+    }
+
+    private fun isColorLight(color: Int): Boolean {
+        val darkness =
+            1 - (0.299 * android.graphics.Color.red(color) + 0.587 * android.graphics.Color.green(color) + 0.114 * android.graphics.Color.blue(
+                color
+            )) / 255
+        return darkness < 0.5
+    }
+
+
+
+    private val actionModeCallback = object : ActionMode.Callback {
+        override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+            //val popupMenuBackgroundColor = MaterialColors.getColor(requireContext(), com.google.android.material.R.attr.popupMenuBackground,"")
+            //setSystemBarColor(requireActivity(), R.color.red_color);
+
+            val customView = LayoutInflater.from(requireContext()).inflate(R.layout.custom_action_mode_layout, null)
+            //mode?.customView = customView
+            mode?.menuInflater?.inflate(R.menu.context_menu, menu)
+            layoutSelectAll.startAnimation(fadeInselectLayoutAnimation)
+            layoutSelectAll.visibility = View.VISIBLE
+            changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurfaceContainer)
+
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+            // You can perform any actions you want to update the menu here
+            return false
+        }
+
+        override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
+            when (item?.itemId) {
+                R.id.delete_mpesa_transaction -> {
+                    // Handle delete action
+                    // Implement this method to delete selected items
+                    // For now, let's just finish the ActionMode
+                    return true
+                }
+                // Add other actions as needed
+            }
+            return false
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode?) {
+            // Clear the selection and finish ActionMode
+            changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurface)
+            clearSelection()
+            layoutSelectAll.startAnimation(fadeOutAnimation)
+            layoutSelectAll.visibility = View.GONE
+            actionMode = null
+            adapter.reinitializeAdapter()
+
+        }
+    }
+
 
     private fun updatesyncCircularProgress() {
         var totalSMS:Int = 0
@@ -693,7 +860,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                         var name = ""
                         name = recepient_arr?.joinToString(
                             separator = " ",
-                            limit = recepient_arr?.size - 2,
+                            limit = recepient_arr?.size!! - 2,
                             truncated = ""
                         ).toString()
                         var phone_no = recepient_arr?.get(recepient_arr.size - 2)
@@ -729,7 +896,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                         var name = ""
                         name = sender_arr?.joinToString(
                             separator = " ",
-                            limit = sender_arr?.size - 2,
+                            limit = sender_arr?.size?.minus(2) ?: 0,
                             truncated = ""
                         ).toString()
                         var phone_no = sender_arr?.get(sender_arr.size - 2)
@@ -804,7 +971,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
                     if (transaction_cost_string != "none") {
                         transaction_cost =
-                            removeNonNumericText(transaction_cost_string)?.toDouble()
+                            removeNonNumericText(transaction_cost_string)?.toDouble()!!
                         //transaction_cost = transaction_cost_string?.replace("Ksh", "")?.dropLast(1)?.toDouble()!!
                     }
 
@@ -1026,6 +1193,12 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         // Example:
         // val viewAllTransactionsActivity = supportFragmentManager.findFragmentByTag(ViewAllTransactionsActivity::class.java.simpleName) as? ViewAllTransactionsActivity
         // viewAllTransactionsActivity?.refreshRecyclerView()
+    }
+
+    fun destroyActionMode() {
+        println("its been called dah")
+        actionMode?.finish()
+        // Add any additional cleanup code if needed
     }
 
     object CallbackSingleton {

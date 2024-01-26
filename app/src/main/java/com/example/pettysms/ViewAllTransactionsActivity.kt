@@ -1,5 +1,7 @@
 package com.example.pettysms
 
+import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.os.Build
@@ -9,19 +11,28 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.Animation
+import android.view.animation.AnimationUtils
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.ActionMode
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.vectordrawable.graphics.drawable.ArgbEvaluator
 import com.example.pettysms.databinding.ActivityViewAllTransactionsBinding
+import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.search.SearchBar
 import com.google.android.material.search.SearchView
@@ -38,7 +49,6 @@ import java.util.Date
 import java.util.Locale
 
 class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragment.OnApplyClickListener {
-    private lateinit var searchBar: SearchBar
     private lateinit var searchView: SearchView
     private lateinit var binding: ActivityViewAllTransactionsBinding
     private lateinit var loadingDialog: AlertDialog
@@ -46,9 +56,25 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     private lateinit var clearAllTextView: TextView
     private lateinit var progressSuggestions: ProgressBar
     private lateinit var noResultsTextView: TextView
+    private lateinit var appBar: AppBarLayout
+    private lateinit var adapter: MpesaTransactionAdapter
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var fadeInAnimation: Animation
+    private lateinit var fadeOutAnimation: Animation
+    private lateinit var fadeInselectLayoutAnimation: Animation
+    private lateinit var layoutSelectAll: LinearLayout
+
+
+    private var actionMode: ActionMode? = null
+    private val selectedTransactions = HashSet<Int>()
+    private val removedTransactions = HashSet<Int>()
+
 
 
     private var allMpesaTransactions = mutableListOf<MpesaTransaction>()
+    private var activeTransactions = mutableListOf<MpesaTransaction>()
+
+    private var searchBar: SearchBar? = null
     private var db_helper: DbHelper? = null
     private var db: SQLiteDatabase? = null
     private var searchHistory = mutableListOf<String>()
@@ -66,12 +92,17 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
         clearAllTextView = binding.clearAllHistoryLink
         progressSuggestions = binding.progressBarSuggestions
         noResultsTextView = binding.noResultsTextView
+        appBar = binding.appBarLayout
+        fadeInAnimation = AnimationUtils.loadAnimation(this, R.anim.fade_in)
+        fadeOutAnimation = AnimationUtils.loadAnimation(this, R.anim.fade_out)
+        fadeInselectLayoutAnimation = AnimationUtils.loadAnimation(this, R.anim.fade_in_select_all_layout)
+        layoutSelectAll = binding.selectAllLayoutViewAllTransactions
 
         clearAllTextView.setOnClickListener {
             clearAllHistory()
         }
 
-        searchBar.setOnMenuItemClickListener { menuItem ->
+        searchBar?.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.search_bar_options -> {
                     // Handle the "Settings" menu item click
@@ -108,11 +139,10 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
             R.color.yellow_color
         )*/
 
-        searchView
-            .editText
-            .setOnEditorActionListener { v: TextView?, actionId: Int, event: KeyEvent? ->
-                searchBar.text = searchView.text
-                searchView.hide()
+
+        searchView.editText.setOnEditorActionListener { v: TextView?, actionId: Int, event: KeyEvent? ->
+            updateSearch(searchView.text.toString())
+            searchView.hide()
                 false
             }
 
@@ -128,6 +158,10 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
 
         setContentView(binding.root)
 
+    }
+
+    fun updateSearch(text:String){
+        //searchBar?.text = text.toString()
     }
 
     private fun setupSearchView() {
@@ -358,8 +392,31 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     }
 
     private fun updateMainRecyclerView(transactions: MutableList<MpesaTransaction>){
-        val recyclerView: RecyclerView = binding.recyclerView
-        val adapter = MpesaTransactionAdapter(transactions)
+        recyclerView = binding.recyclerView
+        activeTransactions = transactions
+        adapter = MpesaTransactionAdapter(this,transactions, object : MpesaTransactionAdapter.OnItemClickListener{
+            override fun onItemClick(transactionId: Int?) {
+                if (actionMode != null) {
+                    toggleSelection(transactionId)
+                }
+            }
+
+            override fun onItemLongClick(transactionId: Int?) {
+
+                    if (actionMode == null) {
+                        adapter.setActionModeStatus(true)
+                        actionMode = startSupportActionMode(actionModeCallback)!!
+                        //println("hello")
+                        toggleSelection(transactionId)
+                    }
+                    else{
+                        actionMode!!.finish()
+                    }
+
+
+            }
+
+        })
 
         recyclerView.layoutManager = LinearLayoutManager(applicationContext)
         recyclerView.adapter = adapter
@@ -378,9 +435,131 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     }
 
 
+    private val actionModeCallback = object : ActionMode.Callback {
+        override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+            //val popupMenuBackgroundColor = MaterialColors.getColor(requireContext(), com.google.android.material.R.attr.popupMenuBackground,"")
+            //setSystemBarColor(requireActivity(), R.color.red_color);
+
+            val customView = LayoutInflater.from(this@ViewAllTransactionsActivity).inflate(R.layout.custom_action_mode_layout, null)
+            //mode?.customView = customView
+            mode?.menuInflater?.inflate(R.menu.context_menu, menu)
+            layoutSelectAll.startAnimation(fadeInselectLayoutAnimation)
+            layoutSelectAll.visibility = View.VISIBLE
+            changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurfaceContainer)
+
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+            // You can perform any actions you want to update the menu here
+            return false
+        }
+
+        override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
+            when (item?.itemId) {
+                R.id.delete_mpesa_transaction -> {
+                    // Handle delete action
+                    // Implement this method to delete selected items
+                    // For now, let's just finish the ActionMode
+                    return true
+                }
+                // Add other actions as needed
+            }
+            return false
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode?) {
+            // Clear the selection and finish ActionMode
+            selectedTransactions.clear()
+            adapter.reinitializeAdapter()
+            adapter.setActionModeStatus(true)
+            changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurface)
+            layoutSelectAll.startAnimation(fadeOutAnimation)
+            layoutSelectAll.visibility = View.GONE
+            actionMode = null
+        }
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun changeStatusBarColorWithAnimation(colorResId: Int) {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            // Retrieve the color from the color resource ID
+            val newStatusBarColor = MaterialColors.getColor(this, colorResId,"")
+
+            // Get the current status bar color
+            val currentStatusBarColor = this.window.statusBarColor
+
+            // Create a ValueAnimator to animate the color change
+            val colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentStatusBarColor, newStatusBarColor)
+            colorAnimator.addUpdateListener { animator ->
+                val animatedColor = animator.animatedValue as Int
+                // Set the animated color to the status bar
+                this.window.statusBarColor = animatedColor
+            }
+
+            // Set up animation duration
+            colorAnimator.duration = 490 // Adjust the duration as needed
+
+            // Start the color animation
+            colorAnimator.start()
+
+            // For a light status bar, you may need to adjust the system UI visibility
+            if (isColorLight(newStatusBarColor)) {
+                this.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            } else {
+                this.window.decorView.systemUiVisibility = 0
+            }
+        }
+    }
+
+    private fun isColorLight(color: Int): Boolean {
+        val darkness =
+            1 - (0.299 * android.graphics.Color.red(color) + 0.587 * android.graphics.Color.green(color) + 0.114 * android.graphics.Color.blue(
+                color
+            )) / 255
+        return darkness < 0.5
+    }
+
+    private fun toggleSelection(transactionId: Int?) {
+        if (selectedTransactions.contains(transactionId)) {
+            selectedTransactions.remove(transactionId)
+            removedTransactions.add(transactionId!!)
+        } else {
+            transactionId?.let {
+                selectedTransactions.add(it)
+                removedTransactions.remove(transactionId)
+            }
+        }
+
+        updateActionModeTitle()
+
+        // Notify the adapter about the change
+        adapter.setSelectedTransactions(selectedTransactions)
+        adapter.setRemovedtransactions(removedTransactions)
+    }
+
+
+    private fun deleteSelectedTransactions() {
+        // Handle the deletion of selected transactions
+        // Update your data source or perform other actions
+        // ...
+        clearSelection()
+    }
+
+    private fun clearSelection() {
+        selectedTransactions.clear()
+        adapter.clearSelection()
+    }
+
+    private fun updateActionModeTitle() {
+        actionMode?.title = "${selectedTransactions.size} selected"
+    }
+
+
 
     private fun showSecondaryMenu() {
-        val anchorView: View = searchBar.findViewById(R.id.search_bar_options)
+        val anchorView: View? = searchBar?.findViewById(R.id.search_bar_options)
         val popupMenu = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
             PopupMenu(this, anchorView, Gravity.END, 0, R.style.PopupMenuStyle)
         } else {

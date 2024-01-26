@@ -32,7 +32,8 @@ class MpesaTransaction(
     var mpesa_depositor: String? = "none",
     var paybill_acount: String? = "none",
     var sender: Sender? = Sender("Non-sender", "Non-sender"),
-    var sms_text: String?
+    var sms_text: String?,
+    var isDeleted: Boolean = false
 ) : Transaction(
     id,
     msg_date,
@@ -140,7 +141,7 @@ class MpesaTransaction(
                             var name = ""
                             name = recepient_arr?.joinToString(
                                 separator = " ",
-                                limit = recepient_arr?.size - 2,
+                                limit = recepient_arr?.size!! - 2,
                                 truncated = ""
                             ).toString()
                             var phone_no = recepient_arr?.get(recepient_arr.size - 2)
@@ -176,7 +177,7 @@ class MpesaTransaction(
                             var name = ""
                             name = sender_arr?.joinToString(
                                 separator = " ",
-                                limit = sender_arr?.size - 2,
+                                limit = sender_arr?.size!! - 2,
                                 truncated = ""
                             ).toString()
                             var phone_no = sender_arr?.get(sender_arr.size - 2)
@@ -238,7 +239,7 @@ class MpesaTransaction(
 
                         if (transaction_cost_string != "none") {
                             transaction_cost =
-                                removeNonNumericText(transaction_cost_string)?.toDouble()
+                                removeNonNumericText(transaction_cost_string)?.toDouble()!!
                             //transaction_cost = transaction_cost_string?.replace("Ksh", "")?.dropLast(1)?.toDouble()!!
                         }
 

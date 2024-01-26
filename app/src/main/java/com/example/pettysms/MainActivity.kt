@@ -26,7 +26,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.color.DynamicColors
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), OnActionModeInteraction {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
@@ -78,6 +78,7 @@ class MainActivity : AppCompatActivity() {
             when(item.itemId){
                 R.id.page_1 -> {
                     check_fragment = "home"
+                    onDestroyActionMode()
                     Navigation.findNavController(this, R.id.nav_host_fragment_content_main).navigate(R.id.HomeFragment)
                     //actionbar.setTitle("Hi" + " Mbarak")
                     //setSupportActionBar(actionbar)
@@ -123,9 +124,11 @@ class MainActivity : AppCompatActivity() {
 
                 }
                 R.id.page_3 -> {
+                    onDestroyActionMode()
                     Navigation.findNavController(this, R.id.nav_host_fragment_content_main).navigate(R.id.settingsFragment)
                     true
                 }
+
                 else -> false
             }
         }
@@ -269,6 +272,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroyActionMode() {
+        // Code to destroy the ActionMode in the fragment
+        println("call 1")
+        val fragment = supportFragmentManager.findFragmentByTag("mpesa")
+        println(fragment.toString())
+        if (fragment != null && fragment is MpesaFragment) {
+            println("call 2")
+            fragment.destroyActionMode()
+        }
+    }
 
 }
 
