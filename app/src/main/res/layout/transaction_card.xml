@@ -61,13 +61,14 @@
             android:layout_width="160dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="14dp"
-            android:layout_marginTop="-9dp"
+            android:layout_marginTop="-7dp"
             android:fontFamily="@font/roboto_light"
-            android:maxLines="2"
+            android:maxLines="1"
             android:text="Transaction Title"
             android:textColor="?attr/colorPrimary"
             android:textFontWeight="600"
             android:textSize="18sp"
+            android:ellipsize="end"
             app:layout_constraintStart_toEndOf="@+id/avatar_view"
             app:layout_constraintTop_toTopOf="@+id/guideline" />
 
@@ -76,7 +77,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="15dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="3dp"
             android:fontFamily="@font/roboto_light"
             android:paddingTop="5dp"
             android:paddingRight="5dp"
@@ -88,7 +89,7 @@
 
         <TextView
             android:id="@+id/transactionDateTextView"
-            android:layout_width="160dp"
+            android:layout_width="175dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:layout_marginEnd="6dp"

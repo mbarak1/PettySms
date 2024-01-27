@@ -1,5 +1,6 @@
 package com.example.pettysms
 
+import android.animation.Animator
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
@@ -39,6 +40,8 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
     private var removedTrasactions = HashSet<Int>()
     private var rotatedTransactions = HashSet<Int>()
 
+
+
     interface OnItemClickListener {
         fun onItemClick(transactionId: Int?)
         fun onItemLongClick(transactionId: Int?)
@@ -60,14 +63,13 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
 
         holder.itemView.setOnClickListener {
             itemClickListener.onItemClick(transaction.id)
-            true
         }
 
         holder.itemView.setOnLongClickListener {
             itemClickListener.onItemLongClick(transaction.id)
-            println("from adapter position" + transaction.id)
             true
         }
+
 
         println("actionmode: " + isInActionMode)
         println("contains: " + selectedTransactions.contains(transaction.id))
@@ -75,14 +77,17 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
         println("hash set :" + selectedTransactions.toString())
         println("transaction_id: " + transaction.id)
 
-        setAvatarView(holder, getTitleTextByTransactionType(transaction), getColorAvatar(context, transaction.transaction_type!!))
+        val colorAvatar = getColorAvatar(context, transaction.transaction_type!!)
+        val titleAvatar = getTitleTextByTransactionType(transaction)
+
+        setAvatarView(holder, titleAvatar, colorAvatar)
         val isPositiveAmount =
-            transaction.transaction_type == "deposit" || transaction.transaction_type == "receival"
+            transaction.transaction_type == "deposit" || transaction.transaction_type == "receival" || transaction.transaction_type == "reverse"
         val formattedAmount =
             formatAmountWithColor(transaction?.amount!!, isPositiveAmount, context)
         holder.amountTextView.text = formattedAmount
         holder.rounded_text.text = transaction.transaction_type?.let { capitalizeEachWord(it) }
-        holder.titleTextView.text = getTitleTextByTransactionType(transaction)
+        holder.titleTextView.text = titleAvatar
         holder.dateTextView.text = transaction.transaction_date?.takeIf { it.isNotEmpty() }
             ?.let { formatDate(it) }
             ?: transaction.msg_date?.let { formatDate(it) } ?: "Unknown Date"
@@ -93,70 +98,100 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
             val drawableResourceId = R.drawable.ic_check_new // Replace with your actual small-sized drawable resource ID
             val smallDrawable: Drawable? = ContextCompat.getDrawable(context, drawableResourceId)
             println("rotated: " + holder.rotated)
-            holder.avatarView.apply {
-                isAnimating = true
-                avatarBackgroundColor = colorSurfaceVariant
-                highlightBorderColor = colorSurfaceVariant
-                highlightBorderColorEnd = colorSurfaceVariant
-                highlightedBorderThickness = 0
-                borderThickness = 0
-                isHighlighted = false
-                distanceToBorder = 0
-                setImageDrawable(smallDrawable)
 
-                // Create a fade-in animation
-                val fadeIn = ObjectAnimator.ofFloat(this, View.ALPHA, 0f, 1f)
-                fadeIn.duration = 10 // Adjust duration as needed
-
-                // Start the fade-in animation
-                fadeIn.start()
-
-                // Set isAnimating to false after starting the animation
-                isAnimating = false
-
-            }
             if (!rotatedTransactions.contains(transaction.id)) {
-                holder.avatarView.animate().rotationY(180f).setDuration(500).withLayer().start()
                 rotatedTransactions.add(transaction.id!!)
+                val rotationAnimator = ObjectAnimator.ofFloat(holder.avatarView, "rotationY", 0f, 180f)
+                rotationAnimator.duration = 500
+                rotationAnimator.interpolator = AccelerateDecelerateInterpolator()
 
+                rotationAnimator.addListener(object : Animator.AnimatorListener {
+                    override fun onAnimationStart(animation: Animator) {
+                        holder.avatarView.apply {
+                            text = getTitleTextByTransactionType(transaction)
+                            highlightBorderColorEnd = getColorAvatar(context, transaction.transaction_type!!)
+                            isAnimating = false
+                            avatarBackgroundColor = android.R.color.transparent
+                            highlightBorderColor = MaterialColors.getColor(
+                                holder.itemView.context,
+                                com.google.android.material.R.attr.colorPrimary,
+                                ""
+                            )
+                            highlightedBorderThickness = 10
+                            isHighlighted = true
+                            borderThickness = 10
+                            setImageDrawable(null)
+                        }
+                        holder.avatarView.rotationY = 0f
+                        holder.itemView.setOnClickListener{}
 
+                        // Animation started
+                    }
+
+                    override fun onAnimationEnd(animation: Animator) {
+                        // Animation ended
+                        holder.itemView.setOnClickListener {
+                            itemClickListener.onItemClick(transaction.id)
+                        }
+                    }
+
+                    override fun onAnimationCancel(animation: Animator) {
+                        // Animation cancelled
+                    }
+
+                    override fun onAnimationRepeat(animation: Animator) {
+                        // Animation repeated
+                    }
+                })
+
+                rotationAnimator.start()
+
+// Start another animation to change AvatarView properties midway
+                val handler = Handler()
+                handler.postDelayed({
+                    holder.avatarView.apply {
+                        isAnimating = true
+                        avatarBackgroundColor = colorSurfaceVariant
+                        highlightBorderColor = colorSurfaceVariant
+                        highlightBorderColorEnd = colorSurfaceVariant
+                        highlightedBorderThickness = 0
+                        borderThickness = 0
+                        isHighlighted = false
+                        distanceToBorder = 0
+                        setImageDrawable(smallDrawable)
+
+                        // Set isAnimating to false after starting the animation
+                        isAnimating = false
+
+                    }
+                }, 250) // Adjust the delay to match the midway point of the rotation animation
 
             }
             else{
+                holder.avatarView.apply {
+                    isAnimating = true
+                    avatarBackgroundColor = colorSurfaceVariant
+                    highlightBorderColor = colorSurfaceVariant
+                    highlightBorderColorEnd = colorSurfaceVariant
+                    highlightedBorderThickness = 0
+                    borderThickness = 0
+                    isHighlighted = false
+                    distanceToBorder = 0
+                    setImageDrawable(smallDrawable)
+
+                    // Set isAnimating to false after starting the animation
+                    isAnimating = false
+
+                }
                 holder.avatarView.rotationY = 180f
 
             }
             val backgroundColor = MaterialColors.getColor(holder.itemView.context, com.google.android.material.R.attr.colorSurfaceContainer,"")
             holder.cardView.setCardBackgroundColor(backgroundColor)
         }else{
-            holder.avatarView.apply {
-                text = getTitleTextByTransactionType(transaction)
-                highlightBorderColorEnd = getColorAvatar(context, transaction.transaction_type!!)
-                isAnimating = false
-                avatarBackgroundColor = android.R.color.transparent
-                highlightBorderColor = MaterialColors.getColor(
-                    holder.itemView.context,
-                    com.google.android.material.R.attr.colorPrimary,
-                    ""
-                )
-                highlightedBorderThickness = 10
-                isHighlighted = true
-                borderThickness = 10
-                // Create a fade-in animation
-                val fadeIn = ObjectAnimator.ofFloat(this, View.ALPHA, 0f, 1f)
-                fadeIn.duration = 200 // Adjust duration as needed
-                setImageDrawable(null)
-
-                // Start the fade-in animation
-                fadeIn.start()
-
-
-
-
-                //stopAnimating(5000, holder.avatarView)
-            }
+            //println("imageview: " + holder.avatarView.avatarBackgroundColor)
             val isPositiveAmount =
-                transaction.transaction_type == "deposit" || transaction.transaction_type == "receival"
+                transaction.transaction_type == "deposit" || transaction.transaction_type == "receival" || transaction.transaction_type == "reverse"
             val formattedAmount =
                 formatAmountWithColor(transaction?.amount!!, isPositiveAmount, context)
             holder.amountTextView.text = formattedAmount
@@ -168,13 +203,103 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
             val backgroundColor = Color.TRANSPARENT
             holder.cardView.setCardBackgroundColor(backgroundColor)
 
+            println("hello inside")
+
             if (rotatedTransactions.contains(transaction.id)){
-                holder.avatarView.animate().rotationY(-360f).setDuration(500).withLayer().start()
                 rotatedTransactions.remove(transaction.id)
+                val colorSurfaceVariant = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorPrimaryInverse)
+                val colorSurface = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorPrimary)
+                val drawableResourceId = R.drawable.ic_check_new // Replace with your actual small-sized drawable resource ID
+                val smallDrawable: Drawable? = ContextCompat.getDrawable(context, drawableResourceId)
+                val rotationAnimator = ObjectAnimator.ofFloat(holder.avatarView, "rotationY", 180f, 0f)
+                rotationAnimator.duration = 500
+                rotationAnimator.interpolator = AccelerateDecelerateInterpolator()
+
+                rotationAnimator.addListener(object : Animator.AnimatorListener {
+                    override fun onAnimationStart(animation: Animator) {
+                        holder.avatarView.apply {
+                            isAnimating = true
+                            avatarBackgroundColor = colorSurfaceVariant
+                            highlightBorderColor = colorSurfaceVariant
+                            highlightBorderColorEnd = colorSurfaceVariant
+                            highlightedBorderThickness = 0
+                            borderThickness = 0
+                            isHighlighted = false
+                            distanceToBorder = 0
+                            setImageDrawable(smallDrawable)
+
+                            // Set isAnimating to false after starting the animation
+                            isAnimating = false
+
+                        }
+                        holder.avatarView.rotationY = 180f
+                        holder.itemView.setOnClickListener{}
+                        // Animation started
+                    }
+
+                    override fun onAnimationEnd(animation: Animator) {
+                        // Animation ended
+                        holder.itemView.setOnClickListener {
+                            itemClickListener.onItemClick(transaction.id)
+                        }
+
+                    }
+
+                    override fun onAnimationCancel(animation: Animator) {
+                        // Animation cancelled
+                        holder.itemView.isClickable = false
+                    }
+
+                    override fun onAnimationRepeat(animation: Animator) {
+                        // Animation repeated
+                    }
+                })
+
+                rotationAnimator.start()
+
+// Start another animation to change AvatarView properties midway
+                val handler = Handler()
+                handler.postDelayed({
+                    holder.avatarView.apply {
+                        text = getTitleTextByTransactionType(transaction)
+                        highlightBorderColorEnd = getColorAvatar(context, transaction.transaction_type!!)
+                        isAnimating = false
+                        avatarBackgroundColor = android.R.color.transparent
+                        highlightBorderColor = MaterialColors.getColor(
+                            holder.itemView.context,
+                            com.google.android.material.R.attr.colorPrimary,
+                            ""
+                        )
+                        highlightedBorderThickness = 10
+                        isHighlighted = true
+                        borderThickness = 10
+                        setImageDrawable(null)
+                    }
+
+                }, 250) // Adjust the delay to match the midway point of the rotation animation
+
             }else{
+                //println("jj")
+                holder.avatarView.apply {
+                    text = getTitleTextByTransactionType(transaction)
+                    highlightBorderColorEnd = getColorAvatar(context, transaction.transaction_type!!)
+                    isAnimating = false
+                    avatarBackgroundColor = android.R.color.transparent
+                    highlightBorderColor = MaterialColors.getColor(
+                        holder.itemView.context,
+                        com.google.android.material.R.attr.colorPrimary,
+                        ""
+                    )
+                    highlightedBorderThickness = 10
+                    isHighlighted = true
+                    borderThickness = 10
+                    setImageDrawable(null)
+
+                }
                 if (holder.avatarView.rotationY == 180f) {
                     holder.avatarView.rotationY = 0f
                 }
+
             }
         }
 
@@ -197,9 +322,9 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
         holder.avatarView.apply {
             this.text = text
             highlightBorderColorEnd = color
-            isAnimating = true
+            isAnimating = false
         }
-        stopAnimating(5000, holder.avatarView)
+        //stopAnimating(5000, holder.avatarView)
     }
 
     fun getTitleTextByTransactionType(transaction: MpesaTransaction): String {
@@ -232,17 +357,29 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
         }
     }
     fun capitalizeEachWord(input: String): String? {
-        val words = input.split(" ".toRegex()).dropLastWhile { it.isEmpty() }
-            .toTypedArray()
+        val words = input.split(" ".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
         val result = StringBuilder()
+
         for (word in words) {
             if (!word.isEmpty()) {
-                val firstLetter = word.substring(0, 1).uppercase(Locale.getDefault())
-                val rest = word.substring(1).lowercase(Locale.getDefault())
-                result.append(firstLetter).append(rest).append(" ")
+                // Replace special characters with space
+                val cleanedWord = word.replace(Regex("[^A-Za-z0-9]"), " ")
+
+                val capitalizedWord = cleanedWord.split(" ").joinToString(" ") {
+                    if (it.isNotEmpty()) {
+                        val firstLetter = it.substring(0, 1).uppercase(Locale.getDefault())
+                        val rest = it.substring(1).lowercase(Locale.getDefault())
+                        "$firstLetter$rest"
+                    } else {
+                        ""
+                    }
+                }
+
+                result.append(capitalizedWord).append(" ")
             }
         }
-        return result.toString().trim { it <= ' ' }
+
+        return result.toString().trim()
     }
 
     fun removeDecimal(input: String): String {
