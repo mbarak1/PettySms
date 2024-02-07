@@ -362,7 +362,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
         if(all_mpesa_transactions.isNullOrEmpty()){
             var latest_mpesa_transaction = mutableListOf<MpesaTransaction>()
-            latest_mpesa_transaction = db_helper?.getLatestTransaction()!!
+            latest_mpesa_transaction = db_helper?.getMostRecentTransaction()!!
             //println("size ya hii mpya ni:" + latest_mpesa_transaction_last_month.size + " " + latest_mpesa_transaction_last_month.first().transaction_date)
 
             balance_text.text = String.format("%,.2f", latest_mpesa_transaction.first().mpesa_balance)
@@ -401,7 +401,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         updateActionModeTitle()
 
         // Notify the adapter about the change
-        adapter.setSelectedTransactions(selectedTransactions)
+        adapter.setSelectedTransactions(selectedTransactions, false)
     }
 
     private fun deleteSelectedTransactions() {

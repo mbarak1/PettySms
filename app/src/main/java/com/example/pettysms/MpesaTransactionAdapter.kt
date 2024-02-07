@@ -1,9 +1,7 @@
 package com.example.pettysms
 
 import android.animation.Animator
-import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.Drawable
@@ -12,6 +10,7 @@ import android.os.Handler
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -35,10 +34,11 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
     private var isInActionMode = false
     private var selectedItems = mutableListOf<Int>()
     // Filtered list that only contains transactions with isDeleted = false
-    private val filteredList: List<MpesaTransaction> = mpesaTransactions.filter { !it.isDeleted }
+    private val filteredList: MutableList<MpesaTransaction> = mpesaTransactions.filter { !it.isDeleted }.toMutableList()
     private val selectedTransactions = HashSet<Int>()
-    private var removedTrasactions = HashSet<Int>()
+    private var removedTransactions = HashSet<Int>()
     private var rotatedTransactions = HashSet<Int>()
+    private val adapterName = this::class.simpleName
 
 
 
@@ -70,12 +70,14 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
             true
         }
 
+        Log.d(adapterName, "selectedItems: " + selectedTransactions)
+        Log.d(adapterName, "RotatedItems:  " + rotatedTransactions)
 
-        println("actionmode: " + isInActionMode)
-        println("contains: " + selectedTransactions.contains(transaction.id))
-        println("removal: " + removedTrasactions.contains(transaction.id))
-        println("hash set :" + selectedTransactions.toString())
-        println("transaction_id: " + transaction.id)
+
+        /*Log.d(adapterName, "actionmode: " + isInActionMode)
+        Log.d(adapterName,"contains: " + selectedTransactions.contains(transaction.id))
+        Log.d(adapterName, "hash set :" + selectedTransactions.toString())
+        Log.d(adapterName, "transaction_id: " + transaction.id)*/
 
         val colorAvatar = getColorAvatar(context, transaction.transaction_type!!)
         val titleAvatar = getTitleTextByTransactionType(transaction)
@@ -97,7 +99,6 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
             val colorSurface = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorPrimary)
             val drawableResourceId = R.drawable.ic_check_new // Replace with your actual small-sized drawable resource ID
             val smallDrawable: Drawable? = ContextCompat.getDrawable(context, drawableResourceId)
-            println("rotated: " + holder.rotated)
 
             if (!rotatedTransactions.contains(transaction.id)) {
                 rotatedTransactions.add(transaction.id!!)
@@ -203,7 +204,7 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
             val backgroundColor = Color.TRANSPARENT
             holder.cardView.setCardBackgroundColor(backgroundColor)
 
-            println("hello inside")
+            //Log.d(adapterName, "hello inside")
 
             if (rotatedTransactions.contains(transaction.id)){
                 rotatedTransactions.remove(transaction.id)
@@ -302,6 +303,19 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
 
             }
         }
+
+        Log.d(adapterName, "Transactions removed on bind: " + removedTransactions.toString())
+
+        /*if (removedTransactions.contains(transaction.id)){
+            val index = filteredList.indexOfFirst { it.id == transaction.id }
+            Log.d(adapterName, "Transaction removed in loop: " + removedTransactions.toString())
+            holder.itemView.animate()?.alpha(0f)?.setDuration(250)?.withEndAction {
+                filteredList.removeAt(index)
+                removedTransactions.remove(transaction.id)
+                notifyItemRemoved(index)
+            }
+        }*/
+        
 
     }
     fun formatAmountWithColor(amount: Double, isPositive: Boolean, context: Context): CharSequence {
@@ -450,10 +464,18 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
         return filteredList[position].hashCode().toLong()
     }
 
-    fun setSelectedTransactions(selected: Set<Int>) {
+    fun setSelectedTransactions(selected: Set<Int>, selectAllFlag: Boolean) {
         selectedTransactions.clear()
         selectedTransactions.addAll(selected)
-        //notifyDataSetChanged()
+        if (selectAllFlag){
+            if (selected.size == mpesaTransactions.size){
+                rotatedTransactions.clear()
+                rotatedTransactions.addAll(selected)
+            }else if (selected.size == 0){
+                rotatedTransactions.clear()
+            }
+        }
+        notifyDataSetChanged()
     }
 
 
@@ -475,16 +497,78 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
     }
     fun setActionModeStatus(b: Boolean) {
         this.isInActionMode = b
-        println("cool")
+        Log.d(adapterName,
+            "cool")
     }
 
-    fun setRemovedtransactions(removedTransactions: HashSet<Int>) {
-        removedTransactions.clear()
-        removedTransactions.addAll(removedTransactions)
+    fun removetransactions(transactionIds: HashSet<Int>, selectAllFlag: Boolean){
+        if (selectAllFlag){
+            filteredList.clear()
+            selectedItems.clear()
+            rotatedTransactions.clear()
+            notifyDataSetChanged()
+        }else{
+            removedTransactions.clear()
+            removedTransactions.addAll(transactionIds)
+            selectedItems.clear()
+            rotatedTransactions.clear()
+            //notifyDataSetChanged()
+            //removedTransactions.clear()
+            Log.d(adapterName, "Transactions removed: " + removedTransactions.toString())
+        }
 
         notifyDataSetChanged()
+    }
+
+    fun setRemovedTransactions(
+        removedTransactionList: HashSet<Int>,
+        checked: Boolean
+    ) {
+        if (checked) {
+            filteredList.clear()
+            selectedTransactions.clear()
+            rotatedTransactions.clear()
+            removeItems(removedTransactionList)
+            removedTransactions.addAll(removedTransactionList)
+            //notifyDataSetChanged()
+        }else{
+            rotatedTransactions.clear()
+            removedTransactions.clear()
+            selectedTransactions.clear()
+            removeItems(removedTransactionList)
+            Log.d(adapterName, "Removed Transactions size: "  + removedTransactionList.size.toString())
+            removedTransactions.addAll(removedTransactionList)
+            //removedTransactions.addAll(removedTransactionList)
+
+            Log.d(adapterName, "Removed Transactions size in function: "  + filteredList.size.toString())
+        }
 
     }
+
+    fun removeItems(transactionIds: HashSet<Int>) {
+        // Create a list to store the indices of items to be removed
+        val indicesToRemove = mutableListOf<Int>()
+
+        // Iterate over the transaction IDs in the HashSet
+        transactionIds.forEach { transactionId ->
+            // Find the index of the item with the corresponding ID
+            val index = filteredList.indexOfFirst { it.id == transactionId }
+            // If the item is found, add its index to the list
+            if (index != -1) {
+                indicesToRemove.add(index)
+            }
+        }
+
+        // Sort the list of indices in descending order to maintain consistency
+        indicesToRemove.sortDescending()
+
+        // Remove the items from the dataSet and notify the adapter with fade-out animation
+        indicesToRemove.forEach { index ->
+            filteredList.removeAt(index)
+            notifyItemRemoved(index)
+        }
+    }
+
 
 
 }

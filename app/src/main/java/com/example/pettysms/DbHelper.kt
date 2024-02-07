@@ -65,6 +65,18 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
     }
 
+    fun deleteTransaction(transactionId: Int){
+        val db = writableDatabase
+
+        val contentValues = ContentValues().apply {
+            put(COL_TRANSACTIONS_IS_DELETED, 1)
+        }
+        val whereClause = "$COL_TRANSACTIONS_ID = ?"
+        val whereArgs = arrayOf(transactionId.toString())
+        db.update(TABLE_TRANSACTIONS, contentValues, whereClause, whereArgs)
+
+    }
+
     fun insertRejectedSMS(date: String, smsBody: String) {
         val db = writableDatabase
 
@@ -209,7 +221,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         return getTransactionsFromQuery(query)
     }
 
-    fun getLatestTransaction(): MutableList<MpesaTransaction> {
+    fun getMostRecentTransaction(): MutableList<MpesaTransaction> {
 
         val query = """
             SELECT *
@@ -426,9 +438,18 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         return hasTables
     }
 
+    fun deleteAllTransactions() {
+        val db = writableDatabase
+
+        val contentValues = ContentValues().apply {
+            put(COL_TRANSACTIONS_IS_DELETED, 1)
+        }
+
+        db.update(TABLE_TRANSACTIONS, contentValues, null, null)
+    }
 
 
-        companion object {
+    companion object {
         // If you change the database schema, you must increment the database version.
             const val DATABASE_VERSION = 2
             const val DATABASE_NAME = "PettySms.db"

@@ -4,10 +4,15 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
+import android.text.Spannable
+import android.text.SpannableStringBuilder
 import android.text.TextWatcher
+import android.text.style.StyleSpan
+import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -19,6 +24,7 @@ import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ProgressBar
@@ -32,6 +38,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.vectordrawable.graphics.drawable.ArgbEvaluator
 import com.example.pettysms.databinding.ActivityViewAllTransactionsBinding
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.chip.Chip
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.search.SearchBar
@@ -61,8 +68,11 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     private lateinit var recyclerView: RecyclerView
     private lateinit var fadeInAnimation: Animation
     private lateinit var fadeOutAnimation: Animation
+    private lateinit var verticalShrinkFadeOut: Animation
     private lateinit var fadeInselectLayoutAnimation: Animation
     private lateinit var layoutSelectAll: LinearLayout
+    private lateinit var selectAllCheckBox: CheckBox
+
 
 
     private var actionMode: ActionMode? = null
@@ -77,6 +87,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     private var searchBar: SearchBar? = null
     private var db_helper: DbHelper? = null
     private var db: SQLiteDatabase? = null
+    private val activityName = this::class.simpleName
     private var searchHistory = mutableListOf<String>()
     private var keyValueMapToFilterAndSortFragment = mutableMapOf<String, MutableList<String>>()
 
@@ -97,6 +108,8 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
         fadeOutAnimation = AnimationUtils.loadAnimation(this, R.anim.fade_out)
         fadeInselectLayoutAnimation = AnimationUtils.loadAnimation(this, R.anim.fade_in_select_all_layout)
         layoutSelectAll = binding.selectAllLayoutViewAllTransactions
+        selectAllCheckBox = binding.checkboxSelectAllItems
+        verticalShrinkFadeOut = AnimationUtils.loadAnimation(this, R.anim.vertical_shrink_fade_out)
 
         clearAllTextView.setOnClickListener {
             clearAllHistory()
@@ -153,7 +166,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
             swipeRefreshLayout.isEnabled
         }*/
 
-        println(searchView.isShowing)
+        Log.d(activityName,searchView.isShowing.toString())
 
 
         setContentView(binding.root)
@@ -241,16 +254,17 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
                             mpesaTransaction.amount.toString().contains(query, ignoreCase = true) ||
                             /*mpesaTransaction.mpesa_code.toString()
                                 .contains(query, ignoreCase = true) ?: false ||*/
-                            mpesaTransaction.recipient?.name.toString()
+                            removeExtraSpaces(mpesaTransaction.recipient?.name.toString())
                                 .contains(query, ignoreCase = true) ||
                             mpesaTransaction.transaction_type.toString()
                                 .contains(query, ignoreCase = true) ||
                             formatDate(dateToSearch.toString())
                                 .contains(query, ignoreCase = true) ||
-                            mpesaTransaction.sender?.name?.contains(
-                                query,
-                                ignoreCase = true
-                            ) ?: false
+                            mpesaTransaction.sender?.name?.contains(query, ignoreCase = true) ?: false
+                }
+
+                if (!searchResults.isEmpty()){
+                    Log.d(activityName, searchResults.first().recipient?.name.toString())
                 }
 
                 // Hide progress bar when the task is complete
@@ -288,6 +302,10 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
            // updateRecyclerView(searchResults)
         }
 
+    }
+    fun removeExtraSpaces(input: String): String {
+        // Replace multiple spaces with a single space using regex
+        return input.replace(Regex("\\s+"), " ")
     }
 
     private fun addToSearchHistory(query: String) {
@@ -442,10 +460,29 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
 
             val customView = LayoutInflater.from(this@ViewAllTransactionsActivity).inflate(R.layout.custom_action_mode_layout, null)
             //mode?.customView = customView
+
             mode?.menuInflater?.inflate(R.menu.context_menu, menu)
+
             layoutSelectAll.startAnimation(fadeInselectLayoutAnimation)
             layoutSelectAll.visibility = View.VISIBLE
             changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurfaceContainer)
+            selectAllCheckBox.setOnCheckedChangeListener { buttonView, isChecked ->
+                if(isChecked){
+                    selectedTransactions.clear()
+                    for (activetransaction in activeTransactions){
+                        selectedTransactions.add(activetransaction.id!!)
+                    }
+                    updateActionModeTitle()
+                    adapter.setSelectedTransactions(selectedTransactions,true)
+
+                }else{
+                    selectedTransactions.clear()
+                    updateActionModeTitle()
+                    adapter.setSelectedTransactions(selectedTransactions, true)
+
+                }
+            }
+
 
             return true
         }
@@ -458,9 +495,8 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
         override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
             when (item?.itemId) {
                 R.id.delete_mpesa_transaction -> {
-                    // Handle delete action
-                    // Implement this method to delete selected items
-                    // For now, let's just finish the ActionMode
+                    deleteSelectedTransactions()
+                    //actionMode?.finish()
                     return true
                 }
                 // Add other actions as needed
@@ -474,9 +510,10 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
             adapter.reinitializeAdapter()
             adapter.setActionModeStatus(true)
             changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurface)
-            layoutSelectAll.startAnimation(fadeOutAnimation)
+            layoutSelectAll.startAnimation(verticalShrinkFadeOut)
             layoutSelectAll.visibility = View.GONE
             actionMode = null
+            selectAllCheckBox.isChecked = false
         }
     }
 
@@ -535,21 +572,82 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
         updateActionModeTitle()
 
         // Notify the adapter about the change
-        adapter.setSelectedTransactions(selectedTransactions)
-        adapter.setRemovedtransactions(removedTransactions)
+        adapter.setSelectedTransactions(selectedTransactions, false)
     }
 
 
     private fun deleteSelectedTransactions() {
         // Handle the deletion of selected transactions
         // Update your data source or perform other actions
-        // ...
-        clearSelection()
+        showWarnigDialog()
+    }
+
+    private fun showWarnigDialog(){
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Warning")
+            .setMessage(getDeleteMessageString())
+            .setIcon(R.drawable.baseline_warning_amber_white_24dp) // Center align the message
+            .setNegativeButton("Dismiss") { dialog, which ->
+                // Respond to negative button press
+            }
+            .setPositiveButton("Confirm") { dialog, which ->
+                // Respond to positive button press
+                adapter.setRemovedTransactions(selectedTransactions, selectAllCheckBox.isChecked)
+                Log.d(activityName, "deleted utilised")
+
+                if(selectAllCheckBox.isChecked){
+                    deleteAllTransactions()
+                    selectAllCheckBox.isChecked = false
+                }
+                else{
+                    deleteSeletectedTransactionsFromDb(selectedTransactions)
+                }
+
+                clearSelectionWithoutNotifyingAdapter()
+
+                updateActionModeTitle()
+            }
+            .show()
+    }
+
+    private fun getDeleteMessageString() : SpannableStringBuilder{
+        val message = "Are you sure you want to delete ${selectedTransactions.size} transaction(s)?"
+        val boldText = selectedTransactions.size.toString()
+
+        val startIndex = message.indexOf(boldText)
+        val endIndex = startIndex + boldText.length
+
+        val spannable = SpannableStringBuilder(message)
+        spannable.setSpan(
+            StyleSpan(Typeface.BOLD),
+            startIndex,
+            endIndex,
+            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        return spannable
+    }
+
+
+
+    private fun deleteSeletectedTransactionsFromDb(selectedTransactions: HashSet<Int>) {
+        for (selectedTransaction in selectedTransactions){
+            db_helper?.deleteTransaction(selectedTransaction)
+            Log.d(activityName, "Deleted Transaction: " + selectedTransaction)
+        }
+    }
+
+    fun deleteAllTransactions(){
+        db_helper?.deleteAllTransactions()
     }
 
     private fun clearSelection() {
         selectedTransactions.clear()
         adapter.clearSelection()
+    }
+
+    private fun clearSelectionWithoutNotifyingAdapter(){
+        selectedTransactions.clear()
     }
 
     private fun updateActionModeTitle() {
@@ -686,7 +784,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     override fun onApplyClick(keyValueMap: Map<String, List<String>>) {
         // Apply custom sorting based on the selected criteria
         var allMpesaTransactionsToSortAndFilter = allMpesaTransactions
-        println("In the beginning: " + allMpesaTransactions.first().sms_text)
+        Log.d(activityName, "In the beginning: " + allMpesaTransactions.first().sms_text)
         val sortCriteria = keyValueMap["sort"] ?: mutableListOf()
         var filterTransactionTypes = keyValueMap["transaction_type"] ?: mutableListOf()
         var dateRange = keyValueMap["date"] ?: mutableListOf()
@@ -701,7 +799,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
         filterTransactionTypes = replaceStringElement(filterTransactionTypes, "Topup", "topup")
 
 
-        println("mafilter: " + dateRange)
+        Log.d(activityName, "mafilter: " + dateRange)
 
         //filterTransactionsByTypes(allMpesaTransactionsToSortAndFilter, filterTransactionTypes)
         val loadingDialog = createLoadingDialog()
@@ -775,7 +873,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
         else{
             startDate = extractCustomDatesFromString(dateRange.first().toString())?.first.toString()
             endDate = extractCustomDatesFromString(dateRange.first().toString())?.second.toString()
-            println("StartDate CUSTOM: " + startDate + "EndDateDate CUSTOM: " + endDate )
+            Log.d(activityName, "StartDate CUSTOM: " + startDate + "EndDateDate CUSTOM: " + endDate )
 
         }
 
@@ -975,23 +1073,6 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
             }
         }
         return null
-    }
-
-    fun generateAllPermutations(criteria: List<String>): List<List<String>> {
-        val result = mutableListOf<List<String>>()
-
-        fun generate(current: List<String>, remaining: List<String>) {
-            if (remaining.isEmpty()) {
-                result.add(current.toList())
-            } else {
-                for (i in remaining.indices) {
-                    generate(current + remaining[i], remaining.subList(0, i) + remaining.subList(i + 1, remaining.size))
-                }
-            }
-        }
-
-        generate(emptyList(), criteria)
-        return result
     }
 
 }
