@@ -78,7 +78,7 @@
                 android:id="@+id/materialCardView"
                 style="?attr/materialCardViewElevatedStyle"
                 android:layout_width="match_parent"
-                android:layout_height="150dp"
+                android:layout_height="110dp"
                 android:layout_marginStart="15dp"
                 android:layout_marginEnd="15dp">
 
@@ -103,7 +103,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="19dp"
                         android:fontFamily="@font/roboto_light"
                         android:text="Ksh."
                         android:textSize="20sp"
@@ -121,9 +121,10 @@
                         android:textSize="60sp"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintHorizontal_bias="0.65"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintVertical_bias="0.628" />
+                        app:layout_constraintVertical_bias="0.8" />
 
                     <ImageView
                         android:id="@+id/imageView"
@@ -138,6 +139,32 @@
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
             </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/materialCardViewChart"
+                style="?attr/materialCardViewElevatedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="170dp"
+                android:layout_marginTop="15dp"
+                android:layout_marginStart="15dp"
+                android:layout_marginEnd="15dp">
+                <!--<com.patrykandpatrick.vico.views.chart.ChartView
+                    android:id="@+id/chart_view_transactions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:chart="line"
+                    app:horizontalLayout="fullWidth"
+                    app:showStartAxis="false"
+                    app:chartHorizontalScrollingEnabled="true"
+                    app:lineChartStyle="@style/Chart1LineLayerStyle"
+                    app:chartZoomEnabled="true"
+                    app:showBottomAxis="true" />-->
+                <com.github.mikephil.charting.charts.LineChart
+                    android:id="@+id/lineChart"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    />
+            </com.google.android.material.card.MaterialCardView>
+
 
             <HorizontalScrollView
                 android:id="@+id/horizontalScrollView"
@@ -340,13 +367,13 @@
                     android:id="@+id/no_transactions_message"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="60dp"
+                    android:layout_marginTop="30dp"
                     android:text="No transactions to show."
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="@+id/transactions_recycler"
                     app:layout_constraintStart_toStartOf="@+id/transactions_recycler"
                     app:layout_constraintTop_toTopOf="@+id/transactions_recycler"
-                    app:layout_constraintVertical_bias="0.928" />
+                    app:layout_constraintVertical_bias="0.795" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/transactions_recycler"

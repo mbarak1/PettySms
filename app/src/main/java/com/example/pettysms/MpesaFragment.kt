@@ -7,11 +7,20 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.PixelFormat
+import android.graphics.Shader
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
@@ -23,6 +32,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.Toolbar
@@ -36,6 +46,17 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.vectordrawable.graphics.drawable.ArgbEvaluator
 import antonkozyriatskyi.circularprogressindicator.CircularProgressIndicator
 import com.example.pettysms.databinding.FragmentMpesaBinding
+import com.github.mikephil.charting.animation.Easing
+import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.components.YAxis
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
+import com.github.mikephil.charting.highlight.Highlight
+import com.github.mikephil.charting.listener.OnChartValueSelectedListener
+import com.github.mikephil.charting.utils.Utils
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.color.MaterialColors
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +64,8 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -79,6 +102,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     private lateinit var bigResult: MpesaTransaction.Companion.MpesaTransactionResult
     private lateinit var layoutSelectAll: LinearLayout
     private lateinit var adapter: MpesaTransactionAdapter
+    private lateinit var lineChart: LineChart
+
 
 
     private var actionMode: ActionMode? = null
@@ -127,6 +152,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         circularProgressDrawable = binding.circularProgress
         viewAlLink = binding.viewAllLink
         appBar = binding.appbar
+        lineChart = binding.lineChart
         layoutSelectAll = binding.selectAllLayout
         //constraintLayout.loadSkeleton { balance_text }
         //mpesa_balance_label.loadSkeleton()
@@ -272,16 +298,18 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         return dataViewModel?.dataArray
     }
 
-    private fun updateTransactionThisMonth(all_mpesa_transactions: MutableList<MpesaTransaction>) {
+    private fun updateTransactionThisMonth(mpesa_transactions: MutableList<MpesaTransaction>) {
         updateTextBox = binding.transactionsThisMonth
         netSpendTextBox= binding.netSpendThisMonth
         val no_transactions_textbox: TextView = binding.noTransactionsMessage
 
-        if (all_mpesa_transactions.isEmpty()){
+        if (mpesa_transactions.isEmpty()){
             no_transactions_textbox.visibility = View.VISIBLE
         }else{
             no_transactions_textbox.visibility = View.INVISIBLE
         }
+
+        var sorted_mpesa_transactions = sortTransactions(mpesa_transactions)
 
         viewAlLink.setOnClickListener{
             Toast.makeText(
@@ -311,7 +339,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
 
         // Filter transactions for the current month and year
-        val transactions_today = all_mpesa_transactions.filter { transaction ->
+        val transactions_today = sorted_mpesa_transactions.filter { transaction ->
             // Assuming transactionDate is a String property in the format "dd/MM/yyyy HH:mm:ss"
             isSameDay(transaction.transaction_date.toString(), currentDate)
         }.toMutableList()
@@ -319,11 +347,11 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         if(!transactions_today.isNullOrEmpty()){
         }
 
-        val totalExpensesThisMonth = all_mpesa_transactions
+        val totalExpensesThisMonth = sorted_mpesa_transactions
             .filter { !it.transaction_date?.isEmpty()!! && isValidDate(it.transaction_date!!, dateFormat, currentMonth, currentYear) && (it.transaction_type != "deposit" && it.transaction_type != "receival" && it.transaction_type != "reverse") }
             .sumOf { it.amount!! }
 
-        val totalIncomeThisMonth = all_mpesa_transactions
+        val totalIncomeThisMonth = sorted_mpesa_transactions
             .filter { !it.transaction_date?.isEmpty()!! && isValidDate(it.transaction_date!!, dateFormat, currentMonth, currentYear) && (it.transaction_type == "deposit" || it.transaction_type == "receival" || it.transaction_type == "reverse") }
             .sumOf { it.amount!! }
 
@@ -333,8 +361,12 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         updateTextBox.text = totalExpensesThisMonth.toString()
         netSpendTextBox.text = netSpendThisMonth.toString()
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            chartUpdate(sorted_mpesa_transactions)
+        }
+
         val recyclerView: RecyclerView = binding.transactionsRecycler
-        adapter = MpesaTransactionAdapter(requireContext(),all_mpesa_transactions, object : MpesaTransactionAdapter.OnItemClickListener{
+        adapter = MpesaTransactionAdapter(requireContext(),sorted_mpesa_transactions, object : MpesaTransactionAdapter.OnItemClickListener{
 
             override fun onItemClick(transactionId: Int?) {
                 if (actionMode != null) {
@@ -358,9 +390,11 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             }
         } )
 
+        Log.d(this.activity.toString(), "stuff: " + sorted_mpesa_transactions.first().transaction_date)
 
 
-        if(all_mpesa_transactions.isNullOrEmpty()){
+
+        if(sorted_mpesa_transactions.isNullOrEmpty()){
             var latest_mpesa_transaction = mutableListOf<MpesaTransaction>()
             latest_mpesa_transaction = db_helper?.getMostRecentTransaction()!!
             //println("size ya hii mpya ni:" + latest_mpesa_transaction_last_month.size + " " + latest_mpesa_transaction_last_month.first().transaction_date)
@@ -368,7 +402,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             balance_text.text = String.format("%,.2f", latest_mpesa_transaction.first().mpesa_balance)
 
         }else{
-            balance_text.text = String.format("%,.2f", all_mpesa_transactions.first().mpesa_balance)
+            balance_text.text = String.format("%,.2f", sorted_mpesa_transactions.first().mpesa_balance)
         }
 
         /*balance_text.hideSkeleton()
@@ -385,6 +419,250 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         recyclerView.adapter = adapter
 
 
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun chartUpdate(sorted_transactions: MutableList<MpesaTransaction>) {
+
+        /*val currentDate = Calendar.getInstance()
+        val currentMonth = currentDate.get(Calendar.MONTH) + 1 // Months in Calendar are 0-based
+        val year = currentDate.get(Calendar.YEAR)
+        val daysInMonth = currentDate.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+        val count_map = countTransactionsByDate(sorted_transactions)
+        count_map.forEach { (date, count) ->
+            println("Date: $date, Transaction Count: $count")
+        }
+
+        val data = (1..daysInMonth).map { dayOfMonth ->
+            currentDate.set(Calendar.DAY_OF_MONTH, dayOfMonth)
+            val dateString = formatter.format(currentDate.time)
+            dateString to 0f // Change 0f to any default value you want
+        }.toMap()
+
+        val data1 = listOf("2022-07-01" to 2f, "2022-07-02" to 6f, "2022-07-04" to 4f).associate { (dateString, yValue) ->
+            LocalDate.parse(dateString) to yValue
+        }
+
+        val chartEntryModel3 = entryModelOf(
+            data1.entries.map { (date, value) ->
+                val xValue = date.toEpochDay().toFloat()
+                val yValue = value
+                entryOf(xValue, yValue)
+            }
+        )
+
+        val xValuesToDates = data1.keys.associateBy { it.toEpochDay().toFloat() }
+        //val chartEntryModel2 = entryModelOf(xValuesToDates.keys.zip(entriesOf(data.values)))
+        val dateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM")
+        val horizontalAxisValueFormatter = AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
+            (xValuesToDates[value] ?: LocalDate.ofEpochDay(value.toLong())).format(dateTimeFormatter)
+        }
+
+        val chartEntryModel = entryModelOf(entriesOf(4f, 12f, 8f, 16f))
+
+        val chartEntryModel2 = entryModelOf(
+            data1.map { (dateString, yValue) ->
+                val xValue = dateString.toEpochDay().toFloat()
+                entryOf(xValue, yValue)
+            }
+        )
+
+
+        val chart = chart_transaction
+        chart.apply {
+             bottomAxis
+        }
+
+        chart.setModel(chartEntryModel2)
+
+
+       // chart_transaction.setModel(chartEntryModel3)*/
+        val dataMap = HashMap<LocalDate, Float>()
+        dataMap[LocalDate.of(2024, 2, 21)] = 4f
+        dataMap[LocalDate.of(2024, 2, 22)] = 8f
+        dataMap[LocalDate.of(2024, 2, 23)] = 6f
+        dataMap[LocalDate.of(2024, 2, 24)] = 2f
+        dataMap[LocalDate.of(2024, 2, 25)] = 7f
+        dataMap[LocalDate.of(2024, 2, 26)] = 5f
+        val count_map = countTransactionsByDate(sorted_transactions)
+        val colorPrimary = MaterialColors.getColor(requireContext(), com.google.android.material.R.attr.colorPrimary, 0)
+        val colorSurfaceContainer = MaterialColors.getColor(requireContext(), com.google.android.material.R.attr.colorSurfaceContainer, 0)
+        val colorControlNormal = MaterialColors.getColor(requireContext(), com.google.android.material.R.attr.colorControlNormal, 0)
+        val entries = ArrayList<Entry>()
+        val xAxisLabels = mutableListOf<String>()
+
+        // Convert LocalDate to formatted strings and add to entries and xAxisLabels
+        val formatter = DateTimeFormatter.ofPattern("dd-MMM", Locale.ENGLISH)
+        var index = 0f
+
+        val minDate = count_map.keys.minOrNull()
+        val maxDate = count_map.keys.maxOrNull()
+
+        if (minDate != null && maxDate != null) {
+            var currentDate = minDate
+            while (currentDate?.isBefore(maxDate) == true || currentDate == maxDate) {
+                val value = count_map[currentDate] ?: 0f
+                entries.add(Entry(index++, value))
+                xAxisLabels.add(currentDate.format(formatter))
+                currentDate = currentDate.plusDays(1) // Move to the next day
+            }
+        }
+        val dataSet = LineDataSet(entries, "Number of Transactions")
+
+        // Set gradient fill
+        val startColor = colorPrimary // Red
+        val endColor = colorSurfaceContainer  // Green
+        val gradientDrawable = ChartUtils.getGradientDrawable(startColor, endColor)
+        dataSet.fillDrawable = gradientDrawable
+        dataSet.setDrawFilled(true)
+
+        // Customize markers
+        dataSet.setDrawCircles(true)
+        dataSet.circleRadius = 4f // Increased size
+        dataSet.setCircleColor(colorPrimary)
+
+        // Customize line
+        dataSet.color = colorPrimary
+        dataSet.lineWidth = 2f // Increased thickness
+        dataSet.mode = LineDataSet.Mode.LINEAR // Smooth line
+
+        val lineData = LineData(dataSet)
+        lineChart.data = lineData
+
+        // Set XAxis formatter to display dates
+        val xAxis = lineChart.xAxis
+        println("malabel: " + xAxisLabels.toString())
+        xAxis.valueFormatter = IndexAxisValueFormatter(xAxisLabels)
+        xAxis.position = XAxis.XAxisPosition.BOTTOM
+        xAxis.setGranularity(1f) // Ensure all x-axis values are shown
+
+
+        // Hide Y axis grid lines
+        val leftAxis: YAxis = lineChart.axisLeft
+        leftAxis.setDrawGridLines(false)
+
+        // Hide right Y axis
+        val rightAxis: YAxis = lineChart.axisRight
+        rightAxis.isEnabled = false
+
+        //lineChart.setTouchEnabled(false) // Disable touch gestures (including zooming)
+        lineChart.isDragEnabled = false // Disable dragging (panning)
+        lineChart.setScaleEnabled(false) // Disable scaling (zooming)
+        lineChart.isDoubleTapToZoomEnabled = false // Disable double-tap zoom
+        lineChart.getDescription().setEnabled(false);
+
+        // Set text color for x-axis and y-axis labels
+        lineChart.xAxis.textColor = colorControlNormal
+        lineChart.axisLeft.textColor = colorControlNormal
+        lineChart.axisRight.textColor = colorControlNormal
+
+// Set text color for legend
+        val legend = lineChart.legend
+        legend.textColor = colorControlNormal
+
+
+
+        // Set animation
+        // Set the initial alpha to 0
+        lineChart.alpha = 0f
+
+        // Animate the alpha to 1 (fully visible) over a specified duration
+        lineChart.animate()
+            .alpha(1f)
+            .setDuration(1000) // Adjust the duration as needed
+            .start()
+        //lineChart.animateX(1500, Easing.EaseInOutExpo)
+        lineChart.invalidate()
+
+        // Display marker when clicked
+        lineChart.setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
+            override fun onValueSelected(e: Entry?, h: Highlight?) {
+                val formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy", Locale.ENGLISH)
+                val date = e?.x?.toInt()?.let { index ->
+                    dataMap.keys.sorted().toList().getOrNull(index)?.format(formatter) ?: ""
+                } ?: ""
+                val value = e?.y ?: 0f // Get the value of the selected data point
+                Toast.makeText(
+                    requireContext(),
+                    "Date: $date Value: $value",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
+            override fun onNothingSelected() {}
+        })
+    }
+
+    object ChartUtils {
+
+        // Function to create a gradient drawable
+        fun getGradientDrawable(startColor: Int, endColor: Int): Drawable {
+            return object : Drawable() {
+                override fun draw(canvas: Canvas) {
+                    val gradient = LinearGradient(
+                        0f, bounds.top.toFloat(), 0f, bounds.bottom.toFloat(),
+                        startColor, endColor, Shader.TileMode.CLAMP
+                    )
+                    val paint = Paint().apply { shader = gradient }
+                    canvas.drawRect(bounds, paint)
+                }
+
+                override fun setAlpha(alpha: Int) {}
+                override fun setColorFilter(colorFilter: ColorFilter?) {}
+                override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+            }
+        }
+    }
+
+    private fun getDateLabels(): List<String> {
+        val dateLabels = mutableListOf<String>()
+        val calendar = Calendar.getInstance()
+        val dateFormat = java.text.SimpleDateFormat("dd-MMM", Locale.ENGLISH)
+        for (i in 0 until 6) {
+            calendar.add(Calendar.DAY_OF_MONTH, 1)
+            dateLabels.add(dateFormat.format(calendar.time))
+        }
+        return dateLabels
+    }
+
+    private fun convertDateToFloat(dateString: String): Float {
+        val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.ENGLISH)
+        val date = dateFormat.parse(dateString)
+        return date.time.toFloat()
+    }
+
+    fun sortTransactions(transactions: MutableList<MpesaTransaction>): MutableList<MpesaTransaction> {
+        val dateFormatter = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+        val comparator = Comparator<MpesaTransaction> { t1, t2 ->
+            val date1 = getDate(t1)
+            val date2 = getDate(t2)
+            date2.compareTo(date1)
+        }
+        transactions.sortWith(comparator)
+        return transactions.toMutableList()
+    }
+
+    private fun getDate(transaction: MpesaTransaction): Date {
+        val dateString = if (transaction.transaction_date?.isNotEmpty() == true) transaction.transaction_date else transaction.msg_date
+        val dateFormatter = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+        return dateFormatter.parse(dateString)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun countTransactionsByDate(transactions: MutableList<MpesaTransaction>): Map<LocalDate, Float> {
+        val transactionCountMap = mutableMapOf<LocalDate, Float>()
+
+        for (transaction in transactions) {
+            val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
+            val localDate = LocalDate.parse(transaction.transaction_date ?: transaction.msg_date, formatter)
+            //val date = transaction.transaction_date?.split(" ")?.get(0) ?: transaction.msg_date?.split(" ")?.get(0) // Extracting only the date part
+            val count = transactionCountMap[localDate] ?: 0
+            transactionCountMap[localDate] = count.toFloat() + 1f
+        }
+
+        return transactionCountMap
     }
 
     private fun toggleSelection(transactionId: Int?) {
