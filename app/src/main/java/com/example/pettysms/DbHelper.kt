@@ -204,6 +204,12 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         val query = "SELECT * FROM $TABLE_TRANSACTIONS WHERE substr($COL_TRANSACTIONS_TRANSACTION_DATE, 4, 7) = '$currentMonthYear'"
         return getTransactionsFromQuery(query)
     }
+    fun getThisMonthMpesaNonDeletedTransactions(): MutableList<MpesaTransaction> {
+
+        val currentMonthYear = SimpleDateFormat("MM/yyyy", Locale.getDefault()).format(Calendar.getInstance().time)
+        val query = "SELECT * FROM $TABLE_TRANSACTIONS WHERE substr($COL_TRANSACTIONS_TRANSACTION_DATE, 4, 7) = '$currentMonthYear' AND is_deleted = 0"
+        return getTransactionsFromQuery(query)
+    }
 
     fun getLatestTransactionLastMonth(): MutableList<MpesaTransaction> {
 

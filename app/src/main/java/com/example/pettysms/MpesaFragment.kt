@@ -14,12 +14,16 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Shader
+import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.StyleSpan
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
@@ -28,6 +32,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -59,6 +64,7 @@ import com.github.mikephil.charting.listener.OnChartValueSelectedListener
 import com.github.mikephil.charting.utils.Utils
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -93,6 +99,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     private lateinit var verticalShrinkAnimation: Animation
     private lateinit var fadeInAnimation: Animation
     private lateinit var fadeOutAnimation: Animation
+    private lateinit var verticalShrinkFadeOut: Animation
     private lateinit var fadeInselectLayoutAnimation: Animation
     private lateinit var updateTextBox : TextView
     private lateinit var netSpendTextBox: TextView
@@ -103,6 +110,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     private lateinit var layoutSelectAll: LinearLayout
     private lateinit var adapter: MpesaTransactionAdapter
     private lateinit var lineChart: LineChart
+    private lateinit var selectAllCheckBox: CheckBox
+
 
 
 
@@ -110,11 +119,13 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
 
     private val selectedTransactions = HashSet<Int>()
+    private val removedTransactions = HashSet<Int>()
     private var rejectedSmsList = mutableListOf<MutableList<String>>()
     private val dataViewModel: DataViewModel by activityViewModels()
 
 
     private var all_mpesa_transactions= mutableListOf<MpesaTransaction>()
+    private var activeTransactions = mutableListOf<MpesaTransaction>()
 
 
     var db_helper = this.activity?.applicationContext?.let { DbHelper(it) }
@@ -154,6 +165,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         appBar = binding.appbar
         lineChart = binding.lineChart
         layoutSelectAll = binding.selectAllLayout
+        selectAllCheckBox = binding.checkboxSelectAllItems
+        verticalShrinkFadeOut = AnimationUtils.loadAnimation(requireContext(), R.anim.vertical_shrink_fade_out)
         //constraintLayout.loadSkeleton { balance_text }
         //mpesa_balance_label.loadSkeleton()
         /*balance_text.loadSkeleton()
@@ -261,7 +274,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
                 if(all_mpesa_transactions.isNullOrEmpty() && all_mpesa_transactions.isNullOrEmpty()) {
                     println("check DB")
-                    all_mpesa_transactions = db_helper?.getThisMonthMpesaTransactions()!!
+                    all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
                     saveArrayToViewModel(all_mpesa_transactions)
                 }
 
@@ -310,6 +323,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         }
 
         var sorted_mpesa_transactions = sortTransactions(mpesa_transactions)
+        activeTransactions = sorted_mpesa_transactions
 
         viewAlLink.setOnClickListener{
             Toast.makeText(
@@ -424,68 +438,6 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun chartUpdate(sorted_transactions: MutableList<MpesaTransaction>) {
 
-        /*val currentDate = Calendar.getInstance()
-        val currentMonth = currentDate.get(Calendar.MONTH) + 1 // Months in Calendar are 0-based
-        val year = currentDate.get(Calendar.YEAR)
-        val daysInMonth = currentDate.getActualMaximum(Calendar.DAY_OF_MONTH)
-        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-
-        val count_map = countTransactionsByDate(sorted_transactions)
-        count_map.forEach { (date, count) ->
-            println("Date: $date, Transaction Count: $count")
-        }
-
-        val data = (1..daysInMonth).map { dayOfMonth ->
-            currentDate.set(Calendar.DAY_OF_MONTH, dayOfMonth)
-            val dateString = formatter.format(currentDate.time)
-            dateString to 0f // Change 0f to any default value you want
-        }.toMap()
-
-        val data1 = listOf("2022-07-01" to 2f, "2022-07-02" to 6f, "2022-07-04" to 4f).associate { (dateString, yValue) ->
-            LocalDate.parse(dateString) to yValue
-        }
-
-        val chartEntryModel3 = entryModelOf(
-            data1.entries.map { (date, value) ->
-                val xValue = date.toEpochDay().toFloat()
-                val yValue = value
-                entryOf(xValue, yValue)
-            }
-        )
-
-        val xValuesToDates = data1.keys.associateBy { it.toEpochDay().toFloat() }
-        //val chartEntryModel2 = entryModelOf(xValuesToDates.keys.zip(entriesOf(data.values)))
-        val dateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM")
-        val horizontalAxisValueFormatter = AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
-            (xValuesToDates[value] ?: LocalDate.ofEpochDay(value.toLong())).format(dateTimeFormatter)
-        }
-
-        val chartEntryModel = entryModelOf(entriesOf(4f, 12f, 8f, 16f))
-
-        val chartEntryModel2 = entryModelOf(
-            data1.map { (dateString, yValue) ->
-                val xValue = dateString.toEpochDay().toFloat()
-                entryOf(xValue, yValue)
-            }
-        )
-
-
-        val chart = chart_transaction
-        chart.apply {
-             bottomAxis
-        }
-
-        chart.setModel(chartEntryModel2)
-
-
-       // chart_transaction.setModel(chartEntryModel3)*/
-        val dataMap = HashMap<LocalDate, Float>()
-        dataMap[LocalDate.of(2024, 2, 21)] = 4f
-        dataMap[LocalDate.of(2024, 2, 22)] = 8f
-        dataMap[LocalDate.of(2024, 2, 23)] = 6f
-        dataMap[LocalDate.of(2024, 2, 24)] = 2f
-        dataMap[LocalDate.of(2024, 2, 25)] = 7f
-        dataMap[LocalDate.of(2024, 2, 26)] = 5f
         val count_map = countTransactionsByDate(sorted_transactions)
         val colorPrimary = MaterialColors.getColor(requireContext(), com.google.android.material.R.attr.colorPrimary, 0)
         val colorSurfaceContainer = MaterialColors.getColor(requireContext(), com.google.android.material.R.attr.colorSurfaceContainer, 0)
@@ -509,7 +461,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                 currentDate = currentDate.plusDays(1) // Move to the next day
             }
         }
-        val dataSet = LineDataSet(entries, "Number of Transactions")
+        val dataSet = LineDataSet(entries, "Number of transactions this month")
 
         // Set gradient fill
         val startColor = colorPrimary // Red
@@ -581,7 +533,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             override fun onValueSelected(e: Entry?, h: Highlight?) {
                 val formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy", Locale.ENGLISH)
                 val date = e?.x?.toInt()?.let { index ->
-                    dataMap.keys.sorted().toList().getOrNull(index)?.format(formatter) ?: ""
+                    count_map.keys.sorted().toList().getOrNull(index)?.format(formatter) ?: ""
                 } ?: ""
                 val value = e?.y ?: 0f // Get the value of the selected data point
                 Toast.makeText(
@@ -614,23 +566,6 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                 override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
             }
         }
-    }
-
-    private fun getDateLabels(): List<String> {
-        val dateLabels = mutableListOf<String>()
-        val calendar = Calendar.getInstance()
-        val dateFormat = java.text.SimpleDateFormat("dd-MMM", Locale.ENGLISH)
-        for (i in 0 until 6) {
-            calendar.add(Calendar.DAY_OF_MONTH, 1)
-            dateLabels.add(dateFormat.format(calendar.time))
-        }
-        return dateLabels
-    }
-
-    private fun convertDateToFloat(dateString: String): Float {
-        val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.ENGLISH)
-        val date = dateFormat.parse(dateString)
-        return date.time.toFloat()
     }
 
     fun sortTransactions(transactions: MutableList<MpesaTransaction>): MutableList<MpesaTransaction> {
@@ -668,11 +603,11 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     private fun toggleSelection(transactionId: Int?) {
         if (selectedTransactions.contains(transactionId)) {
             selectedTransactions.remove(transactionId)
-            println("removed")
+            removedTransactions.add(transactionId!!)
         } else {
-            if (transactionId != null) {
-                println("added")
-                selectedTransactions.add(transactionId)
+            transactionId?.let {
+                selectedTransactions.add(it)
+                removedTransactions.remove(transactionId)
             }
         }
 
@@ -682,16 +617,95 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         adapter.setSelectedTransactions(selectedTransactions, false)
     }
 
+
+    private fun showWarnigDialog(){
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Warning")
+            .setMessage(getDeleteMessageString())
+            .setIcon(R.drawable.baseline_warning_amber_white_24dp) // Center align the message
+            .setNegativeButton("Dismiss") { dialog, which ->
+                // Respond to negative button press
+            }
+            .setPositiveButton("Confirm") { dialog, which ->
+                // Respond to positive button press
+                adapter.setRemovedTransactions(selectedTransactions, selectAllCheckBox.isChecked)
+                Log.d(this.activity.toString(), "deleted utilised")
+
+                if(selectAllCheckBox.isChecked){
+                    deleteAllTransactions()
+                    selectAllCheckBox.isChecked = false
+                }
+                else{
+                    deleteSeletectedTransactionsFromDb(selectedTransactions)
+                }
+
+                clearSelectionWithoutNotifyingAdapter()
+
+                updateActionModeTitle()
+            }
+            .show()
+    }
+
+    private fun getDeleteMessageString() : SpannableStringBuilder {
+        val message = "Are you sure you want to delete ${selectedTransactions.size} transaction(s)?"
+        val boldText = selectedTransactions.size.toString()
+
+        val startIndex = message.indexOf(boldText)
+        val endIndex = startIndex + boldText.length
+
+        val spannable = SpannableStringBuilder(message)
+        spannable.setSpan(
+            StyleSpan(Typeface.BOLD),
+            startIndex,
+            endIndex,
+            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        return spannable
+    }
+
     private fun deleteSelectedTransactions() {
         // Handle the deletion of selected transactions
         // Update your data source or perform other actions
-        // ...
-        clearSelection()
+        showWarnigDialog()
+    }
+
+    private fun deleteSeletectedTransactionsFromDb(selectedTransactions: HashSet<Int>) {
+        for (selectedTransaction in selectedTransactions){
+            db_helper?.deleteTransaction(selectedTransaction)
+            Log.d(this.activity.toString(), "Deleted Transaction: " + selectedTransaction)
+        }
+
+        updateDeletedTransactionsArray()
+
+    }
+
+    fun updateDeletedTransactionsArray(){
+        val iterator = all_mpesa_transactions.iterator()
+        while (iterator.hasNext()) {
+            val item = iterator.next()
+            if (item.id in selectedTransactions) {
+                iterator.remove()
+            }
+        }
+
+        saveArrayToViewModel(all_mpesa_transactions)
+
+        updateTransactionThisMonth(all_mpesa_transactions)
+    }
+
+    fun deleteAllTransactions(){
+        db_helper?.deleteAllTransactions()
+        updateDeletedTransactionsArray()
     }
 
     private fun clearSelection() {
         selectedTransactions.clear()
         adapter.clearSelection()
+    }
+
+    private fun clearSelectionWithoutNotifyingAdapter(){
+        selectedTransactions.clear()
     }
 
     private fun updateActionModeTitle() {
@@ -750,9 +764,27 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             val customView = LayoutInflater.from(requireContext()).inflate(R.layout.custom_action_mode_layout, null)
             //mode?.customView = customView
             mode?.menuInflater?.inflate(R.menu.context_menu, menu)
+
             layoutSelectAll.startAnimation(fadeInselectLayoutAnimation)
             layoutSelectAll.visibility = View.VISIBLE
             changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurfaceContainer)
+            selectAllCheckBox.setOnCheckedChangeListener { buttonView, isChecked ->
+                if(isChecked){
+                    selectedTransactions.clear()
+                    for (activetransaction in activeTransactions){
+                        selectedTransactions.add(activetransaction.id!!)
+                    }
+                    updateActionModeTitle()
+                    adapter.setSelectedTransactions(selectedTransactions,true)
+
+                }else{
+                    selectedTransactions.clear()
+                    updateActionModeTitle()
+                    adapter.setSelectedTransactions(selectedTransactions, true)
+
+                }
+            }
+
 
             return true
         }
@@ -765,6 +797,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
             when (item?.itemId) {
                 R.id.delete_mpesa_transaction -> {
+                    deleteSelectedTransactions()
                     // Handle delete action
                     // Implement this method to delete selected items
                     // For now, let's just finish the ActionMode
@@ -777,12 +810,14 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
         override fun onDestroyActionMode(mode: ActionMode?) {
             // Clear the selection and finish ActionMode
+            selectedTransactions.clear()
+            adapter.reinitializeAdapter()
+            adapter.setActionModeStatus(true)
             changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurface)
-            clearSelection()
-            layoutSelectAll.startAnimation(fadeOutAnimation)
+            layoutSelectAll.startAnimation(verticalShrinkFadeOut)
             layoutSelectAll.visibility = View.GONE
             actionMode = null
-            adapter.reinitializeAdapter()
+            selectAllCheckBox.isChecked = false
 
         }
     }
@@ -1445,7 +1480,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
 
 
-        all_mpesa_transactions = db_helper?.getThisMonthMpesaTransactions()!!
+        all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
 
 
 
@@ -1460,7 +1495,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     }
     override fun onRefresh() {
         // This method will be called when you need to refresh the RecyclerViews
-        all_mpesa_transactions = db_helper?.getThisMonthMpesaTransactions()!!
+        all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
         requireActivity().runOnUiThread {
             updateTransactionThisMonth(all_mpesa_transactions)
 
