@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/transactionViewerLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".TransactionViewer">
+
+  <com.google.android.material.card.MaterialCardView
+      android:id="@+id/amountCard"
+      style="?attr/materialCardViewFilledStyle"
+      android:layout_width="match_parent"
+      app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+      android:layout_height="180dp"
+      app:cardCornerRadius="30dp"
+      android:layout_marginTop="-40dp"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toTopOf="parent">
+
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+      <TextView
+          android:id="@+id/transactionAmount"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="100/-"
+          android:textSize="31sp"
+          android:letterSpacing="0.09"
+          android:textFontWeight="1000"
+          android:textColor="?attr/colorPrimary"
+          android:fontFamily="@font/roboto_light"
+          app:layout_constraintBottom_toBottomOf="parent"
+          app:layout_constraintEnd_toEndOf="parent"
+          app:layout_constraintStart_toStartOf="parent"
+          app:layout_constraintTop_toTopOf="parent"
+          app:layout_constraintVertical_bias="0.503" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+  </com.google.android.material.card.MaterialCardView>
+
+  <xyz.schwaab.avvylib.AvatarView
+      android:id="@+id/avatar_view"
+      android:layout_width="100dp"
+      android:layout_height="100dp"
+      android:layout_marginTop="-45dp"
+      app:avvy_border_color="@android:color/darker_gray"
+      app:avvy_border_highlight_color="?attr/colorPrimary"
+      app:avvy_border_highlight_color_end="#3088ff"
+      app:avvy_border_thickness="2dp"
+      app:avvy_border_thickness_highlight="3dp"
+      app:avvy_distance_to_border="2dp"
+      app:avvy_highlighted="true"
+      app:avvy_loading_arches="5"
+      app:avvy_loading_arches_degree_area="90"
+      app:avvy_text_color="?attr/colorAccent"
+      app:avvy_text_size="30sp"
+      app:avvy_circle_background_color="?attr/colorSurface"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/amountCard" />
+
+  <com.google.android.material.chip.ChipGroup
+      android:id="@+id/chipGroup"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="35dp"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintHorizontal_bias="0.501"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/avatar_view">
+
+    <com.google.android.material.chip.Chip
+        android:id="@+id/code_chip"
+        style="@style/Widget.Material3.Chip.Suggestion.Elevated"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="45dp"
+        android:clickable="false"
+        android:text="code"
+        android:textFontWeight="800"
+        android:fontFamily="@font/roboto_light"
+        android:textColor="@color/black"
+        app:chipBackgroundColor="@color/green_color"
+        app:chipCornerRadius="20dp" />
+
+    <com.google.android.material.chip.Chip
+        android:id="@+id/type_chip"
+        style="@style/Widget.Material3.Chip.Suggestion.Elevated"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="false"
+        android:text="Type"
+        android:textFontWeight="800"
+        android:fontFamily="@font/roboto_light"
+        android:textColor="@color/white"
+        app:chipCornerRadius="20dp" />
+  </com.google.android.material.chip.ChipGroup>
+
+  <com.google.android.material.card.MaterialCardView
+      android:id="@+id/detailsCard"
+      style="?attr/materialCardViewElevatedStyle"
+      app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginLeft="20dp"
+      android:layout_marginRight="20dp"
+      app:layout_constraintBottom_toBottomOf="parent"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintHorizontal_bias="1.0"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/chipGroup"
+      app:layout_constraintVertical_bias="0.18" >
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+      <LinearLayout
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/transactionDetailsLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_light"
+            android:letterSpacing="0.1"
+            android:text="@string/transaction_details"
+            android:textFontWeight="1000"
+            android:textSize="19sp" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:id="@+id/transactionIdLayout"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:layout_marginRight="17dp"
+          android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/transactionIdLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Date"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/transactionIdValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_light"
+            android:gravity="end"
+            android:text="Transaction Date"
+            android:textColor="?attr/colorPrimary"
+            android:textFontWeight="1000"
+            android:textSize="16sp" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:id="@+id/transactionDateLayout"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:layout_marginRight="17dp"
+          android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/transactionDateLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Date"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/transactionDateValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_light"
+            android:gravity="end"
+            android:text="Transaction Date"
+            android:textColor="?attr/colorPrimary"
+            android:textFontWeight="1000"
+            android:textSize="16sp" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:id="@+id/transactorLayout"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:layout_marginRight="17dp"
+          android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/transactorLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Date"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/transactorValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_light"
+            android:gravity="end"
+            android:maxLines="1"
+            android:maxLength="30"
+            android:ellipsize="end"
+            android:text="Transaction Date"
+            android:textColor="?attr/colorPrimary"
+            android:textFontWeight="1000"
+            android:textSize="16sp" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:id="@+id/descriptionLayout"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:layout_marginRight="17dp"
+          android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/descriptionLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Date"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/descriptionValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_light"
+            android:gravity="end"
+            android:maxLines="1"
+            android:maxLength="30"
+            android:ellipsize="end"
+            android:text="Transaction Date"
+            android:textColor="?attr/colorPrimary"
+            android:textFontWeight="1000"
+            android:textSize="16sp" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:id="@+id/trasactionCostLayout"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:layout_marginRight="17dp"
+          android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/transactionCostLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Date"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/transactionCostValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_light"
+            android:gravity="end"
+            android:text="Transaction Date"
+            android:textColor="?attr/colorPrimary"
+            android:textFontWeight="1000"
+            android:textSize="16sp" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:id="@+id/trasactionBalanceLayout"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:layout_marginRight="17dp"
+          android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/transactionBalanceLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Date"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/transactionBalanceValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_light"
+            android:gravity="end"
+            android:text="Transaction Date"
+            android:textColor="?attr/colorPrimary"
+            android:textFontWeight="1000"
+            android:textSize="16sp" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:id="@+id/smsTextLayout"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:layout_marginRight="17dp"
+          android:layout_marginBottom="25dp"
+          android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/smsTextLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Date"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/smsTextValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto"
+            android:gravity="end"
+            android:autoLink="web"
+            android:textFontWeight="1000"
+            android:text="Transaction Date"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="16sp" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:id="@+id/paybillAccountLayout"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginLeft="17dp"
+          android:layout_marginTop="20dp"
+          android:layout_marginRight="17dp"
+          android:layout_marginBottom="20dp"
+          android:orientation="horizontal"
+          android:visibility="gone">
+
+        <TextView
+            android:id="@+id/paybillAccountLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_light"
+            android:text="Transaction Date"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/paybillAccountValue"
+            android:layout_width="wrap_content"
+            android:textColor="?attr/colorPrimary"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/roboto_light"
+            android:gravity="end"
+            android:maxLines="1"
+            android:maxLength="30"
+            android:ellipsize="end"
+            android:text="Transaction Date"
+            android:textFontWeight="1000"
+            android:textSize="16sp" />
+      </LinearLayout>
+    </LinearLayout>
+  </com.google.android.material.card.MaterialCardView>
+
+  <LinearLayout
+      android:id="@+id/actionButtonsLayout"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      app:layout_constraintBottom_toBottomOf="parent"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintHorizontal_bias="0.504"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/detailsCard"
+      app:layout_constraintVertical_bias="0.396">
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/editActionButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginStart="40dp"
+        android:layout_marginTop="40dp"
+        android:layout_marginBottom="40dp"
+        android:src="@drawable/material_3_edit_24px" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/deleteActionButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginStart="50dp"
+        android:layout_marginTop="40dp"
+        android:layout_marginBottom="40dp"
+        android:src="@drawable/ic_baseline_material_3_delete_action_button" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/shareActionButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginStart="50dp"
+        android:layout_marginTop="40dp"
+        android:layout_marginEnd="40dp"
+        android:layout_marginBottom="40dp"
+        android:src="@drawable/material_3_share_24px" />
+
+  </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

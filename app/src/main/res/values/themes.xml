@@ -24,5 +24,9 @@
         <item name="android:windowBackground">@android:color/white</item>
         <item name="actionMenuTextColor">?attr/colorAccent</item>
     </style>
+    <style name="FullscreenDialogAnimation">
+        <item name="android:windowEnterAnimation">@anim/slide_in_bottom</item>
+        <item name="android:windowExitAnimation">@anim/slide_out_bottom</item>
+    </style>
 
 </resources>

@@ -34,6 +34,8 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
     private val SMS_RECEIVE_PERMISSION_CODE = 126
     private val SMS_READ_PERMISSION_CODE = 127
     private val REQUEST_SMS_PERMISSION = 123
+    private val READ_EXTERNAL_STORAGE_CODE = 1
+    private val WRITE_EXTERNAL_STORAGE_CODE = 2
     private var check_fragment = "home"
     private var isServiceScheduled = false
 
@@ -96,6 +98,8 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
                     checkPermission(Manifest.permission.RECEIVE_SMS, SMS_RECEIVE_PERMISSION_CODE)
                     checkPermission(Manifest.permission.SEND_SMS, SMS_SEND_PERMISSION_CODE)
                     checkPermission(Manifest.permission.READ_SMS, SMS_READ_PERMISSION_CODE)
+                    checkPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE_CODE)
+                    checkPermission(Manifest.permission.READ_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE_CODE)
 
 
                     val requiredPermissionSmsSend = Manifest.permission.SEND_SMS
@@ -114,6 +118,8 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
                         checkPermission(Manifest.permission.RECEIVE_SMS, SMS_RECEIVE_PERMISSION_CODE)
                         checkPermission(Manifest.permission.SEND_SMS, SMS_SEND_PERMISSION_CODE)
                         checkPermission(Manifest.permission.READ_SMS, SMS_READ_PERMISSION_CODE)
+                        checkPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE_CODE)
+                        checkPermission(Manifest.permission.READ_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE_CODE)
 
                     }
 

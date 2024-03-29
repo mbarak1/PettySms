@@ -1,5 +1,7 @@
 package com.example.pettysms
 
-class User(val id: Int, var name: String?, var type: UserTypes) {
+import java.io.Serializable
+
+class User(val id: Int, var name: String?, var type: UserTypes){
 }
 

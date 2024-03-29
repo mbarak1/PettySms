@@ -9,6 +9,7 @@ import android.widget.ProgressBar
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.Serializable
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,7 +48,7 @@ class MpesaTransaction(
     user,
     payment_mode,
     description
-) {
+){
 
     companion object{
         data class MpesaTransactionResult(

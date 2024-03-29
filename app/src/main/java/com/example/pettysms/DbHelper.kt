@@ -454,6 +454,17 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         db.update(TABLE_TRANSACTIONS, contentValues, null, null)
     }
 
+    fun updateTransactionDescription(transactionId: Int, newDescription: String): Boolean {
+        val db = this.writableDatabase
+        val contentValues = ContentValues().apply {
+            put(COL_TRANSACTIONS_DESCRIPTION, newDescription)
+        }
+
+        val updateResult = db.update(TABLE_TRANSACTIONS, contentValues, "$COL_TRANSACTIONS_ID=?", arrayOf(transactionId.toString()))
+        db.close()
+        return updateResult != -1
+    }
+
 
     companion object {
         // If you change the database schema, you must increment the database version.

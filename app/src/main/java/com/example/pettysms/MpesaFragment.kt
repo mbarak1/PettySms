@@ -2,6 +2,7 @@ package com.example.pettysms
 
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -37,6 +38,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
@@ -65,6 +67,7 @@ import com.github.mikephil.charting.utils.Utils
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -386,6 +389,17 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                 if (actionMode != null) {
                     toggleSelection(transactionId)
                 }
+                else{
+                    val selectedTransaction = sorted_mpesa_transactions.find { it.id == transactionId }
+                    val gson = Gson()
+                    val mpesaTransactionJson = gson.toJson(selectedTransaction)
+
+                    val intent = Intent(requireContext(), TransactionViewer::class.java).apply {
+                        putExtra("mpesaTransactionJson", mpesaTransactionJson)
+                    }
+                    transactionViewerLauncher.launch(intent)
+
+                }
             }
 
             override fun onItemLongClick(transactionId: Int?) {
@@ -404,7 +418,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             }
         } )
 
-        Log.d(this.activity.toString(), "stuff: " + sorted_mpesa_transactions.first().transaction_date)
+        //Log.d(this.activity.toString(), "stuff: " + sorted_mpesa_transactions.first().transaction_date)
 
 
 
@@ -433,6 +447,23 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         recyclerView.adapter = adapter
 
 
+    }
+
+    private val transactionViewerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            // TransactionViewer activity is finished
+            // Execute your code here
+            println("habari yako")
+            all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
+            saveArrayToViewModel(all_mpesa_transactions)
+            updateTransactionThisMonth(all_mpesa_transactions)
+
+        }else{
+            println("hallo hallo")
+            all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
+            saveArrayToViewModel(all_mpesa_transactions)
+            updateTransactionThisMonth(all_mpesa_transactions)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)

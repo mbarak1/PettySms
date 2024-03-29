@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background circle -->
+    <item android:drawable="@drawable/background_circle"/>
+    <!-- Icon -->
+    <item
+        android:id="@+id/icon"
+        android:drawable="@drawable/material_3_edit_24px"
+        android:gravity="center"/>
+</layer-list>
