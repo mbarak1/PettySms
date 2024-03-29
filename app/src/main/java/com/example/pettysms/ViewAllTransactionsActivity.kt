@@ -2,7 +2,9 @@ package com.example.pettysms
 
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Typeface
 import android.os.Build
@@ -29,6 +31,7 @@ import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
@@ -43,6 +46,7 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.search.SearchBar
 import com.google.android.material.search.SearchView
+import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -416,6 +420,16 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
             override fun onItemClick(transactionId: Int?) {
                 if (actionMode != null) {
                     toggleSelection(transactionId)
+                }else{
+                    val selectedTransaction = activeTransactions.find { it.id == transactionId }
+                    val gson = Gson()
+                    val mpesaTransactionJson = gson.toJson(selectedTransaction)
+
+                    val intent = Intent(this@ViewAllTransactionsActivity, TransactionViewer::class.java).apply {
+                        putExtra("mpesaTransactionJson", mpesaTransactionJson)
+                    }
+                    transactionViewerLauncher.launch(intent)
+
                 }
             }
 
@@ -451,6 +465,22 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
             emptyMessage.visibility = View.GONE
         }
     }
+
+    private val transactionViewerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            // TransactionViewer activity is finished
+            // Execute your code here
+            println("habari yako")
+            allMpesaTransactions = db_helper?.getAllMpesaTransactions() ?: mutableListOf()
+            updateMainRecyclerView(allMpesaTransactions)
+
+        }else{
+            println("hallo hallo")
+            allMpesaTransactions = db_helper?.getAllMpesaTransactions() ?: mutableListOf()
+            updateMainRecyclerView(allMpesaTransactions)
+        }
+    }
+
 
 
     private val actionModeCallback = object : ActionMode.Callback {
