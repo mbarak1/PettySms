@@ -1,15 +1,9 @@
 package com.example.pettysms
 
-import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.View
 import android.widget.ProgressBar
-import android.widget.Toast
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.Serializable
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -17,36 +11,36 @@ import java.util.regex.Pattern
 
 class MpesaTransaction(
     id: Int?,
-    msg_date: String?,
-    transaction_date: String?,
-    mpesa_code: String?,
+    msgDate: String?,
+    transactionDate: String?,
+    mpesaCode: String?,
     recipient: Recepient?,
     account: Account?,
-    company_owner: Owner? = Owner(1, "abdulcon"),
+    companyOwner: Owner? = Owner(1, "Abdulcon Enterprises Limited", "abdulcon"),
     amount: Double? = 0.00,
-    transaction_type: String?,
+    transactionType: String?,
     user: User? = User(1, "Mbarak", UserTypes(1, "admin")),
-    payment_mode: PaymentMode? = PaymentMode(1, "mpesa"),
+    paymentMode: PaymentMode? = PaymentMode(1, "mpesa"),
     description: String? = "General Expenses",
-    var mpesa_balance: Double? = 0.00,
-    var transaction_cost: Double? = 0.00,
-    var mpesa_depositor: String? = "none",
-    var paybill_acount: String? = "none",
+    var mpesaBalance: Double? = 0.00,
+    var transactionCost: Double? = 0.00,
+    var mpesaDepositor: String? = "none",
+    var paybillAcount: String? = "none",
     var sender: Sender? = Sender("Non-sender", "Non-sender"),
-    var sms_text: String?,
+    var smsText: String?,
     var isDeleted: Boolean = false
 ) : Transaction(
     id,
-    msg_date,
-    transaction_date,
-    mpesa_code,
+    msgDate,
+    transactionDate,
+    mpesaCode,
     recipient,
     account,
-    company_owner,
+    companyOwner,
     amount,
-    transaction_type,
+    transactionType,
     user,
-    payment_mode,
+    paymentMode,
     description
 ){
 
@@ -269,9 +263,9 @@ class MpesaTransaction(
 
                         var mpesa_transaction = MpesaTransaction(
                             id = null,
-                            msg_date = msg_date,
-                            transaction_date = transaction_date,
-                            mpesa_code = mpesa_code,
+                            msgDate = msg_date,
+                            transactionDate = transaction_date,
+                            mpesaCode = mpesa_code,
                             recipient = recipient,
                             account = Account(
                                 id = 1,
@@ -280,12 +274,12 @@ class MpesaTransaction(
                                 type = "Expense"
                             ),
                             amount = amount,
-                            transaction_type = transaction_type,
-                            mpesa_balance = mpesa_balance,
-                            transaction_cost = transaction_cost,
-                            mpesa_depositor = mpesa_depositor,
-                            sms_text = msg_txt,
-                            paybill_acount = paybill_account,
+                            transactionType = transaction_type,
+                            mpesaBalance = mpesa_balance,
+                            transactionCost = transaction_cost,
+                            mpesaDepositor = mpesa_depositor,
+                            smsText = msg_txt,
+                            paybillAcount = paybill_account,
                             sender = sender
                         )
 

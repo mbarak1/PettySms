@@ -116,14 +116,13 @@
             android:id="@+id/transactionAmountTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="35dp"
+            android:layout_marginEnd="6dp"
             android:fontFamily="@font/roboto_light"
             android:text="Transaction Amount"
             android:textAlignment="textEnd"
             android:textColor="?attr/colorPrimary"
             android:textSize="20sp"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/transactionTitleTextView"
             app:layout_constraintTop_toTopOf="@+id/transactionTitleTextView" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>

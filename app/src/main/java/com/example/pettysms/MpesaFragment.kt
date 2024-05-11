@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -53,7 +52,6 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.vectordrawable.graphics.drawable.ArgbEvaluator
 import antonkozyriatskyi.circularprogressindicator.CircularProgressIndicator
 import com.example.pettysms.databinding.FragmentMpesaBinding
-import com.github.mikephil.charting.animation.Easing
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.components.YAxis
@@ -63,7 +61,6 @@ import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import com.github.mikephil.charting.highlight.Highlight
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener
-import com.github.mikephil.charting.utils.Utils
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -427,10 +424,10 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             latest_mpesa_transaction = db_helper?.getMostRecentTransaction()!!
             //println("size ya hii mpya ni:" + latest_mpesa_transaction_last_month.size + " " + latest_mpesa_transaction_last_month.first().transaction_date)
 
-            balance_text.text = String.format("%,.2f", latest_mpesa_transaction.first().mpesa_balance)
+            balance_text.text = String.format("%,.2f", latest_mpesa_transaction.first().mpesaBalance)
 
         }else{
-            balance_text.text = String.format("%,.2f", sorted_mpesa_transactions.first().mpesa_balance)
+            balance_text.text = String.format("%,.2f", sorted_mpesa_transactions.first().mpesaBalance)
         }
 
         /*balance_text.hideSkeleton()
@@ -1359,9 +1356,9 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
                     var mpesa_transaction = MpesaTransaction(
                         id = null,
-                        msg_date = msg_date,
-                        transaction_date = transaction_date,
-                        mpesa_code = mpesa_code,
+                        msgDate = msg_date,
+                        transactionDate = transaction_date,
+                        mpesaCode = mpesa_code,
                         recipient = recipient,
                         account = Account(
                             id = 1,
@@ -1370,12 +1367,12 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                             type = "Expense"
                         ),
                         amount = amount,
-                        transaction_type = transaction_type,
-                        mpesa_balance = mpesa_balance,
-                        transaction_cost = transaction_cost,
-                        mpesa_depositor = mpesa_depositor,
-                        sms_text = msg_txt,
-                        paybill_acount = paybill_account,
+                        transactionType = transaction_type,
+                        mpesaBalance = mpesa_balance,
+                        transactionCost = transaction_cost,
+                        mpesaDepositor = mpesa_depositor,
+                        smsText = msg_txt,
+                        paybillAcount = paybill_account,
                         sender = sender
                     )
 

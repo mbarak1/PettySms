@@ -11,6 +11,10 @@
         android:icon="@drawable/ic_logo_mpesa_2"
         android:title="@string/mpesa_tool" />
     <item
+        android:id="@+id/page_4"
+        android:icon="@drawable/payments_24px"
+        android:title="Petty Cash" />
+    <item
         android:id="@+id/page_3"
         android:icon="@drawable/ic_baseline_material_3_settings"
         android:title="@string/action_settings" />

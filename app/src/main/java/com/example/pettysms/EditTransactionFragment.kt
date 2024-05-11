@@ -1,5 +1,6 @@
 package com.example.pettysms
 
+import android.app.Dialog
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.os.Bundle
@@ -8,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -66,6 +68,16 @@ class EditTransactionFragment : DialogFragment() {
         } else {
             throw RuntimeException("$context must implement OnValueSelectedListener")
         }
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val dialog = super.onCreateDialog(savedInstanceState)
+        dialog.window?.setFlags(
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+        )
+        dialog.window?.attributes?.windowAnimations = R.style.FullscreenDialogAnimation
+        return dialog
     }
 
 
@@ -132,7 +144,7 @@ class EditTransactionFragment : DialogFragment() {
         // Convert JSON string back to object using Gson
         val gson = Gson()
         val mpesaTransaction = gson.fromJson(myObjectJson, MpesaTransaction::class.java)
-        Toast.makeText(requireContext(), mpesaTransaction.sms_text, Toast.LENGTH_LONG).show()
+        Toast.makeText(requireContext(), mpesaTransaction.smsText, Toast.LENGTH_LONG).show()
 
         val transactionColor = getColorAvatar(requireContext(), mpesaTransaction.transaction_type.toString())
         colorPrimary = MaterialColors.getColor(requireContext(), com.google.android.material.R.attr.colorPrimary, 0)
@@ -244,7 +256,7 @@ class EditTransactionFragment : DialogFragment() {
                 transaction.recipient?.name?.let { capitalizeEachWord(it) } ?: ""
             }
             "deposit" -> {
-                transaction.mpesa_depositor?.let { capitalizeEachWord(it) } ?: ""
+                transaction.mpesaDepositor?.let { capitalizeEachWord(it) } ?: ""
             }
             "receival" -> {
                 transaction.sender?.name?.let { capitalizeEachWord(it) } ?: ""

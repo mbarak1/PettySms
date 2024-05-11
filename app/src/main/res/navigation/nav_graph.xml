@@ -17,6 +17,9 @@
         <action
             android:id="@+id/action_HomeFragment_to_settingsFragment"
             app:destination="@id/settingsFragment" />
+        <action
+            android:id="@+id/action_HomeFragment_to_pettyCashFragment"
+            app:destination="@id/pettyCashFragment" />
     </fragment>
     <fragment
         android:id="@+id/MpesaFragment"
@@ -30,6 +33,9 @@
         <action
             android:id="@+id/action_MpesaFragment_to_settingsFragment"
             app:destination="@id/settingsFragment" />
+        <action
+            android:id="@+id/action_MpesaFragment_to_pettyCashFragment"
+            app:destination="@id/pettyCashFragment" />
     </fragment>
     <fragment
         android:id="@+id/settingsFragment"
@@ -41,6 +47,24 @@
         <action
             android:id="@+id/action_settingsFragment_to_MpesaFragment"
             app:destination="@id/MpesaFragment" />
+        <action
+            android:id="@+id/action_settingsFragment_to_pettyCashFragment"
+            app:destination="@id/pettyCashFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/pettyCashFragment"
+        android:name="com.example.pettysms.PettyCashFragment"
+        android:label="fragment_petty_cash"
+        tools:layout="@layout/fragment_petty_cash" >
+        <action
+            android:id="@+id/action_pettyCashFragment_to_HomeFragment"
+            app:destination="@id/HomeFragment" />
+        <action
+            android:id="@+id/action_pettyCashFragment_to_MpesaFragment"
+            app:destination="@id/MpesaFragment" />
+        <action
+            android:id="@+id/action_pettyCashFragment_to_settingsFragment"
+            app:destination="@id/settingsFragment" />
     </fragment>
 
 </navigation>

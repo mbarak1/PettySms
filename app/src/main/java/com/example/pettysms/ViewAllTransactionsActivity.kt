@@ -41,7 +41,6 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.vectordrawable.graphics.drawable.ArgbEvaluator
 import com.example.pettysms.databinding.ActivityViewAllTransactionsBinding
 import com.google.android.material.appbar.AppBarLayout
-import com.google.android.material.chip.Chip
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.search.SearchBar
@@ -253,7 +252,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
                         query,
                         ignoreCase = true
                     ) ?: false ||
-                            mpesaTransaction.mpesa_depositor.toString()
+                            mpesaTransaction.mpesaDepositor.toString()
                                 .contains(query, ignoreCase = true) ||
                             mpesaTransaction.amount.toString().contains(query, ignoreCase = true) ||
                             /*mpesaTransaction.mpesa_code.toString()
@@ -814,7 +813,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     override fun onApplyClick(keyValueMap: Map<String, List<String>>) {
         // Apply custom sorting based on the selected criteria
         var allMpesaTransactionsToSortAndFilter = allMpesaTransactions
-        Log.d(activityName, "In the beginning: " + allMpesaTransactions.first().sms_text)
+        Log.d(activityName, "In the beginning: " + allMpesaTransactions.first().smsText)
         val sortCriteria = keyValueMap["sort"] ?: mutableListOf()
         var filterTransactionTypes = keyValueMap["transaction_type"] ?: mutableListOf()
         var dateRange = keyValueMap["date"] ?: mutableListOf()
@@ -1044,8 +1043,8 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
                     } // Compare amounts
                     "Transactor" -> {
                         //println("sort by transactor")
-                        compareValues("${obj1.recipient?.name}${obj1.sender?.name}${obj1.mpesa_depositor}",
-                            "${obj2.recipient?.name}${obj2.sender?.name}${obj2.mpesa_depositor}")
+                        compareValues("${obj1.recipient?.name}${obj1.sender?.name}${obj1.mpesaDepositor}",
+                            "${obj2.recipient?.name}${obj2.sender?.name}${obj2.mpesaDepositor}")
                     }
                     // add other criteria as needed
                     else -> 0 // default to 0 if criteria is not recognized

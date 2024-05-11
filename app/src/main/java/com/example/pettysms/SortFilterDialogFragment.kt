@@ -9,6 +9,7 @@ import android.view.MenuInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -53,7 +54,6 @@ class SortFilterDialogFragment : DialogFragment() {
             dialog.window!!.setLayout(width, height)
         }
     }
-
 
 
     override fun onCreateView(
@@ -346,6 +346,11 @@ class SortFilterDialogFragment : DialogFragment() {
         // call the superclass to get the Dialog.
         val dialog = super.onCreateDialog(savedInstanceState)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.window?.setFlags(
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+        )
+        dialog.window?.attributes?.windowAnimations = R.style.FullscreenDialogAnimation
         return dialog
     }
 
@@ -399,6 +404,7 @@ class SortFilterDialogFragment : DialogFragment() {
     fun setOnApplyClickListener(listener: OnApplyClickListener) {
         this.onApplyClickListener = listener
     }
+
 
 
 }

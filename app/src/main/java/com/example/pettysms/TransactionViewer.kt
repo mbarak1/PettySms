@@ -1,7 +1,6 @@
 package com.example.pettysms
 
 import android.app.Activity
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -15,21 +14,16 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
-import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.pdf.PdfDocument
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
-import android.provider.MediaStore
 import android.text.Spannable
 import android.text.SpannableString
-import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
-import android.text.style.StyleSpan
 import android.util.Log
-import android.view.KeyEvent
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
@@ -40,7 +34,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.graphics.ColorUtils
-import androidx.fragment.app.DialogFragment
 import com.example.pettysms.databinding.ActivityTransactionViewerBinding
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
@@ -52,7 +45,6 @@ import xyz.schwaab.avvylib.AvatarView
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.properties.Delegates
@@ -206,7 +198,7 @@ class TransactionViewer : AppCompatActivity(), EditTransactionFragment.OnDescrip
 
 
 
-        Toast.makeText(this, "Transaction Id in Transaction Viewer: " + mpesaTransaction?.id + " Its Text: " + mpesaTransaction?.sms_text, Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Transaction Id in Transaction Viewer: " + mpesaTransaction?.id + " Its Text: " + mpesaTransaction?.smsText, Toast.LENGTH_LONG).show()
 
     }
 
@@ -449,8 +441,8 @@ class TransactionViewer : AppCompatActivity(), EditTransactionFragment.OnDescrip
         transactionDateValue.text = formatDate(mpesaTransaction.transaction_date.toString())
         transactorValue.text = getTitleTextByTransactionType(mpesaTransaction)
         descriptionValue.text = mpesaTransaction.description
-        transactionCostValue.text = mpesaTransaction.transaction_cost.toString() + "/-"
-        transactionBalanceValue.text = mpesaTransaction?.mpesa_balance?.let {
+        transactionCostValue.text = mpesaTransaction.transactionCost.toString() + "/-"
+        transactionBalanceValue.text = mpesaTransaction?.mpesaBalance?.let {
             addCommasToDoubleValue(
                 it
             ).toString()
@@ -458,12 +450,12 @@ class TransactionViewer : AppCompatActivity(), EditTransactionFragment.OnDescrip
 
         smsTextValue.text = smsTextValueString
         smsTextValue.setOnClickListener{
-            mpesaTransaction?.sms_text?.let { it1 -> showTextModal(this, it1) }
+            mpesaTransaction?.smsText?.let { it1 -> showTextModal(this, it1) }
         }
 
         if(mpesaTransaction.transaction_type == "paybill"){
             paybillAccountLayout.visibility = View.VISIBLE
-            paybillAccountValue.text = mpesaTransaction.paybill_acount
+            paybillAccountValue.text = mpesaTransaction.paybillAcount
             val layoutParams = smsTextLayout.layoutParams as LinearLayout.LayoutParams
             layoutParams.bottomMargin = 0
             smsTextLayout.layoutParams = layoutParams
@@ -551,7 +543,7 @@ class TransactionViewer : AppCompatActivity(), EditTransactionFragment.OnDescrip
                 transaction.recipient?.name?.let { capitalizeEachWord(it) } ?: ""
             }
             "deposit" -> {
-                transaction.mpesa_depositor?.let { capitalizeEachWord(it) } ?: ""
+                transaction.mpesaDepositor?.let { capitalizeEachWord(it) } ?: ""
             }
             "receival" -> {
                 transaction.sender?.name?.let { capitalizeEachWord(it) } ?: ""

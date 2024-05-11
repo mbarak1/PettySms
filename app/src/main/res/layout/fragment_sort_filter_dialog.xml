@@ -22,6 +22,7 @@
             android:layout_width="match_parent"
             android:layout_height="?android:attr/actionBarSize"
             app:contentInsetStartWithNavigation="0dp"
+            app:titleTextAppearance="@style/ToolbarTitleTextAppearance"
             app:menu="@menu/menu_sort_filter"
             app:navigationIcon="@drawable/baseline_close_24">
 

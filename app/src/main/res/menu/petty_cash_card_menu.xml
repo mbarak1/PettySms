@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/menu_mpesa"
+        android:icon="@drawable/ic_mpesa_2"
+        android:iconTint="?attr/colorControlNormal"
+        android:title="M-Pesa" />
+    <item
+        android:id="@+id/menu_cash"
+        android:icon="@drawable/finance_chip_24px"
+        android:iconTint="?attr/colorControlNormal"
+        android:title="Cash" />
+</menu>

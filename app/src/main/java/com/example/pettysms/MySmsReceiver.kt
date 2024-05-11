@@ -117,6 +117,7 @@ class MySmsReceiver : BroadcastReceiver() {
 
     private fun showNotification(context: Context, message: String) {
         val channelId = "channel_1"
+        val notificationId = System.currentTimeMillis().toInt() // Unique notification ID
 
         val NOTIFICATION_SOUND_URI = Uri.parse("android.resource://${BuildConfig.APPLICATION_ID}/${R.raw.petty_sms_marimba}")
 
@@ -151,15 +152,15 @@ class MySmsReceiver : BroadcastReceiver() {
             notificationManager.createNotificationChannel(channel)
         }
 
+        // Notify after MediaPlayer setup
         val mp: MediaPlayer = MediaPlayer.create(context, R.raw.petty_sms_marimba)
-
-        // Start playing the sound
-        mp.start()
-
-        // Release the MediaPlayer when sound playback is complete
-        mp.setOnCompletionListener {
-            mp.release()
+        mp.setVolume(1.0f, 1.0f) // Set the volume to 80% of maximum (range: 0.0 to 1.0)
+        mp.setOnCompletionListener { mp.release() } // Release the MediaPlayer when sound playback is complete
+        mp.setOnPreparedListener { _ ->
+            mp.start() // Start playing the sound after MediaPlayer is prepared
+            notificationManager.notify(notificationId, notificationBuilder.build())
         }
+
 
         // Notify
         notificationManager.notify(0, notificationBuilder.build())

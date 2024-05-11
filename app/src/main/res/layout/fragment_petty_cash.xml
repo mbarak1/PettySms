@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/frameLayout2"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".PettyCashFragment">
+
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/floatingActionButton"
+        style="@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="120dp"
+        android:layout_gravity="bottom|end"
+        android:text="@string/add"
+        app:layout_anchor="@id/nestedScrollView"
+        android:textColor="?attr/colorOnPrimaryContainer"
+        app:iconTint="?attr/colorOnPrimaryContainer"
+        android:clickable="true"
+        app:icon="@drawable/outline_add_24"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:contentDescription="@string/add_petty_cash" />
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayoutPettyCash"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="0dp"
+        android:layout_marginRight="0dp"
+        android:fitsSystemWindows="true"
+        app:liftOnScroll="false"
+        android:background="@color/colorTransparent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/pettyCashToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:titleTextAppearance="@style/ToolbarTitleTextAppearance"
+            android:elevation="4dp">
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/nestedScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="85dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/appBarLayoutPettyCash"
+        >
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/viewPager"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginTop="30dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <com.tbuonomo.viewpagerdotsindicator.WormDotsIndicator
+                android:id="@+id/worm_dots_indicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                app:dotsColor="?attr/colorPrimary"
+                app:dotsCornerRadius="8dp"
+                app:dotsSize="10dp"
+                app:dotsSpacing="4dp"
+                app:dotsStrokeColor="?attr/colorPrimary"
+                app:dotsStrokeWidth="2dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.497"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/viewPager" />
+
+            <LinearLayout
+                android:id="@+id/statusLinearLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:orientation="horizontal"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/worm_dots_indicator">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardDbStatus"
+                    style="@style/Widget.Material3.CardView.Filled"
+                    android:layout_width="180dp"
+                    android:layout_height="65dp"
+                    android:layout_marginStart="30dp"
+                    android:layout_weight="1"
+                    android:gravity="start">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="27dp"
+                            android:layout_height="27dp"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/database_24px"
+                            app:tint="?attr/colorControlNormal" />
+
+                        <ImageView
+                            android:id="@+id/dbDotImageView"
+                            android:layout_width="13dp"
+                            android:layout_height="13dp"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginStart="12dp"
+                            android:layout_marginTop="0.5dp"
+                            android:src="@drawable/dot_shape"
+                            android:visibility="visible"
+                            app:tint="@color/grey_color" />
+
+                        <TextView
+                            android:id="@+id/dbStatusLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginStart="8dp"
+                            android:text="Offline"
+                            android:textSize="18sp" />
+
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardQbStatus"
+                    style="@style/Widget.Material3.CardView.Filled"
+                    android:layout_width="180dp"
+                    android:layout_height="65dp"
+                    android:layout_marginStart="50dp"
+                    android:layout_marginEnd="30dp"
+                    android:layout_weight="1"
+                    android:gravity="end">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="27dp"
+                            android:layout_height="27dp"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/brand_quickbooks"
+                            app:tint="?attr/colorControlNormal" />
+
+                        <ImageView
+                            android:id="@+id/qbDotImageView"
+                            android:layout_width="13dp"
+                            android:layout_height="13dp"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginStart="12dp"
+                            android:layout_marginTop="0.5dp"
+                            android:src="@drawable/dot_shape"
+                            android:visibility="visible"
+                            app:tint="@color/grey_color" />
+
+                        <TextView
+                            android:id="@+id/qbStatusLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center_vertical"
+                            android:layout_marginStart="8dp"
+                            android:text="Offline"
+                            android:textSize="18sp" />
+
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
+
+
+            <LinearLayout
+                android:id="@+id/buttonLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:orientation="vertical"
+                app:layout_constraintTop_toBottomOf="@+id/statusLinearLayout">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="82dp"
+                        android:layout_height="80dp"
+                        android:layout_marginStart="20dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/pc_button_background"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Company Center"
+                        android:textAlignment="center"
+                        android:textSize="8sp"
+                        app:icon="@drawable/corporate_fare_24px"
+                        app:iconGravity="top"
+                        app:iconSize="33dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="82dp"
+                        android:layout_height="80dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginStart="45dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/pc_button_background"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Reports"
+                        android:textAlignment="center"
+                        android:textSize="8sp"
+                        app:icon="@drawable/lab_profile_24px"
+                        app:iconGravity="top"
+                        app:iconSize="33dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="82dp"
+                        android:layout_height="80dp"
+                        android:layout_marginStart="40dp"
+                        android:layout_marginEnd="20dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/pc_button_background"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Transactors"
+                        android:textSize="8sp"
+                        app:icon="@drawable/manage_accounts_24px"
+                        app:iconGravity="top"
+                        app:iconSize="33dp" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="30dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="82dp"
+                        android:layout_height="80dp"
+                        android:layout_marginStart="20dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/pc_button_background"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Accounts"
+                        android:textAlignment="center"
+                        android:textSize="8sp"
+                        app:icon="@drawable/account_tree_24px"
+                        app:iconGravity="top"
+                        app:iconSize="33dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="82dp"
+                        android:layout_height="80dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginStart="45dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/pc_button_background"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Queue"
+                        android:textAlignment="center"
+                        android:textSize="8sp"
+                        app:icon="@drawable/list_alt_24px"
+                        app:iconGravity="top"
+                        app:iconSize="33dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/trucksButton"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="82dp"
+                        android:layout_height="80dp"
+                        android:layout_marginStart="40dp"
+                        android:layout_marginEnd="20dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/pc_button_background"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Trucks"
+                        android:textSize="7.5sp"
+                        app:icon="@drawable/outline_local_shipping_black_24dp"
+                        app:iconGravity="top"
+                        app:iconSize="33dp" />
+
+                </LinearLayout>
+
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="30dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                app:layout_constraintTop_toBottomOf="@id/buttonLayout">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="15dp"
+                    android:layout_weight="1"
+                    android:gravity="start"
+                    android:fontFamily="@font/montserrat_medium"
+                    android:text="Recent Petty Cash"
+                    android:textFontWeight="600"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:id="@+id/view_all_link"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="15dp"
+                    android:layout_weight="1"
+                    android:autoLink="web"
+                    android:clickable="true"
+                    android:gravity="end"
+                    android:text="View All"
+                    android:textColor="?attr/colorPrimary" />
+
+
+            </LinearLayout>
+
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+    </androidx.core.widget.NestedScrollView>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

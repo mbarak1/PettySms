@@ -347,7 +347,7 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
                 transaction.recipient?.name?.let { capitalizeEachWord(it) } ?: ""
             }
             "deposit" -> {
-                transaction.mpesa_depositor?.let { capitalizeEachWord(it) } ?: ""
+                transaction.mpesaDepositor?.let { capitalizeEachWord(it) } ?: ""
             }
             "receival" -> {
                 transaction.sender?.name?.let { capitalizeEachWord(it) } ?: ""

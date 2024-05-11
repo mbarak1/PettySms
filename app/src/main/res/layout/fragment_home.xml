@@ -40,6 +40,7 @@
             android:layout_width="match_parent"
             app:layout_scrollFlags="enterAlways"
             app:menu="@menu/menu_home"
+            app:titleTextAppearance="@style/ToolbarTitleTextAppearance"
             android:layout_height="?attr/actionBarSize">
 
         </androidx.appcompat.widget.Toolbar>

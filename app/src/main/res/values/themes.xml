@@ -8,6 +8,7 @@
 
     <style name="PopupMenuStyle" parent="@android:style/Widget.PopupMenu">
         <item name="android:popupBackground">?attr/popupMenuBackground</item> <!-- Set the background color -->
+        <item name="android:popupMenuStyle">@style/Widget.Material3.PopupMenu</item>
     </style>
 
     <style name="PrefsTheme" parent="PreferenceThemeOverlay.v14.Material">
@@ -17,6 +18,7 @@
     <style name="Theme.PettySMS" parent="Base.Theme.PettySMS" />
 
     <style name="Theme.FullScreenDialog" parent="Theme.MaterialComponents.Light.Dialog">
+        <item name="android:windowAnimationStyle">@style/FullscreenDialogAnimation</item>
         <item name="colorPrimaryDark">?attr/colorPrimaryDark</item>
         <item name="colorAccent">?attr/colorAccent</item>
         <item name="colorPrimary">?attr/colorPrimary</item>
@@ -24,9 +26,16 @@
         <item name="android:windowBackground">@android:color/white</item>
         <item name="actionMenuTextColor">?attr/colorAccent</item>
     </style>
+
     <style name="FullscreenDialogAnimation">
         <item name="android:windowEnterAnimation">@anim/slide_in_bottom</item>
         <item name="android:windowExitAnimation">@anim/slide_out_bottom</item>
     </style>
+
+    <style name="ToolbarTitleTextAppearance" parent="@style/TextAppearance.Widget.AppCompat.Toolbar.Title">
+        <item name="android:fontFamily">@font/montserrat_medium</item>
+    </style>
+
+
 
 </resources>

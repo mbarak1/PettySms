@@ -1,20 +1,15 @@
 package com.example.pettysms
 
 import android.graphics.Color
-import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.BackgroundColorSpan
-import android.text.style.StyleSpan
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.TextView
-import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import xyz.schwaab.avvylib.AvatarView
@@ -126,10 +121,10 @@ class SuggestionsAdapter(
         }
         else if (suggestion.transaction_type == "deposit"){
             val context = holder.color_frame.context
-            holder.titleTextView.text = suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }
+            holder.titleTextView.text = suggestion.mpesaDepositor?.let { capitalizeEachWord(it) }
             // Highlight the search query in the titleTextView
             holder.titleTextView.text = highlightSearchQuery(
-                suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }.orEmpty(),
+                suggestion.mpesaDepositor?.let { capitalizeEachWord(it) }.orEmpty(),
                 query
             )
             val color = ContextCompat.getColor(context, R.color.light_green_color)
@@ -145,7 +140,7 @@ class SuggestionsAdapter(
             setGradientBackground(holder.color_frame, colorPrimary, color)
 
             holder.avatarView.apply {
-                text = suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }
+                text = suggestion.mpesaDepositor?.let { capitalizeEachWord(it) }
                 highlightBorderColorEnd = color
                 isAnimating = false
             }
@@ -255,9 +250,9 @@ class SuggestionsAdapter(
 
         else if (suggestion.transaction_type == "withdraw"){
             val context = holder.color_frame.context
-            holder.titleTextView.text = suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }
+            holder.titleTextView.text = suggestion.mpesaDepositor?.let { capitalizeEachWord(it) }
             holder.titleTextView.text = highlightSearchQuery(
-                suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }.orEmpty(),
+                suggestion.mpesaDepositor?.let { capitalizeEachWord(it) }.orEmpty(),
                 query
             )
             val color = ContextCompat.getColor(context, R.color.brown_color)
@@ -273,7 +268,7 @@ class SuggestionsAdapter(
             setGradientBackground(holder.color_frame, colorPrimary, color)
 
             holder.avatarView.apply {
-                text = suggestion.mpesa_depositor?.let { capitalizeEachWord(it) }
+                text = suggestion.mpesaDepositor?.let { capitalizeEachWord(it) }
                 highlightBorderColorEnd = color
                 isAnimating = false
             }

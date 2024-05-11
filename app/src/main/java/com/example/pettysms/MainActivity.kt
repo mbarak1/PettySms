@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.telephony.SmsMessage
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -36,7 +37,9 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
     private val REQUEST_SMS_PERMISSION = 123
     private val READ_EXTERNAL_STORAGE_CODE = 1
     private val WRITE_EXTERNAL_STORAGE_CODE = 2
+    private val INTERNET_CODE = 3
     private var check_fragment = "home"
+    private var activityName = "MainActivity"
     private var isServiceScheduled = false
 
 
@@ -70,6 +73,27 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
             )
         }
 
+        Log.d(activityName, "Inside Main Activity")
+
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.MANAGE_DOCUMENTS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // Request the permission
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.MANAGE_DOCUMENTS),
+                INTERNET_CODE
+            )
+            Log.d(activityName, "Camera Permission Permitted")
+        }else{
+            Log.d(activityName, "Camera Permission Denied")
+        }
+
+
+
 
 
 
@@ -81,6 +105,7 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
                 R.id.page_1 -> {
                     check_fragment = "home"
                     onDestroyActionMode()
+                    checkPermission(Manifest.permission.INTERNET, INTERNET_CODE)
                     Navigation.findNavController(this, R.id.nav_host_fragment_content_main).navigate(R.id.HomeFragment)
                     //actionbar.setTitle("Hi" + " Mbarak")
                     //setSupportActionBar(actionbar)
@@ -132,6 +157,17 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
                 R.id.page_3 -> {
                     onDestroyActionMode()
                     Navigation.findNavController(this, R.id.nav_host_fragment_content_main).navigate(R.id.settingsFragment)
+                    true
+                }
+
+                R.id.page_4 -> {
+                    check_fragment = "petty_cash"
+                    onDestroyActionMode()
+                    Navigation.findNavController(this, R.id.nav_host_fragment_content_main).navigate(R.id.pettyCashFragment)
+                    //actionbar.setTitle("Hi" + " Mbarak")
+                    //setSupportActionBar(actionbar)
+                    //Toast.makeText(this,supportFragmentManager.findFragmentById(R.id.MpesaFragment).toString(),Toast.LENGTH_SHORT).show()
+
                     true
                 }
 
