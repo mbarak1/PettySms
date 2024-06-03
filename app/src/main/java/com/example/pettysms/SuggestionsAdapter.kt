@@ -1,5 +1,7 @@
 package com.example.pettysms
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -12,6 +14,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.google.gson.Gson
 import xyz.schwaab.avvylib.AvatarView
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -19,6 +22,7 @@ import java.util.Locale
 class SuggestionsAdapter(
     private val suggestions: List<MpesaTransaction>,
     private val query: String,
+    private val context: Context,
     private val onSuggestionClick: (MpesaTransaction) -> Unit
 
 ) : RecyclerView.Adapter<SuggestionsAdapter.ViewHolder>() {
@@ -32,6 +36,21 @@ class SuggestionsAdapter(
         val color_frame: View = itemView.findViewById(R.id.card_color)
         val rounded_text: TextView = itemView.findViewById(R.id.roundedTextView)
         val avatarView: AvatarView = itemView.findViewById(R.id.avatar_view)
+
+        init {
+            itemView.setOnClickListener {
+                val position = adapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    val selectedTransaction = suggestions[position]
+                    val gson = Gson()
+                    val mpesaTransactionJson = gson.toJson(selectedTransaction)
+                    val intent = Intent(context, TransactionViewer::class.java).apply {
+                        putExtra("mpesaTransactionJson", mpesaTransactionJson)
+                    }
+                    context.startActivity(intent)
+                }
+            }
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {

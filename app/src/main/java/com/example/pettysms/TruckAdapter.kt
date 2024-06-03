@@ -3,14 +3,16 @@ package com.example.pettysms
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.MaterialColors
+import com.google.gson.Gson
 
-class TruckAdapter(private val trucks: List<Truck>) : RecyclerView.Adapter<TruckAdapter.TruckViewHolder>() {
+class TruckAdapter(private val context: TrucksActivity, private var trucks: List<Truck>) : RecyclerView.Adapter<TruckAdapter.TruckViewHolder>() {
 
     inner class TruckViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         // Define views in the truck card layout
@@ -18,6 +20,7 @@ class TruckAdapter(private val trucks: List<Truck>) : RecyclerView.Adapter<Truck
         val truckMakeImage: ImageView = itemView.findViewById(R.id.modelImage)
         val truckCard: MaterialCardView = itemView.findViewById(R.id.truckMainCard)
         val truckImage: ImageView = itemView.findViewById(R.id.truckImage)
+        val editButton: ImageButton = itemView.findViewById(R.id.editActionButton)
         // Add other TextViews for truck details
     }
 
@@ -41,7 +44,12 @@ class TruckAdapter(private val trucks: List<Truck>) : RecyclerView.Adapter<Truck
         if (currentTruck.activeStatus == true) {
             // Assuming you have a color resource named "colorSurfaceContainerLow"
             val lowSurfaceContainerColor = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorSurfaceContainerHigh)
+            val colorControlNormal = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorControlNormal)
+
             holder.truckCard.setCardBackgroundColor(lowSurfaceContainerColor)
+            holder.truckNoTextView.setTextColor(colorControlNormal)
+            holder.truckMakeImage.setColorFilter(colorControlNormal)
+            holder.truckImage.setColorFilter(colorControlNormal)
             //holder.truckNoTextView.setTextColor(R.color.grey_color)
         }else{
             holder.truckNoTextView.setTextColor(ContextCompat.getColor(holder.itemView.context, R.color.grey_color))
@@ -52,6 +60,14 @@ class TruckAdapter(private val trucks: List<Truck>) : RecyclerView.Adapter<Truck
 
         }
         holder.truckMakeImage.setImageResource(truckLogoImage)
+
+        // Set click listener for edit button
+        holder.editButton.setOnClickListener {
+            val gson = Gson()
+            val truckJson = gson.toJson(currentTruck)
+
+            (context).showAddOrEditTruckDialog("Edit", truckJson)
+        }
 
 
         // Bind other truck details to TextViews
@@ -77,5 +93,10 @@ class TruckAdapter(private val trucks: List<Truck>) : RecyclerView.Adapter<Truck
 
     override fun getItemCount(): Int {
         return trucks.size
+    }
+
+    fun updateTrucks(newTrucks: List<Truck>) {
+        trucks = newTrucks
+        notifyDataSetChanged()
     }
 }

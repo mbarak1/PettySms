@@ -3,4 +3,5 @@
     <dimen name="icon_large">30dp</dimen>
     <dimen name="balanceCardMarginTop">105dp</dimen>
     <dimen name="corner_radius">30dp</dimen>
+    <dimen name="check_stroke_width">3dp</dimen>
 </resources>

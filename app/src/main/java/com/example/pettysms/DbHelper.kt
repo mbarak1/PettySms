@@ -180,7 +180,9 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 $COL_TRUCK_NO TEXT, 
                 $COL_TRUCK_MAKE TETX,
                 $COL_TRUCK_OWNER TEXT,
-                $COL_TRUCK_ACTIVE_STATUS INTEGER
+                $COL_TRUCK_ACTIVE_STATUS INTEGER,
+                $COL_IS_DELETED INTEGER DEFAULT 0
+
                 
             )
         """
@@ -189,9 +191,18 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             CREATE TABLE IF NOT EXISTS $TABLE_OWNERS (
                 $COL_OWNER_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 $COL_OWNER_NAME TEXT, 
-                $COL_OWNER_CODE TEXT
+                $COL_OWNER_CODE TEXT,
+                $COL_IS_OWNER_DELETED DEFAULT 0
+
             )
         """
+
+        val SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY_TRUCKS" + "(" +
+                "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "$COL_SEARCH_HISTORY_QUERY TEXT," +
+                "$COL_TIMESTAMP INTEGER" +
+                ")"
+                    .trimIndent()
 
 
 
@@ -200,6 +211,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         db.execSQL(SQL_CREATE_ENTRIES)
         db.execSQL(SQL_CREATE_ENTRIES_REJECTED_SMS)
         db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY)
+        db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS)
         db.execSQL(SQL_CREATE_TABLE_OWNERS)
         db.execSQL(SQL_CREATE_TABLE_TRUCKS)
 
@@ -485,16 +497,25 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
     //NEW PETTY CASH METHODS
 
-    private fun insertTruck(db: SQLiteDatabase, truck: Truck) {
+    fun insertTruck(db: SQLiteDatabase, truck: Truck) {
         val values = ContentValues().apply {
             put(COL_TRUCK_NO, truck.truckNo)
             put(COL_TRUCK_MAKE, truck.make)
             put(COL_TRUCK_OWNER, truck.owner?.ownerCode)
             put(COL_TRUCK_ACTIVE_STATUS, if (truck.activeStatus == true) 1 else 0)
-
+            put(COL_IS_DELETED, if (truck.isDeleted == true) 1 else 0) // Add is_deleted column
             // Add other truck details...
         }
         db.insertWithOnConflict(TABLE_TRUCKS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+
+    fun isTruckExists(truckNo: String): Boolean {
+        val db = this.readableDatabase
+        val query = "SELECT * FROM $TABLE_TRUCKS WHERE $COL_TRUCK_NO = ?"
+        val cursor: Cursor = db.rawQuery(query, arrayOf(truckNo))
+        val exists = cursor.count > 0
+        return exists
     }
 
     fun insertTruckIfNotAvailable(db: SQLiteDatabase, truck: Truck) {
@@ -518,10 +539,12 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 put(COL_TRUCK_MAKE, truck.make)
                 put(COL_TRUCK_OWNER, truck.owner?.ownerCode)
                 put(COL_TRUCK_ACTIVE_STATUS, if (truck.activeStatus == true) 1 else 0)
+                put(COL_IS_DELETED, if (truck.isDeleted == true) 1 else 0) // Add is_deleted column
             }
             db.insert(TABLE_TRUCKS, null, values)
         }
     }
+
 
     fun insertTrucks(trucks: List<Truck>) {
         val db = this.writableDatabase
@@ -547,28 +570,34 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 COL_TRUCK_NO,
                 COL_TRUCK_MAKE,
                 COL_TRUCK_OWNER,
-                COL_TRUCK_ACTIVE_STATUS
-            ), null, null, null, null, null)
+                COL_TRUCK_ACTIVE_STATUS,
+                COL_IS_DELETED // Include the is_deleted column
+            ), "$COL_IS_DELETED = ?", arrayOf("0"), // Filter out deleted trucks
+            null, null, COL_TRUCK_NO
+        )
         while (cursor.moveToNext()) {
-            val truckNo = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRUCK_NO))
             val truckId = cursor.getInt(cursor.getColumnIndexOrThrow(COL_ID))
+            val truckNo = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRUCK_NO))
             val truckMake = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRUCK_MAKE))
             val truckOwnerCode = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRUCK_OWNER))
-            val truckActiveStatusInteger = cursor.getInt(cursor.getColumnIndexOrThrow(
-                COL_TRUCK_ACTIVE_STATUS
-            ))
-            var truckActiveStatus = true
-            if(truckActiveStatusInteger == 0){
-                truckActiveStatus = false
-            }
+            val truckActiveStatusInteger = cursor.getInt(cursor.getColumnIndexOrThrow(COL_TRUCK_ACTIVE_STATUS))
+            val isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(COL_IS_DELETED)) == 1
+
+            val truckActiveStatus = truckActiveStatusInteger == 1
 
             val owner = getOwnerByCode(truckOwnerCode) ?: Owner(1, "Abdulcon Enterprises Limited", "abdulcon")
 
-            trucks.add(Truck(truckId, truckNo, truckMake, owner, truckActiveStatus))
+            if (!isDeleted) {
+                trucks.add(Truck(truckId, truckNo, truckMake, owner, truckActiveStatus, isDeleted))
+            }
         }
+
+        cursor.close()
+        db.close()
 
         return trucks
     }
+
 
     fun getTruckUniqueModelStrings(): List<String> {
         val modelStrings = mutableListOf<String>()
@@ -610,17 +639,27 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
     // Modify insertOwner to accept a SQLiteDatabase instance
     private fun insertOwner(db: SQLiteDatabase, owner: Owner) {
         // Perform insertion of owner into the database using the provided SQLiteDatabase instance
-        val values = ContentValues()
-        values.put(COL_OWNER_ID, owner.id)
-        values.put(COL_OWNER_NAME, owner.name)
-        values.put(COL_OWNER_CODE, owner.ownerCode)
+        val values = ContentValues().apply {
+            put(COL_OWNER_ID, owner.id)
+            put(COL_OWNER_NAME, owner.name)
+            put(COL_OWNER_CODE, owner.ownerCode)
+            put(COL_IS_DELETED, 0) // Set default value for is_deleted
+        }
         db.insert(TABLE_OWNERS, null, values)
     }
 
     fun getAllOwners(): List<Owner> {
         val owners = mutableListOf<Owner>()
         val db = this.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM $TABLE_OWNERS", null)
+        val cursor = db.query(
+            TABLE_OWNERS,
+            arrayOf(COL_OWNER_ID, COL_OWNER_NAME, COL_OWNER_CODE),
+            "$COL_IS_DELETED = ?",
+            arrayOf("0"), // Only fetch owners that are not deleted
+            null,
+            null,
+            null
+        )
         cursor.use {
             while (it.moveToNext()) {
                 val ownerId = it.getInt(it.getColumnIndexOrThrow(COL_OWNER_ID))
@@ -652,6 +691,117 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 db.close()
             }
         }
+    }
+
+    fun addTruckQueryToSearchHistory(query: String) {
+        val db = writableDatabase
+
+        // Check if the query already exists in the database
+        val selection = "$COL_SEARCH_HISTORY_QUERY = ?"
+        val selectionArgs = arrayOf(query)
+        val cursor = db.query(
+            TABLE_SEARCH_HISTORY_TRUCKS,
+            arrayOf(COL_SEARCH_HISTORY_QUERY),
+            selection,
+            selectionArgs,
+            null,
+            null,
+            null
+        )
+
+        // If the query does not exist, insert it
+        if (cursor.count == 0) {
+            val contentValues = ContentValues().apply {
+                put(COL_SEARCH_HISTORY_QUERY, query)
+                put(COL_TIMESTAMP, System.currentTimeMillis())
+            }
+            db.insert(TABLE_SEARCH_HISTORY_TRUCKS, null, contentValues)
+        }
+
+        cursor.close()
+        db.close()
+    }
+
+    fun clearTruckSearchHistory() {
+        val db = writableDatabase
+        try {
+            // Clear the search history table
+            db.execSQL("DELETE FROM $TABLE_SEARCH_HISTORY_TRUCKS")
+        } catch (e: SQLException) {
+            // Handle exceptions, if any
+            e.printStackTrace()
+        } finally {
+            db.close()
+        }
+    }
+
+    fun getTruckSearchHistory(): MutableList<String>{
+        val db = readableDatabase
+
+        val SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY_TRUCKS" + "(" +
+                "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "$COL_SEARCH_HISTORY_QUERY TEXT," +
+                "$COL_TIMESTAMP INTEGER" +
+                ")"
+                    .trimIndent()
+
+        db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS)
+
+
+
+        val cursor = db.query(
+            TABLE_SEARCH_HISTORY_TRUCKS,
+            arrayOf(COL_SEARCH_HISTORY_QUERY),
+            null,
+            null,
+            null,
+            null,
+            "$COL_TIMESTAMP DESC"
+        )
+
+        val searchHistory = mutableListOf<String>()
+        with(cursor) {
+            while (moveToNext()) {
+                val query = getString(getColumnIndexOrThrow(COL_SEARCH_HISTORY_QUERY))
+                searchHistory.add(query)
+            }
+        }
+        cursor.close()
+        db.close()
+
+        return searchHistory
+    }
+
+    fun updateTruck(
+        db: SQLiteDatabase,
+        truckId: Int?,
+        truckNo: String,
+        make: String,
+        owner: Owner?,
+        activeStatus: Boolean,
+        isDeleted: Boolean = false // New parameter for is_deleted
+    ) {
+        val values = ContentValues().apply {
+            put(COL_TRUCK_NO, truckNo)
+            put(COL_TRUCK_MAKE, make)
+            owner?.ownerCode?.let { put(COL_TRUCK_OWNER, it) }
+            put(COL_TRUCK_ACTIVE_STATUS, if (activeStatus) 1 else 0)
+            put(COL_IS_DELETED, if (isDeleted) 1 else 0) // Add is_deleted column
+        }
+
+        val whereClause = "$COL_ID = ?"
+        val whereArgs = arrayOf(truckId.toString())
+
+        db.update(TABLE_TRUCKS, values, whereClause, whereArgs)
+    }
+
+
+    fun deleteTruck(db: SQLiteDatabase, id: Int?) {
+        val values = ContentValues().apply {
+            put(COL_IS_DELETED, 1)
+        }
+        db.update(TABLE_TRUCKS, values, "$COL_ID = ?", arrayOf(id.toString()))
+        db.close()
     }
 
 
@@ -694,6 +844,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_SEARCH_HISTORY_ID = "id"
             const val COL_SEARCH_HISTORY_QUERY = "query"
             const val TABLE_SEARCH_HISTORY = "search_history"
+            const val TABLE_SEARCH_HISTORY_TRUCKS = "search_history_trucks"
             const val COL_TIMESTAMP = "timestamp" // Add this line
 
             //ALL SMS TABLE VARIABLES
@@ -712,20 +863,23 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_TRUCK_MAKE = "make"
             const val COL_TRUCK_OWNER = "owner"
             const val COL_TRUCK_ACTIVE_STATUS = "active_status"
+            const val COL_IS_DELETED = "is_deleted"
 
-            //OWNERS TABLE VARIABLES
+
+        //OWNERS TABLE VARIABLES
 
             const val TABLE_OWNERS = "owners"
             const val COL_OWNER_ID = "id"
             const val COL_OWNER_NAME = "name"
             const val COL_OWNER_CODE = "owner_code"
+            const val COL_IS_OWNER_DELETED = "is_deleted"
 
 
 
             fun dropAllTables(db: SQLiteDatabase) {
 
             // List all the table names you want to drop
-            val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS, TABLE_ALL_SMS, TABLE_SEARCH_HISTORY, TABLE_TRUCKS, TABLE_OWNERS)
+            val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS, TABLE_ALL_SMS, TABLE_SEARCH_HISTORY, TABLE_TRUCKS, TABLE_OWNERS, TABLE_SEARCH_HISTORY_TRUCKS)
 
             for (tableName in tableNames) {
                 db.execSQL("DROP TABLE IF EXISTS $tableName;")

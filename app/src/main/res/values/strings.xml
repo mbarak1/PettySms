@@ -82,4 +82,7 @@
     <string name="truck_no">Truck No.</string>
     <string name="owner">Owner</string>
     <string name="model">Model</string>
+    <string name="make">Make</string>
+    <string name="no_trucks_to_show">No trucks to show</string>
+    <string name="save">Save</string>
 </resources>

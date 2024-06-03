@@ -184,6 +184,22 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
         if(!searchHistory.isNullOrEmpty()){
             showHistoryitems("")
         }
+        // Define the color for the status bar when the search view is focused
+        val searchFocusedColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorSurfaceContainer,"")
+        // Define the default color for the status bar
+        val defaultStatusBarColor = this.window.statusBarColor
+        searchView.addTransitionListener { searchView: com.google.android.material.search.SearchView?, previousState: SearchView.TransitionState?, newState: SearchView.TransitionState ->
+            if (newState == SearchView.TransitionState.SHOWING) {
+                // Change the status bar color to match the SearchView's surface color
+                this.window.statusBarColor = searchFocusedColor
+                println("is focused")
+            }
+            else if (newState == SearchView.TransitionState.HIDDEN){
+                // Revert the status bar color to the default color
+                this.window.statusBarColor = defaultStatusBarColor
+                println("is not focused")
+            }
+        }
         searchView.editText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == KeyEvent.KEYCODE_ENTER) {
                 val query = searchView.text.toString()
@@ -283,7 +299,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
 
             }
             // Display search results in the RecyclerView within the SearchView
-            val suggestionsAdapter = SuggestionsAdapter(searchResults, query) { suggestion ->
+            val suggestionsAdapter = SuggestionsAdapter(searchResults, query, this@ViewAllTransactionsActivity) { suggestion ->
                 // Handle the suggestion click (e.g., perform a specific action)
                 // You can update the SearchView text or do something else
                 //searchBar.text = query
@@ -332,7 +348,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
 
     }
 
-    private fun showHistoryitems(query: String){
+    private fun showHistoryitems(quƒery: String){
 
         // Create an instance of SearchHistoryAdapter with the click listener
         val historyAdapter = SearchHistoryAdapter(searchHistory) { clickedQuery ->

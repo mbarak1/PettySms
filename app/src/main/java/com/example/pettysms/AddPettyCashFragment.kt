@@ -25,7 +25,7 @@ class AddPettyCashFragment : DialogFragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setStyle(STYLE_NORMAL, R.style.Theme_PettySMS)
+        setStyle(STYLE_NORMAL, R.style.PrefsTheme)
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -34,7 +34,7 @@ class AddPettyCashFragment : DialogFragment() {
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
-        dialog.window?.attributes?.windowAnimations = R.style.FullscreenDialogAnimation
+        dialog.window?.attributes?.windowAnimations = R.style.FullscreenDialogAnimationAddOrEdit
         return dialog
     }
 
