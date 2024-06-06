@@ -130,6 +130,8 @@ class AddOrEditTruckDialog : DialogFragment(), ViewPagerChangeListener {
     private fun deleteTruckFromDb(id: Int?) {
         db = dbHelper1?.writableDatabase
         db?.let { dbHelper1?.deleteTruck(it, id) }
+        createDeleteSuccessfulDialog()
+        deleteSuccessfulDialog.show()
         onAddTruckListener?.onAddTruck()
         closeDialog()
     }
@@ -383,6 +385,23 @@ class AddOrEditTruckDialog : DialogFragment(), ViewPagerChangeListener {
 
         // Create and customize the dialog
         successfulDialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(customView)
+            .setCancelable(true)
+            .create()
+    }
+
+    private fun createDeleteSuccessfulDialog() {
+        // Inflate custom view for the loading dialog
+        val customView = LayoutInflater.from(requireContext()).inflate(R.layout.save_successful_dialog, null)
+
+        // Set up loading text or any other views if needed
+        val saveSuccessfullyText = customView.findViewById<TextView>(R.id.success_message_text)
+        val checkView = customView.findViewById<CheckView>(R.id.check)
+        saveSuccessfullyText.text = "Truck Successfully Deleted!"
+        checkView.check()
+
+        // Create and customize the dialog
+        deleteSuccessfulDialog = MaterialAlertDialogBuilder(requireContext())
             .setView(customView)
             .setCancelable(true)
             .create()
