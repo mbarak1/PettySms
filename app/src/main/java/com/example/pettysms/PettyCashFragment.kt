@@ -58,6 +58,7 @@ class PettyCashFragment : Fragment() {
     private lateinit var loadingDialog: AlertDialog
     private lateinit var loadingText: TextView
     private lateinit var truckButton: Button
+    private lateinit var ownerButton: Button
     private val binding get() = _binding!!
     private var dbStatus = false
     private var qbStatus = false
@@ -87,6 +88,7 @@ class PettyCashFragment : Fragment() {
         nestedScrollView = binding.nestedScrollView
         floatingActionButton = binding.floatingActionButton
         truckButton = binding.trucksButton
+        ownerButton = binding.ownersButton
 
         dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
         db = dbHelper?.writableDatabase
@@ -162,6 +164,19 @@ class PettyCashFragment : Fragment() {
         truckButton.setOnClickListener {
             trucksButtonAction()
         }
+        ownerButton.setOnClickListener {
+            ownersButtonAction()
+        }
+    }
+
+    private fun ownersButtonAction() {
+        val intent = Intent(activity, OwnersActivity::class.java)
+
+        // Optionally, you can pass data to the second activity using extras
+        intent.putExtra("key", "value")
+
+        // Start the second activity
+        startActivity(intent)
     }
 
     private fun trucksButtonAction() {

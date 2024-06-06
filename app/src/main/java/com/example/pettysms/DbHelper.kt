@@ -192,12 +192,20 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 $COL_OWNER_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 $COL_OWNER_NAME TEXT, 
                 $COL_OWNER_CODE TEXT,
+                $COL_OWNER_LOGO_PATH TEXT,
                 $COL_IS_OWNER_DELETED DEFAULT 0
 
             )
         """
 
         val SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY_TRUCKS" + "(" +
+                "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "$COL_SEARCH_HISTORY_QUERY TEXT," +
+                "$COL_TIMESTAMP INTEGER" +
+                ")"
+                    .trimIndent()
+
+        val SQL_CREATE_ENTRIES_SEARCH_HISTORY_OWNERS = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY_OWNERS" + "(" +
                 "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "$COL_SEARCH_HISTORY_QUERY TEXT," +
                 "$COL_TIMESTAMP INTEGER" +
@@ -212,6 +220,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         db.execSQL(SQL_CREATE_ENTRIES_REJECTED_SMS)
         db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY)
         db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS)
+        db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_OWNERS)
         db.execSQL(SQL_CREATE_TABLE_OWNERS)
         db.execSQL(SQL_CREATE_TABLE_TRUCKS)
 
@@ -615,7 +624,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
     fun getOwnerByCode(ownerCode: String): Owner? {
         val db = this.readableDatabase
-        val selection = "$COL_OWNER_CODE = ?"
+        val selection = "$COL_OWNER_CODE = ? AND $COL_IS_DELETED = 0" // Ensure to exclude deleted owners
         val selectionArgs = arrayOf(ownerCode)
         val cursor = db.query(TABLE_OWNERS, null, selection, selectionArgs, null, null, null)
         var owner: Owner? = null
@@ -623,7 +632,10 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             if (cursor.moveToFirst()) {
                 val ownerId = cursor.getInt(cursor.getColumnIndexOrThrow(COL_OWNER_ID))
                 val ownerName = cursor.getString(cursor.getColumnIndexOrThrow(COL_OWNER_NAME))
-                owner = Owner(ownerId, ownerName, ownerCode)
+                val logoPath = cursor.getString(cursor.getColumnIndexOrThrow(COL_OWNER_LOGO_PATH)) // Retrieve logo path
+                val isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(COL_IS_DELETED)) == 1 // Retrieve is_deleted flag
+
+                owner = Owner(ownerId, ownerName, ownerCode, logoPath, isDeleted)
             }
         } finally {
             cursor.close()
@@ -636,14 +648,15 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
 
 
+
     // Modify insertOwner to accept a SQLiteDatabase instance
-    private fun insertOwner(db: SQLiteDatabase, owner: Owner) {
-        // Perform insertion of owner into the database using the provided SQLiteDatabase instance
+    fun insertOwner(db: SQLiteDatabase, owner: Owner) {
         val values = ContentValues().apply {
             put(COL_OWNER_ID, owner.id)
             put(COL_OWNER_NAME, owner.name)
             put(COL_OWNER_CODE, owner.ownerCode)
-            put(COL_IS_DELETED, 0) // Set default value for is_deleted
+            put(COL_IS_DELETED, if (owner.isDeleted) 1 else 0)
+            put(COL_OWNER_LOGO_PATH, owner.logoPath)
         }
         db.insert(TABLE_OWNERS, null, values)
     }
@@ -653,9 +666,9 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         val db = this.readableDatabase
         val cursor = db.query(
             TABLE_OWNERS,
-            arrayOf(COL_OWNER_ID, COL_OWNER_NAME, COL_OWNER_CODE),
+            arrayOf(COL_OWNER_ID, COL_OWNER_NAME, COL_OWNER_CODE, COL_OWNER_LOGO_PATH),
             "$COL_IS_DELETED = ?",
-            arrayOf("0"), // Only fetch owners that are not deleted
+            arrayOf("0"),
             null,
             null,
             null
@@ -665,10 +678,13 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 val ownerId = it.getInt(it.getColumnIndexOrThrow(COL_OWNER_ID))
                 val ownerName = it.getString(it.getColumnIndexOrThrow(COL_OWNER_NAME))
                 val ownerCode = it.getString(it.getColumnIndexOrThrow(COL_OWNER_CODE))
-                owners.add(Owner(ownerId, ownerName, ownerCode))
+                val logoPath = it.getString(it.getColumnIndexOrThrow(COL_OWNER_LOGO_PATH))
+                owners.add(Owner(ownerId, ownerName, ownerCode, logoPath))
             }
         }
-        // Close the database connection after the cursor is closed
+
+        println("Inside owners db")
+        cursor.close()
         db.close()
         return owners
     }
@@ -804,6 +820,173 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         db.close()
     }
 
+    fun getOwnerSearchHistory(): MutableList<String> {
+        val db = readableDatabase
+
+        val SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY_OWNERS" + "(" +
+                "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "$COL_SEARCH_HISTORY_QUERY TEXT," +
+                "$COL_TIMESTAMP INTEGER" +
+                ")"
+                    .trimIndent()
+
+        db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS)
+
+
+
+        val cursor = db.query(
+            TABLE_SEARCH_HISTORY_OWNERS,
+            arrayOf(COL_SEARCH_HISTORY_QUERY),
+            null,
+            null,
+            null,
+            null,
+            "$COL_TIMESTAMP DESC"
+        )
+
+        val searchHistory = mutableListOf<String>()
+        with(cursor) {
+            while (moveToNext()) {
+                val query = getString(getColumnIndexOrThrow(COL_SEARCH_HISTORY_QUERY))
+                searchHistory.add(query)
+            }
+        }
+        cursor.close()
+        db.close()
+
+        return searchHistory
+
+    }
+
+    fun addOwnerQueryToSearchHistory(query: String) {
+        val db = writableDatabase
+
+        // Check if the query already exists in the database
+        val selection = "$COL_SEARCH_HISTORY_QUERY = ?"
+        val selectionArgs = arrayOf(query)
+        val cursor = db.query(
+            TABLE_SEARCH_HISTORY_OWNERS,
+            arrayOf(COL_SEARCH_HISTORY_QUERY),
+            selection,
+            selectionArgs,
+            null,
+            null,
+            null
+        )
+
+        // If the query does not exist, insert it
+        if (cursor.count == 0) {
+            val contentValues = ContentValues().apply {
+                put(COL_SEARCH_HISTORY_QUERY, query)
+                put(COL_TIMESTAMP, System.currentTimeMillis())
+            }
+            db.insert(TABLE_SEARCH_HISTORY_OWNERS, null, contentValues)
+        }
+
+        cursor.close()
+        db.close()
+    }
+
+    fun clearOwnerSearchHistory() {
+        val db = writableDatabase
+        try {
+            // Clear the search history table
+            db.execSQL("DELETE FROM $TABLE_SEARCH_HISTORY_OWNERS")
+        } catch (e: SQLException) {
+            // Handle exceptions, if any
+            e.printStackTrace()
+        } finally {
+            db.close()
+        }
+    }
+
+    fun isOwnerNameExists(ownerName: String): Boolean {
+        val db = this.readableDatabase
+        val selection = "$COL_OWNER_NAME = ?"
+        val selectionArgs = arrayOf(ownerName)
+        val cursor = db.query(
+            TABLE_OWNERS,
+            arrayOf(COL_OWNER_ID), // You can query any column, here we just need a count
+            selection,
+            selectionArgs,
+            null,
+            null,
+            null
+        )
+
+        val exists = cursor.count > 0
+        cursor.close()
+        db.close()
+        return exists
+    }
+
+    fun isOwnerCodeExists(ownerCode: String): Boolean {
+        val db = this.readableDatabase
+        val selection = "$COL_OWNER_CODE = ?"
+        val selectionArgs = arrayOf(ownerCode)
+        val cursor = db.query(
+            TABLE_OWNERS,
+            arrayOf(COL_OWNER_ID), // You can query any column, here we just need a count
+            selection,
+            selectionArgs,
+            null,
+            null,
+            null
+        )
+
+        val exists = cursor.count > 0
+        cursor.close()
+        db.close()
+        return exists
+    }
+
+    fun updateOwner(db: SQLiteDatabase, owner: Owner) {
+        // Prepare the ContentValues to update the owner record
+        val values = ContentValues().apply {
+            put(COL_OWNER_NAME, owner.name)
+            put(COL_OWNER_CODE, owner.ownerCode)
+            put(COL_OWNER_LOGO_PATH, owner.logoPath)
+            put(COL_IS_OWNER_DELETED, if (owner.isDeleted) 1 else 0)
+        }
+
+        // Define the WHERE clause to update the specific owner by ID
+        val whereClause = "$COL_OWNER_ID = ?"
+        val whereArgs = arrayOf(owner.id.toString())
+
+        // Execute the update operation
+        db.update(TABLE_OWNERS, values, whereClause, whereArgs)
+    }
+
+    fun doesOwnerHaveTrucks(ownerCode: String): Boolean {
+        val db = this.readableDatabase
+        val cursor = db.rawQuery("SELECT COUNT(*) FROM $TABLE_TRUCKS WHERE $COL_TRUCK_OWNER = ?",
+            arrayOf(ownerCode)
+        )
+        var count = 0
+        if (cursor.moveToFirst()) {
+            count = cursor.getInt(0)
+        }
+        cursor.close()
+        db.close()
+        return count > 0
+    }
+
+    fun deleteOwner(ownerId: Int): Boolean {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put(COL_IS_OWNER_DELETED, 1)  // Set the is_deleted flag to 1 (true)
+        }
+        val whereClause = "$COL_OWNER_ID = ?"
+        val whereArgs = arrayOf(ownerId.toString())
+
+        // Perform the soft delete operation
+        val rowsUpdated = db.update(TABLE_OWNERS, values, whereClause, whereArgs)
+        db.close()
+
+        // Return true if one or more rows were updated, false otherwise
+        return rowsUpdated > 0
+    }
+
 
     companion object {
         // If you change the database schema, you must increment the database version.
@@ -845,6 +1028,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_SEARCH_HISTORY_QUERY = "query"
             const val TABLE_SEARCH_HISTORY = "search_history"
             const val TABLE_SEARCH_HISTORY_TRUCKS = "search_history_trucks"
+            const val TABLE_SEARCH_HISTORY_OWNERS = "search_history_owners"
             const val COL_TIMESTAMP = "timestamp" // Add this line
 
             //ALL SMS TABLE VARIABLES
@@ -873,6 +1057,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_OWNER_NAME = "name"
             const val COL_OWNER_CODE = "owner_code"
             const val COL_IS_OWNER_DELETED = "is_deleted"
+            const val COL_OWNER_LOGO_PATH = "logo_path"
 
 
 

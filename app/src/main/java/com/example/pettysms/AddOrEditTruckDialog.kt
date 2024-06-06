@@ -53,6 +53,7 @@ class AddOrEditTruckDialog : DialogFragment(), ViewPagerChangeListener {
     private lateinit var saveButton: Button
     private lateinit var successfulDialog: AlertDialog
     private lateinit var saveErrorDialog: AlertDialog
+    private lateinit var deleteSuccessfulDialog: AlertDialog
     private lateinit var activeStatusLinearLayout: LinearLayout
     private lateinit var statusSwitch: MaterialSwitch
 
@@ -216,6 +217,7 @@ class AddOrEditTruckDialog : DialogFragment(), ViewPagerChangeListener {
             truckNoValidity = true
             autoCompleteTextView.setText(truck?.owner?.name)
             var position = findAllSubstringsIgnoreCase(truckModels.toTypedArray(), truck!!.make.toString())
+            viewPager.setCurrentItem(position[0], false)
             println("Edit Position: $position")
             adapter.setSelectedItemPosition(position[0])
 
