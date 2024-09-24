@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="-40dp">
+
+    <com.google.android.material.card.MaterialCardView
+
+        style="?attr/materialCardViewElevatedStyle"
+        android:id="@+id/transactorCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@android:color/transparent"
+        app:cardElevation="0dp"
+        android:layout_marginStart="68dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="32dp"
+        android:layout_marginBottom="40dp"
+        android:clickable="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="5dp">
+
+            <xyz.schwaab.avvylib.AvatarView
+                android:id="@+id/avatarView"
+                android:layout_width="45dp"
+                android:layout_height="45dp"
+                app:avvy_border_color="@android:color/darker_gray"
+                app:avvy_border_highlight_color="?attr/colorPrimary"
+                app:avvy_border_highlight_color_end="#3088ff"
+                app:avvy_border_thickness="2dp"
+                app:avvy_border_thickness_highlight="3dp"
+                app:avvy_distance_to_border="2dp"
+                app:avvy_highlighted="true"
+                app:avvy_loading_arches="5"
+                app:avvy_loading_arches_degree_area="90"
+                app:avvy_text_color="?attr/colorControlNormal"
+                app:avvy_text_size="16sp"
+                android:layout_marginStart="10dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/transactorName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:layout_marginStart="11dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:textSize="17sp"
+                android:textFontWeight="550"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toEndOf="@+id/avatarView"
+                app:layout_constraintTop_toTopOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+    </com.google.android.material.card.MaterialCardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+

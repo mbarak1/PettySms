@@ -4,4 +4,8 @@
     <dimen name="balanceCardMarginTop">105dp</dimen>
     <dimen name="corner_radius">30dp</dimen>
     <dimen name="check_stroke_width">3dp</dimen>
+    <dimen name="header_text_size">10sp</dimen>
+    <dimen name="header_padding">10dp</dimen>
+    <dimen name="index_width">40dp</dimen>
+    <dimen name="index_text_size">16sp</dimen>
 </resources>

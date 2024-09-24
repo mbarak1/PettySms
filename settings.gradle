@@ -12,7 +12,9 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven { url 'https://jitpack.io' }
+
     }
 }
 rootProject.name = "Petty SMS"
 include ':app'
+include ':library'

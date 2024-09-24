@@ -80,6 +80,8 @@
     <string name="add_truck">Add Truck</string>
     <string name="this_search_bar_provides_search_functionality_that_is_used_to_search_for_trucks">This search bar provides search functionality that is used to search for trucks</string>
     <string name="this_search_bar_provides_search_functionality_that_is_used_to_search_for_companies">This search bar provides search functionality that is used to search for companies or owners</string>
+    <string name="this_search_bar_provides_search_functionality_that_is_used_to_search_for_transactors">This search bar provides search functionality that is used to search for transactors</string>
+
     <string name="truck_no">Truck No.</string>
     <string name="owner">Owner</string>
     <string name="model">Model</string>
@@ -90,4 +92,7 @@
     <string name="search_companies">Search Companies</string>
     <string name="company_name">Company Name</string>
     <string name="company_code">Company Code</string>
+    <string name="no_transactors_to_display">No Transactors to display</string>
+    <string name="search_transactors">Search Transactors</string>
+    <string name="transactor_name">Transactor Name</string>
 </resources>

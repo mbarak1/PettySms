@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ContentResolver
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
@@ -1472,6 +1473,13 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
                 progressBar.progress = currentProgress
             }
+
+            val transactors = Transactor.getTransactorsFromTransactions(convertedTransactions)
+            addTransactorsToDb(transactors)
+            for (transaction in convertedTransactions){
+                updateTransactionCheck(transaction)
+            }
+
         }
 
 
@@ -1521,6 +1529,21 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         }
 
     }
+
+    private fun addTransactorsToDb(transactors: List<Transactor>) {
+        db_helper = this.activity?.applicationContext?.let { DbHelper(it) }
+
+        db_helper?.insertTransactors(transactors)
+
+
+    }
+
+    private fun updateTransactionCheck(mpesaTransaction: MpesaTransaction){
+
+        db_helper = this.activity?.applicationContext?.let { DbHelper(it) }
+        mpesaTransaction.id?.let { db_helper?.transactorCheckUpdateTransaction(it) }
+    }
+
     override fun onRefresh() {
         // This method will be called when you need to refresh the RecyclerViews
         all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!

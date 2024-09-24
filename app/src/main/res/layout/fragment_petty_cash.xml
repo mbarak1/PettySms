@@ -251,6 +251,7 @@
                         app:iconSize="33dp" />
 
                     <com.google.android.material.button.MaterialButton
+                        android:id="@+id/transactorsButton"
                         style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="82dp"
                         android:layout_height="80dp"

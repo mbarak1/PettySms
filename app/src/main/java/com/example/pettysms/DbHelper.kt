@@ -54,6 +54,8 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         contentValues.put(COL_TRANSACTIONS_SENDER_NAME, mpesaTransaction.sender?.name)
         contentValues.put(COL_TRANSACTIONS_SENDER_PHONE_NO, mpesaTransaction.sender?.phone_no)
         contentValues.put(COL_TRANSACTIONS_IS_DELETED, if (mpesaTransaction.isDeleted == true) 1 else 0)
+        contentValues.put(COL_TRANSACTIONS_TRANSACTOR_CHECK, if (mpesaTransaction.transactorCheck == true) 1 else 0)
+
 
 
 
@@ -64,6 +66,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
 
     }
+
 
     fun deleteTransaction(transactionId: Int){
         val db = writableDatabase
@@ -76,6 +79,20 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         db.update(TABLE_TRANSACTIONS, contentValues, whereClause, whereArgs)
 
     }
+
+    fun transactorCheckUpdateTransaction(transactionId: Int){
+        val db = writableDatabase
+
+        val contentValues = ContentValues().apply {
+            put(COL_TRANSACTIONS_TRANSACTOR_CHECK, 1)
+        }
+        val whereClause = "$COL_TRANSACTIONS_ID = ?"
+        val whereArgs = arrayOf(transactionId.toString())
+        db.update(TABLE_TRANSACTIONS, contentValues, whereClause, whereArgs)
+
+    }
+
+
 
     fun insertRejectedSMS(date: String, smsBody: String) {
         val db = writableDatabase
@@ -148,7 +165,9 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 COL_TRANSACTIONS_SENDER_NAME + " TEXT," +
                 COL_TRANSACTIONS_SENDER_PHONE_NO + " TEXT," +
                 COL_TRANSACTIONS_DESCRIPTION + " TEXT," +
-                COL_TRANSACTIONS_IS_DELETED + " INTEGER" + // Removed the trailing comma
+                COL_TRANSACTIONS_IS_DELETED + " INTEGER" +
+                COL_TRANSACTIONS_TRANSACTOR_CHECK + " INTEGER" +
+// Removed the trailing comma
 // Removed the trailing comma
                 ")"
 
@@ -212,6 +231,22 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 ")"
                     .trimIndent()
 
+        val SQL_CREATE_TABLE_TRANSACTORS = """
+            CREATE TABLE $TABLE_TRANSACTORS (
+                $COL_TRANSACTOR_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                $COL_TRANSACTOR_NAME TEXT,
+                $COL_TRANSACTOR_PHONE_NO TEXT,
+                $COL_TRANSACTOR_ADDRESS TEXT DEFAULT 'N/A',
+                $COL_TRANSACTOR_TYPE TEXT,
+                $COL_TRANSACTOR_ID_CARD_NO INTEGER,
+                $COL_IS_TRANSACTOR_DELETED BOOLEAN DEFAULT 0,
+                $COL_IS_IMPORTED BOOLEAN DEFAULT 0,
+                $COL_TRANSACTOR_LOGO_PATH TEXT,
+                $COL_TRANSACTOR_INTERACTIONS INTEGER DEFAULT 0,
+                $COL_TRANSACTOR_AVATAR_COLOR TEXT
+            )
+        """
+
 
 
 
@@ -223,6 +258,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_OWNERS)
         db.execSQL(SQL_CREATE_TABLE_OWNERS)
         db.execSQL(SQL_CREATE_TABLE_TRUCKS)
+        db.execSQL(SQL_CREATE_TABLE_TRANSACTORS)
 
 
 
@@ -252,6 +288,12 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
         val currentMonthYear = SimpleDateFormat("MM/yyyy", Locale.getDefault()).format(Calendar.getInstance().time)
         val query = "SELECT * FROM $TABLE_TRANSACTIONS WHERE substr($COL_TRANSACTIONS_TRANSACTION_DATE, 4, 7) = '$currentMonthYear' AND is_deleted = 0"
+        return getTransactionsFromQuery(query)
+    }
+
+    fun getTransactorNotCheckedTransactions(): MutableList<MpesaTransaction> {
+
+        val query = "SELECT * FROM $TABLE_TRANSACTIONS WHERE $COL_TRANSACTIONS_TRANSACTOR_CHECK = 0"
         return getTransactionsFromQuery(query)
     }
 
@@ -394,8 +436,10 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                     COL_TRANSACTIONS_SENDER_NAME))
                 val sender_phone_no = cursor.getString(cursor.getColumnIndex(
                     COL_TRANSACTIONS_SENDER_PHONE_NO))
-                val is_deleted = cursor.getString(cursor.getColumnIndex(
+                val is_deleted = cursor.getInt(cursor.getColumnIndex(
                     COL_TRANSACTIONS_IS_DELETED))
+                val transactorCheck = cursor.getInt(cursor.getColumnIndex(
+                    COL_TRANSACTIONS_TRANSACTOR_CHECK))
 
                 val transaction = MpesaTransaction(id = id, mpesaCode = mpesa_code, msgDate = msg_date, transactionDate = transaction_date,
                     account = Account(
@@ -413,7 +457,9 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                     paybillAcount = paybill_account,
                     description = description,
                     sender = Sender(sender_name,sender_phone_no),
-                    isDeleted = if (is_deleted.toInt() == 1) true else false
+                    isDeleted = if (is_deleted == 1) true else false,
+                    transactorCheck = if (transactorCheck == 1) true else false
+
                 )
                 transactions.add(transaction)
             } while (cursor.moveToNext())
@@ -988,6 +1034,199 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
     }
 
 
+    fun getAllTransactors(): List<Transactor> {
+        val transactors = mutableListOf<Transactor>()
+        val db = this.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM $TABLE_TRANSACTORS", null)
+
+        if (cursor.moveToFirst()) {
+            do {
+                val id = cursor.getInt(cursor.getColumnIndexOrThrow(COL_TRANSACTOR_ID))
+                val name = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRANSACTOR_NAME))
+                val phoneNo = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRANSACTOR_PHONE_NO))
+                val address = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRANSACTOR_ADDRESS))
+                val transactorType = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRANSACTOR_TYPE))
+                val idCardNo = cursor.getInt(cursor.getColumnIndexOrThrow(COL_TRANSACTOR_ID_CARD_NO))
+                val isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(COL_IS_TRANSACTOR_DELETED)) > 0
+                val isImported = cursor.getInt(cursor.getColumnIndexOrThrow(COL_IS_IMPORTED)) > 0
+                val logoPath = cursor.getString(cursor.getColumnIndexOrThrow(COL_TRANSACTOR_LOGO_PATH))
+                val interactions = cursor.getInt(cursor.getColumnIndexOrThrow(
+                    COL_TRANSACTOR_INTERACTIONS))
+                val avatarColor = cursor.getString(cursor.getColumnIndexOrThrow(
+                    COL_TRANSACTOR_AVATAR_COLOR))
+
+
+                val transactor = Transactor(id, name, phoneNo, idCardNo, address, transactorType, logoPath, interactions, isDeleted, isImported, avatarColor )
+                transactors.add(transactor)
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        db.close()
+        return transactors
+    }
+
+    fun isTableExists(db: SQLiteDatabase, tableName: String): Boolean {
+        val cursor = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'", null)
+        val exists = cursor.count > 0
+        cursor.close()
+        return exists
+    }
+
+    fun insertTransactors(transactors: List<Transactor>) {
+        val db = this.writableDatabase
+        println("transactor insert")
+
+        // Check if the transactors table exists, create if it doesn't
+        if (!isTableExists(db, TABLE_TRANSACTORS)) {
+            onCreate(db)
+        }
+
+        db.beginTransaction()
+        try {
+            // Insert each transactor into the transactors table
+            for (transactor in transactors) {
+                insertTransactor(db, transactor) // Pass the database instance to the insertTransactor function
+            }
+            db.setTransactionSuccessful()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            if (db.isOpen) { // Check if the database connection is open
+                db.endTransaction()
+                db.close()
+            }
+        }
+    }
+
+    fun insertTransactor(db: SQLiteDatabase, transactor: Transactor): Long {
+        if (transactorExists(db, transactor.name, transactor.phoneNumber)) {
+            return -1 // Transactor already exists
+        }else if(checkIfTransactorExistsByPhoneNumber(db, transactor?.phoneNumber.toString())){
+            updateTransactorName(db, transactor)
+        }
+
+        val contentValues = ContentValues().apply {
+            put(COL_TRANSACTOR_NAME, transactor.name)
+            put(COL_TRANSACTOR_PHONE_NO, transactor.phoneNumber)
+            put(COL_TRANSACTOR_ADDRESS, transactor.address)
+            put(COL_TRANSACTOR_TYPE, transactor.transactorType)
+            put(COL_TRANSACTOR_ID_CARD_NO, transactor.idCard)
+            put(COL_IS_TRANSACTOR_DELETED, transactor.isDeleted)
+            put(COL_IS_IMPORTED, transactor.isImported)
+            put(COL_TRANSACTOR_LOGO_PATH, transactor.transactorProfilePicturePath)
+            put(COL_TRANSACTOR_INTERACTIONS, transactor.interactions)
+            put(COL_TRANSACTOR_AVATAR_COLOR, transactor.avatarColor)
+        }
+
+        println("transactor insert")
+
+        return db.insert(TABLE_TRANSACTORS, null, contentValues)
+    }
+
+    fun updateTransactor(db: SQLiteDatabase, transactor: Transactor): Int {
+        // Prepare the ContentValues with the fields that need to be updated
+        val contentValues = ContentValues().apply {
+            put(COL_TRANSACTOR_NAME, transactor.name)
+            put(COL_TRANSACTOR_PHONE_NO, transactor.phoneNumber)
+            put(COL_TRANSACTOR_ADDRESS, transactor.address)
+            put(COL_TRANSACTOR_TYPE, transactor.transactorType)
+            put(COL_TRANSACTOR_ID_CARD_NO, transactor.idCard)
+            put(COL_TRANSACTOR_LOGO_PATH, transactor.transactorProfilePicturePath)
+        }
+
+        // Define the WHERE clause to update based on the transactor ID
+        val whereClause = "$COL_TRANSACTOR_ID = ?"
+        val whereArgs = arrayOf(transactor.id.toString())
+
+        // Update the transactor in the database and return the number of rows affected
+        return db.update(TABLE_TRANSACTORS, contentValues, whereClause, whereArgs)
+    }
+
+    private fun updateTransactorName(db: SQLiteDatabase, transactor: Transactor): Int {
+
+        val contentValues = ContentValues().apply {
+            put(COL_TRANSACTOR_NAME, transactor.name)
+        }
+
+        // Update the transactor record in the database where the name and phone number match
+        val whereClause = "$COL_TRANSACTOR_PHONE_NO = ?"
+        val whereArgs = arrayOf(transactor.phoneNumber)
+
+        return db.update(TABLE_TRANSACTORS, contentValues, whereClause, whereArgs)
+    }
+
+    private fun transactorExists(db: SQLiteDatabase, name: String?, phoneNo: String?): Boolean {
+        val queryBuilder = StringBuilder("SELECT * FROM $TABLE_TRANSACTORS WHERE ")
+        val queryParams = mutableListOf<String>()
+
+        if (name != null) {
+            queryBuilder.append("$COL_TRANSACTOR_NAME = ?")
+            queryParams.add(name)
+        } else {
+            queryBuilder.append("$COL_TRANSACTOR_NAME IS NULL")
+        }
+
+        if (phoneNo != null) {
+            queryBuilder.append(" AND $COL_TRANSACTOR_PHONE_NO = ?")
+            queryParams.add(phoneNo)
+        } else {
+            queryBuilder.append(" AND $COL_TRANSACTOR_PHONE_NO IS NULL")
+        }
+
+        val cursor: Cursor = db.rawQuery(queryBuilder.toString(), queryParams.toTypedArray())
+        val exists = cursor.count > 0
+        cursor.close()
+        return exists
+    }
+
+    fun incrementTransactorInteractions(transactorId: Int) {
+        val db = this.writableDatabase
+        val incrementQuery = """
+            UPDATE transactors
+            SET interactions = interactions + 1
+            WHERE id = ?
+        """
+        db.execSQL(incrementQuery, arrayOf(transactorId))
+        db.close()
+    }
+
+    fun checkIfTransactorExistsByPhoneNumber(db: SQLiteDatabase?, phoneNumber: String): Boolean {
+        val query = "SELECT COUNT(*) FROM $TABLE_TRANSACTORS WHERE $COL_TRANSACTOR_PHONE_NO = ?"
+        val cursor = db?.rawQuery(query, arrayOf(phoneNumber))
+
+        var exists = false
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                exists = cursor.getInt(0) > 0 // Check if count is greater than 0
+            }
+            cursor.close()
+        }
+        return exists
+    }
+
+    fun deleteTransactor(transactor: Transactor): Boolean {
+        val db = this.writableDatabase
+        val contentValues = ContentValues().apply {
+            put(COL_IS_TRANSACTOR_DELETED, 1) // Set is_deleted to 1 (soft delete)
+        }
+
+        // Ensure the Transactor has a valid ID before proceeding
+        val transactorId = transactor.id ?: return false
+
+        // Update the transactor's record where the id matches
+        val result = db.update(
+            TABLE_TRANSACTORS,
+            contentValues,
+            "$COL_TRANSACTOR_ID = ?",
+            arrayOf(transactorId.toString())
+        )
+
+        db.close()
+
+        return result > 0 // Return true if at least one row was updated
+    }
+
+
     companion object {
         // If you change the database schema, you must increment the database version.
             const val DATABASE_VERSION = 2
@@ -1014,8 +1253,10 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_TRANSACTIONS_SENDER_NAME = "sender_name"
             const val COL_TRANSACTIONS_SENDER_PHONE_NO = "sender_phone_no"
             const val COL_TRANSACTIONS_IS_DELETED = "is_deleted"
+            const val COL_TRANSACTIONS_TRANSACTOR_CHECK = "transactor_check"
 
-            //REJECTED SMS TABLE VARIABLES
+
+        //REJECTED SMS TABLE VARIABLES
 
             const val TABLE_REJECTED_SMS = "rejected_sms"
             const val COL_REJECTED_MESSAGES_ID = "id"
@@ -1058,6 +1299,21 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_OWNER_CODE = "owner_code"
             const val COL_IS_OWNER_DELETED = "is_deleted"
             const val COL_OWNER_LOGO_PATH = "logo_path"
+
+            //TRANSACTORS TABLE VARIABLES
+
+            const val TABLE_TRANSACTORS = "transactors"
+            const val COL_TRANSACTOR_ID = "id"
+            const val COL_TRANSACTOR_NAME = "name"
+            const val COL_TRANSACTOR_PHONE_NO = "phone_no"
+            const val COL_TRANSACTOR_ADDRESS = "address"
+            const val COL_TRANSACTOR_TYPE = "transactor_type"
+            const val COL_TRANSACTOR_ID_CARD_NO = "id_card_no"
+            const val COL_IS_TRANSACTOR_DELETED = "is_deleted"
+            const val COL_IS_IMPORTED = "is_imported"
+            const val COL_TRANSACTOR_LOGO_PATH = "logo_path"
+            const val COL_TRANSACTOR_INTERACTIONS = "interactions"
+            const val COL_TRANSACTOR_AVATAR_COLOR = "avatar_color"
 
 
 

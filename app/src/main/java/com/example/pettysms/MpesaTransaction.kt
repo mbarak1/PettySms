@@ -28,7 +28,8 @@ class MpesaTransaction(
     var paybillAcount: String? = "none",
     var sender: Sender? = Sender("Non-sender", "Non-sender"),
     var smsText: String?,
-    var isDeleted: Boolean = false
+    var isDeleted: Boolean = false,
+    var transactorCheck : Boolean = false
 ) : Transaction(
     id,
     msgDate,
@@ -308,6 +309,8 @@ class MpesaTransaction(
 
             return MpesaTransactionResult(transactions_list, rejectedSmsList)
         }
+
+
         fun findDatesInText(text: String): List<Date> {
             val dateFound = mutableListOf<Date>()
 
@@ -377,6 +380,47 @@ class MpesaTransaction(
             val match = regex.find(input)
 
             return match?.value?.toDouble()
+        }
+
+        fun getTitleTextByTransactionType(transaction: MpesaTransaction): String {
+            return when (transaction.transaction_type) {
+                "topup", "send_money", "paybill", "till", "withdraw", "reverse" -> ({
+                    transaction.recipient?.name?.let { capitalizeEachWord(it) } ?: ""
+                }).toString()
+                "deposit" -> ({
+                    transaction.mpesaDepositor?.let { capitalizeEachWord(it) } ?: ""
+                }).toString()
+                "receival" -> ({
+                    transaction.sender?.name?.let { capitalizeEachWord(it) } ?: ""
+                }).toString()
+                else -> ""
+            }
+        }
+
+        fun capitalizeEachWord(input: String): String? {
+            val words = input.split(" ".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+            val result = StringBuilder()
+
+            for (word in words) {
+                if (!word.isEmpty()) {
+                    // Replace special characters with space
+                    val cleanedWord = word.replace(Regex("[^A-Za-z0-9]"), " ")
+
+                    val capitalizedWord = cleanedWord.split(" ").joinToString(" ") {
+                        if (it.isNotEmpty()) {
+                            val firstLetter = it.substring(0, 1).uppercase(Locale.getDefault())
+                            val rest = it.substring(1).lowercase(Locale.getDefault())
+                            "$firstLetter$rest"
+                        } else {
+                            ""
+                        }
+                    }
+
+                    result.append(capitalizedWord).append(" ")
+                }
+            }
+
+            return result.toString().trim()
         }
 
     }

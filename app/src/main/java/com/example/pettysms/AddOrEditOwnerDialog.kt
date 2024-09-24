@@ -58,6 +58,7 @@ class AddOrEditOwnerDialog : DialogFragment() {
 
 
 
+
     private var _binding: FragmentAddOrEditOwnerDialogBinding? = null
     private val binding get() = _binding!!
     private var onAddOwnerListener: AddOrEditOwnerDialog.OnAddOwnerListener? = null
@@ -164,7 +165,6 @@ class AddOrEditOwnerDialog : DialogFragment() {
         companyCodeTextView = binding.ownerCodeTextField
         saveButton = binding.saveButton
         logoImageBtn = binding.logoImageButton
-        dbHelper = DbHelper(requireContext())
         db = dbHelper?.writableDatabase
 
         val defaultLogoDrawable: Drawable? = ContextCompat.getDrawable(requireContext(), R.drawable.p_logo_cropped)

@@ -165,7 +165,7 @@ class OwnersActivity : AppCompatActivity(), AddOrEditOwnerDialog.OnAddOwnerListe
         dialog.arguments = args
 
         dialog.setOnAddOwnerListener(this)
-        dialog.show(supportFragmentManager, "AddOrEditTruckDialog")
+        dialog.show(supportFragmentManager, "AddOrEditOwnerDialog")
 
     }
 

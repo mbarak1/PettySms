@@ -59,6 +59,7 @@ class PettyCashFragment : Fragment() {
     private lateinit var loadingText: TextView
     private lateinit var truckButton: Button
     private lateinit var ownerButton: Button
+    private lateinit var transactorsButton: Button
     private val binding get() = _binding!!
     private var dbStatus = false
     private var qbStatus = false
@@ -89,6 +90,7 @@ class PettyCashFragment : Fragment() {
         floatingActionButton = binding.floatingActionButton
         truckButton = binding.trucksButton
         ownerButton = binding.ownersButton
+        transactorsButton = binding.transactorsButton
 
         dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
         db = dbHelper?.writableDatabase
@@ -167,6 +169,18 @@ class PettyCashFragment : Fragment() {
         ownerButton.setOnClickListener {
             ownersButtonAction()
         }
+        transactorsButton.setOnClickListener {
+            transactorsButtonAction()
+        }
+
+    }
+
+    private fun transactorsButtonAction() {
+        val intent = Intent(activity, TransactorsActivity::class.java)
+
+        intent.putExtra("key", "value")
+
+        startActivity(intent)
     }
 
     private fun ownersButtonAction() {

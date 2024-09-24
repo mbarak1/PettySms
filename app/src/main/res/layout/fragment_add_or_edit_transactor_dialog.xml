@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    tools:context=".AddOrEditTransactorDialog">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appBarLayout2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/addOrEditTransactorToolbar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:elevation="4dp"
+                app:titleTextAppearance="@style/ToolbarTitleTextAppearance">
+
+            </com.google.android.material.appbar.MaterialToolbar>
+
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/nestedScrollView2"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/appBarLayout2">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <TextView
+                    android:id="@+id/ownerPictureMessage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="20dp"
+                    android:layout_marginTop="20dp"
+                    android:fontFamily="@font/montserrat_medium"
+                    android:text="Transactor Details: "
+                    android:textSize="18sp"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <xyz.schwaab.avvylib.AvatarView
+                    android:id="@+id/avatar_view"
+                    android:layout_width="200dp"
+                    android:layout_height="200dp"
+                    android:layout_marginTop="20dp"
+                    app:avvy_border_color="@android:color/darker_gray"
+                    app:avvy_border_highlight_color="?attr/colorPrimary"
+                    app:avvy_border_highlight_color_end="#3088ff"
+                    app:avvy_border_thickness="2dp"
+                    app:avvy_border_thickness_highlight="3dp"
+                    app:avvy_circle_background_color="?attr/colorSurface"
+                    app:avvy_distance_to_border="2dp"
+                    app:avvy_highlighted="true"
+                    app:avvy_loading_arches="5"
+                    app:avvy_loading_arches_degree_area="90"
+                    app:avvy_text_color="?attr/colorAccent"
+                    app:avvy_text_size="40sp"
+                    android:scaleType="fitCenter"
+                    app:layout_constraintBaseline_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/ownerPictureMessage" />
+
+
+                <ImageButton
+                    android:id="@+id/logoImageButton"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:layout_marginTop="196dp"
+                    android:background="@drawable/background_circle"
+                    android:padding="2dp"
+                    android:src="@drawable/outline_camera_alt_24"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintHorizontal_bias="0.728"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+
+                <LinearLayout
+                    android:id="@+id/transactorNameLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="48dp"
+                    android:layout_marginStart="10dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/avatar_view">
+
+                    <ImageView
+                        android:id="@+id/nameImageView"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/outline_account_circle_24" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/transactorNameTextFieldLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginEnd="20dp"
+                        app:helperText="Please input transactor name either individual name in form of first name and last name (e.g. John Doe) or company name (e.g. ABC Company Ltd)"
+                        app:helperTextEnabled="true"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@+id/avatar_view">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/transactorNameTextField"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="@string/transactor_name" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/transactorAddressLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="20dp"
+                    android:layout_marginStart="10dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/transactorNameLayout">
+
+                    <ImageView
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/home_pin_24px" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/transactorAddressTextFieldLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="20dp"
+                    android:layout_marginEnd="20dp"
+                    app:helperText="Please input transactor physical address"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/ownerNameTextFieldLayout">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/transactorAddressTextField"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Transactor Address" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/transactorTypeLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="20dp"
+                    android:layout_marginStart="10dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/transactorAddressLayout">
+
+                    <ImageView
+                        android:id="@+id/transactorTypeImageView"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/outline_admin_panel_settings_black_24dp" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/transactorDropdownLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="20dp"
+                        android:layout_marginStart="20dp"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/autoCompleteTextView"
+                            android:hint="Transactor Type"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/transactorIdLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="20dp"
+                    android:layout_marginStart="10dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/transactorTypeLayout">
+
+                    <ImageView
+                        android:id="@+id/idImageView"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/id_card_24px" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/transactorIdTextFieldLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginEnd="20dp"
+                        app:helperText="Please input transactor Identity Card Number"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@+id/ownerNameTextFieldLayout">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/transactorIdTextField"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="Transactor ID No." />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/transactorPhoneNumberLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="20dp"
+                    android:layout_marginStart="10dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/transactorIdLayout">
+
+                    <ImageView
+                        android:id="@+id/phoneImageView"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/outline_call_black_24dp" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/transactorPhoneNumberTextFieldLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginEnd="20dp"
+                        app:helperText="Please input phone number in the form of 07xxxxxxxx or 01xxxxxxxx"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@+id/ownerNameTextFieldLayout">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/transactorPhoneNumberTextField"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="Transactor Phone No." />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/saveButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="20dp"
+                    android:layout_marginTop="48dp"
+                    android:layout_marginEnd="20dp"
+                    android:layout_marginBottom="48dp"
+                    android:text="@string/save"
+                    app:icon="@drawable/baseline_check_24"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/transactorPhoneNumberLayout"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+        </androidx.core.widget.NestedScrollView>
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</FrameLayout>

@@ -193,11 +193,35 @@ class SmsServiceHelper() {
 
         if (db != null) {
             for (transaction in result) {
-                dbHelper?.insertMpesaTransaction(transaction)
+                dbHelper.insertMpesaTransaction(transaction)
+
             }
+
+            val transactors = Transactor.getTransactorsFromTransactions(result)
+            addTransactorsToDb(transactors, context)
+
+            for (transaction in result){
+                updateTransactionCheck(transaction, context)
+            }
+
+
+
+
         }
         // Check if the callback is set and invoke the onRefresh() method
         MpesaFragment.CallbackSingleton.refreshCallback?.onRefresh()
 
     }
+
+    private fun addTransactorsToDb(transactor: List<Transactor>, context: Context) {
+        val dbHelper = DbHelper(context)
+        dbHelper.insertTransactors(transactor)
+
+    }
+
+    private fun updateTransactionCheck(mpesaTransaction: MpesaTransaction, context: Context){
+        val dbHelper = DbHelper(context)
+        mpesaTransaction.id?.let { dbHelper.transactorCheckUpdateTransaction(it) }
+    }
+
 }
