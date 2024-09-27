@@ -1364,8 +1364,10 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                         account = Account(
                             id = 1,
                             name = "General Expenses",
-                            description = "General Expenses",
-                            type = "Expense"
+                            type = "Expense",
+                            owner = null,
+                            accountNumber = null,
+                            currency = "Kenyan Shilling"
                         ),
                         amount = amount,
                         transactionType = transaction_type,

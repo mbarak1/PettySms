@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteOpenHelper
 import java.sql.SQLException
 import java.text.SimpleDateFormat
@@ -232,7 +233,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                     .trimIndent()
 
         val SQL_CREATE_TABLE_TRANSACTORS = """
-            CREATE TABLE $TABLE_TRANSACTORS (
+            CREATE TABLE IF NOT EXISTS $TABLE_TRANSACTORS (
                 $COL_TRANSACTOR_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 $COL_TRANSACTOR_NAME TEXT,
                 $COL_TRANSACTOR_PHONE_NO TEXT,
@@ -247,6 +248,25 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             )
         """
 
+        val SQL_CREATE_TABLE_ACCOUNTS = """
+            CREATE TABLE IF NOT EXISTS $TABLE_ACCOUNTS (
+                $COL_ACCOUNT_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                $COL_ACCOUNT_NAME TEXT,
+                $COL_ACCOUNT_NUMBER TEXT,
+                $COL_ACCOUNT_TYPE TEXT,
+                $COL_ACCOUNT_OWNER INTEGER,
+                $COL_ACCOUNT_CURRENCY TEXT DEFAULT 'Kenyan Shilling',
+                $COL_ACCOUNT_IS_DELETED BOOLEAN DEFAULT 0
+            )
+        """
+
+        val SQL_CREATE_ENTRIES_SEARCH_HISTORY_ACCOUNTS = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY_ACCOUNTS" + "(" +
+                "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "$COL_SEARCH_HISTORY_QUERY TEXT," +
+                "$COL_TIMESTAMP INTEGER" +
+                ")"
+                    .trimIndent()
+
 
 
 
@@ -256,9 +276,11 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY)
         db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_TRUCKS)
         db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_OWNERS)
+        db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_ACCOUNTS)
         db.execSQL(SQL_CREATE_TABLE_OWNERS)
         db.execSQL(SQL_CREATE_TABLE_TRUCKS)
         db.execSQL(SQL_CREATE_TABLE_TRANSACTORS)
+        db.execSQL(SQL_CREATE_TABLE_ACCOUNTS)
 
 
 
@@ -445,9 +467,12 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                     account = Account(
                         id = 1,
                         name = "General Expenses",
-                        description = "General Expenses",
-                        type = "Expense"
-                    ), amount = amount,
+                        type = "Expense",
+                        accountNumber = null,
+                        currency = "Kenyan Shillings",
+                        owner = null
+                    )
+                    , amount = amount,
                     recipient = Recepient(name = recepient_name, phone_no = recepient_phone_no),
                     transactionType = transaction_type,
                     mpesaBalance = mpesa_balance,
@@ -1056,7 +1081,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                     COL_TRANSACTOR_AVATAR_COLOR))
 
 
-                val transactor = Transactor(id, name, phoneNo, idCardNo, address, transactorType, logoPath, interactions, isDeleted, isImported, avatarColor )
+                val transactor = Transactor(id, name, phoneNo, idCardNo, address, transactorType, transactorProfilePicturePath = logoPath, interactions, isDeleted, isImported, avatarColor )
                 transactors.add(transactor)
             } while (cursor.moveToNext())
         }
@@ -1101,26 +1126,32 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
     fun insertTransactor(db: SQLiteDatabase, transactor: Transactor): Long {
         if (transactorExists(db, transactor.name, transactor.phoneNumber)) {
             return -1 // Transactor already exists
-        }else if(checkIfTransactorExistsByPhoneNumber(db, transactor?.phoneNumber.toString())){
+        }else if(checkIfTransactorExistsByPhoneNumber(db, transactor?.phoneNumber.toString()) && transactor?.transactorType != "Corporate"){
             updateTransactorName(db, transactor)
         }
 
-        val contentValues = ContentValues().apply {
-            put(COL_TRANSACTOR_NAME, transactor.name)
-            put(COL_TRANSACTOR_PHONE_NO, transactor.phoneNumber)
-            put(COL_TRANSACTOR_ADDRESS, transactor.address)
-            put(COL_TRANSACTOR_TYPE, transactor.transactorType)
-            put(COL_TRANSACTOR_ID_CARD_NO, transactor.idCard)
-            put(COL_IS_TRANSACTOR_DELETED, transactor.isDeleted)
-            put(COL_IS_IMPORTED, transactor.isImported)
-            put(COL_TRANSACTOR_LOGO_PATH, transactor.transactorProfilePicturePath)
-            put(COL_TRANSACTOR_INTERACTIONS, transactor.interactions)
-            put(COL_TRANSACTOR_AVATAR_COLOR, transactor.avatarColor)
+        if (!transactor.name.isNullOrEmpty()){
+            val contentValues = ContentValues().apply {
+                put(COL_TRANSACTOR_NAME, transactor.name)
+                put(COL_TRANSACTOR_PHONE_NO, transactor.phoneNumber)
+                put(COL_TRANSACTOR_ADDRESS, transactor.address)
+                put(COL_TRANSACTOR_TYPE, transactor.transactorType)
+                put(COL_TRANSACTOR_ID_CARD_NO, transactor.idCard)
+                put(COL_IS_TRANSACTOR_DELETED, transactor.isDeleted)
+                put(COL_IS_IMPORTED, transactor.isImported)
+                put(COL_TRANSACTOR_LOGO_PATH, transactor.transactorProfilePicturePath)
+                put(COL_TRANSACTOR_INTERACTIONS, transactor.interactions)
+                put(COL_TRANSACTOR_AVATAR_COLOR, transactor.avatarColor)
+            }
+
+            println("transactor insert")
+
+            return db.insert(TABLE_TRANSACTORS, null, contentValues)
+        }else{
+            return -1
         }
 
-        println("transactor insert")
 
-        return db.insert(TABLE_TRANSACTORS, null, contentValues)
     }
 
     fun updateTransactor(db: SQLiteDatabase, transactor: Transactor): Int {
@@ -1227,6 +1258,275 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
     }
 
 
+    fun insertAccount(db: SQLiteDatabase, account: Account) {
+        val values = ContentValues().apply {
+            put(COL_ACCOUNT_ID, account.id) // Assuming this is set to null for autoincrement
+            put(COL_ACCOUNT_NAME, account.name)
+            put(COL_ACCOUNT_NUMBER, account.accountNumber)
+            put(COL_ACCOUNT_TYPE, account.type)
+            put(COL_ACCOUNT_OWNER, account.owner?.ownerCode) // Assuming this is a foreign key
+            put(COL_ACCOUNT_CURRENCY, account.currency ?: "Kenyan Shilling") // Default currency if null
+            put(COL_ACCOUNT_IS_DELETED, if (account.isDeleted) 1 else 0) // Convert boolean to int
+        }
+
+        try {
+            db.insertOrThrow(TABLE_ACCOUNTS, null, values)
+            println("Account inserted successfully: ${account.name}")
+        } catch (e: SQLiteException) {
+            e.printStackTrace()
+        }
+    }
+
+    fun insertAccounts(accounts: List<Account>) {
+        val db = this.writableDatabase
+        println("account insert")
+
+        db.beginTransaction()
+        try {
+            // Insert each account into the accounts table
+            for (account in accounts) {
+                insertAccount(db, account) // Pass the database instance to the insertAccount function
+            }
+            db.setTransactionSuccessful()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            if (db.isOpen) { // Check if the database connection is open
+                db.endTransaction()
+                db.close()
+            }
+        }
+    }
+
+    fun getAllAccountsWithPagination(offset: Int, limit: Int = 30): List<Account> {
+        val db = this.readableDatabase
+        val accounts = mutableListOf<Account>()
+
+        // SQL query with LIMIT and OFFSET
+        val sql = "SELECT * FROM $TABLE_ACCOUNTS LIMIT ? OFFSET ?"
+        val cursor = db.rawQuery(sql, arrayOf(limit.toString(), offset.toString()))
+
+        cursor?.use {
+            if (it.moveToFirst()) {
+                do {
+                    val id = it.getInt(it.getColumnIndexOrThrow(COL_ACCOUNT_ID))
+                    val name = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_NAME))
+                    val accountNumber = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_NUMBER))
+                    val type = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_TYPE))
+                    val ownerCode = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_OWNER))
+                    val currency = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_CURRENCY))
+                    val isDeleted = it.getInt(it.getColumnIndexOrThrow(COL_ACCOUNT_IS_DELETED)) == 1
+
+                    // Fetch the owner
+                    val owner = getOwnerByCode(ownerCode)
+
+                    // Create the Account object
+                    val account = Account(id, name, owner, type, currency, accountNumber, isDeleted)
+                    accounts.add(account)
+                } while (it.moveToNext())
+            }
+        }
+
+        return accounts
+    }
+
+
+    fun getAllAccounts(): List<Account> {
+        val db = this.readableDatabase
+        val accounts = mutableListOf<Account>()
+
+        // SQL query to select all records from the accounts table
+        val sql = "SELECT * FROM $TABLE_ACCOUNTS"
+        val cursor: Cursor? = db.rawQuery(sql, null)
+
+        cursor?.use {
+            // Check if the cursor has any records
+            if (it.moveToFirst()) {
+                do {
+                    // Extracting data from the cursor to create Account objects
+                    val id = it.getInt(it.getColumnIndexOrThrow(COL_ACCOUNT_ID))
+                    val name = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_NAME))
+                    val accountNumber = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_NUMBER))
+                    val type = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_TYPE))
+                    val ownerCode = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_OWNER))
+                    val currency = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_CURRENCY))
+                    val isDeleted = it.getInt(it.getColumnIndexOrThrow(COL_ACCOUNT_IS_DELETED)) == 1
+
+                    // Creating an Owner object based on owner ID (you'll need to adjust this if you have an Owner class)
+                    val owner = getOwnerByCode(ownerCode) // Adjust this as necessary based on how the Owner class is defined
+
+                    // Creating an Account object and adding it to the list
+                    val account = Account(id, name, owner, type, currency, accountNumber, isDeleted)
+                    accounts.add(account)
+                } while (it.moveToNext())
+            }
+        }
+
+        return accounts
+    }
+
+    fun getOwnerByName(ownerName: String): Owner? {
+        val db = this.readableDatabase
+        val selection = "$COL_OWNER_NAME = ? AND $COL_IS_DELETED = 0" // Ensure to exclude deleted owners
+        val selectionArgs = arrayOf(ownerName)
+        val cursor = db.query(TABLE_OWNERS, null, selection, selectionArgs, null, null, null)
+        var owner: Owner? = null
+        try {
+            if (cursor.moveToFirst()) {
+                val ownerId = cursor.getInt(cursor.getColumnIndexOrThrow(COL_OWNER_ID))
+                val ownerCode = cursor.getString(cursor.getColumnIndexOrThrow(COL_OWNER_CODE))
+                val logoPath = cursor.getString(cursor.getColumnIndexOrThrow(COL_OWNER_LOGO_PATH)) // Retrieve logo path
+                val isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(COL_IS_DELETED)) == 1 // Retrieve is_deleted flag
+
+                owner = Owner(ownerId, ownerName, ownerCode, logoPath, isDeleted)
+            }
+        } finally {
+            cursor.close()
+            // Do not close the database connection here
+        }
+        // Close the database connection outside of the try-finally block
+        return owner
+    }
+
+    fun getAccountSearchHistory(): MutableList<String> {
+        val db = readableDatabase
+
+        // Create the table if it doesn't exist
+        val SQL_CREATE_ENTRIES_SEARCH_HISTORY_ACCOUNTS = "CREATE TABLE IF NOT EXISTS $TABLE_SEARCH_HISTORY_ACCOUNTS" + "(" +
+                "$COL_SEARCH_HISTORY_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "$COL_SEARCH_HISTORY_QUERY TEXT," +
+                "$COL_TIMESTAMP INTEGER" +
+                ")"
+                    .trimIndent()
+
+        db.execSQL(SQL_CREATE_ENTRIES_SEARCH_HISTORY_ACCOUNTS)
+
+        // Query to get the search history
+        val cursor = db.query(
+            TABLE_SEARCH_HISTORY_ACCOUNTS,
+            arrayOf(COL_SEARCH_HISTORY_QUERY),
+            null,    // no selection
+            null,    // no selection args
+            null,    // no group by
+            null,    // no having
+            "$COL_TIMESTAMP DESC"    // order by timestamp descending
+        )
+
+        // Initialize the search history list
+        val searchHistory = mutableListOf<String>()
+
+        cursor.use {
+            // Check if the cursor has at least one row
+            if (it.count > 0) {
+                it.moveToFirst() // Move to the first row
+                do {
+                    val query = it.getString(it.getColumnIndexOrThrow(COL_SEARCH_HISTORY_QUERY))
+                    searchHistory.add(query)
+                } while (it.moveToNext()) // Iterate over all rows
+            }
+        }
+
+        return searchHistory
+    }
+
+
+
+    fun addAccountQueryToSearchHistory(query: String) {
+        val db = writableDatabase
+
+        // Check if the query already exists in the database
+        val selection = "$COL_SEARCH_HISTORY_QUERY = ?"
+        val selectionArgs = arrayOf(query)
+        val cursor = db.query(
+            TABLE_SEARCH_HISTORY_ACCOUNTS,
+            arrayOf(COL_SEARCH_HISTORY_QUERY),
+            selection,
+            selectionArgs,
+            null,
+            null,
+            null
+        )
+
+        // If the query does not exist, insert it
+        if (cursor.count == 0) {
+            val contentValues = ContentValues().apply {
+                put(COL_SEARCH_HISTORY_QUERY, query)
+                put(COL_TIMESTAMP, System.currentTimeMillis())
+            }
+            db.insert(TABLE_SEARCH_HISTORY_ACCOUNTS, null, contentValues)
+        }
+
+        cursor.close()
+    }
+
+    fun clearAccountSearchHistory() {
+        val db = writableDatabase
+        try {
+            // Clear the search history table
+            db.execSQL("DELETE FROM $TABLE_SEARCH_HISTORY_ACCOUNTS")
+        } catch (e: SQLException) {
+            // Handle exceptions, if any
+            e.printStackTrace()
+        } finally {
+            //db.close()
+        }
+    }
+
+    fun getAccountsByName(query: String): MutableList<Account> {
+        val accountsList = mutableListOf<Account>()
+        val db = this.readableDatabase
+
+        // Use a parameterized query to prevent SQL injection
+        val selection = "$COL_ACCOUNT_NAME LIKE ? AND $COL_ACCOUNT_IS_DELETED = ?"
+        val selectionArgs = arrayOf("%$query%", "0") // Assuming "0" means not deleted
+
+        val cursor = db.query(
+            TABLE_ACCOUNTS,
+            null, // Select all columns
+            selection,
+            selectionArgs,
+            null, // Group by
+            null, // Having
+            null // Order by
+        )
+
+        // Iterate through the results
+        if (cursor.moveToFirst()) {
+            do {
+                val accountId = cursor.getInt(cursor.getColumnIndexOrThrow(COL_ACCOUNT_ID))
+                val accountName = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_NAME))
+                val accountNumber = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_NUMBER))
+                val accountType = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_TYPE))
+                val accountOwner = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_OWNER))
+                val accountCurrency = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_CURRENCY))
+                val accountIsDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(COL_ACCOUNT_IS_DELETED))
+
+                val owner = getOwnerByCode(accountOwner) // Adjust this as necessary based on how the Owner class is defined
+
+
+                // Create an Account object and add it to the list
+                val account = Account(
+                    id = accountId,
+                    name = accountName,
+                    accountNumber = accountNumber,
+                    type = accountType,
+                    owner = owner,
+                    currency = accountCurrency,
+                    isDeleted = accountIsDeleted == 1 // Assuming 1 means deleted
+                )
+                accountsList.add(account)
+
+            } while (cursor.moveToNext())
+        }
+
+        cursor.close() // Always close the cursor after use
+        db.close() // Close the database connection
+
+        return accountsList
+    }
+
+
+
     companion object {
         // If you change the database schema, you must increment the database version.
             const val DATABASE_VERSION = 2
@@ -1270,6 +1570,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val TABLE_SEARCH_HISTORY = "search_history"
             const val TABLE_SEARCH_HISTORY_TRUCKS = "search_history_trucks"
             const val TABLE_SEARCH_HISTORY_OWNERS = "search_history_owners"
+            const val TABLE_SEARCH_HISTORY_ACCOUNTS = "search_history_accounts"
             const val COL_TIMESTAMP = "timestamp" // Add this line
 
             //ALL SMS TABLE VARIABLES
@@ -1315,12 +1616,23 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_TRANSACTOR_INTERACTIONS = "interactions"
             const val COL_TRANSACTOR_AVATAR_COLOR = "avatar_color"
 
+            // ACCOUNTS TABLE VARIABLES
+
+            const val TABLE_ACCOUNTS = "accounts"
+            const val COL_ACCOUNT_ID = "id"
+            const val COL_ACCOUNT_NAME = "name"
+            const val COL_ACCOUNT_NUMBER = "account_number"
+            const val COL_ACCOUNT_TYPE = "account_type"
+            const val COL_ACCOUNT_OWNER = "owner"
+            const val COL_ACCOUNT_CURRENCY = "currency"
+            const val COL_ACCOUNT_IS_DELETED = "is_deleted"
+
 
 
             fun dropAllTables(db: SQLiteDatabase) {
 
             // List all the table names you want to drop
-            val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS, TABLE_ALL_SMS, TABLE_SEARCH_HISTORY, TABLE_TRUCKS, TABLE_OWNERS, TABLE_SEARCH_HISTORY_TRUCKS)
+            val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS, TABLE_ALL_SMS, TABLE_SEARCH_HISTORY, TABLE_TRUCKS, TABLE_OWNERS, TABLE_SEARCH_HISTORY_TRUCKS, TABLE_ACCOUNTS, TABLE_SEARCH_HISTORY_ACCOUNTS)
 
             for (tableName in tableNames) {
                 db.execSQL("DROP TABLE IF EXISTS $tableName;")

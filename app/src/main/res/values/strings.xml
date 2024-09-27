@@ -77,10 +77,14 @@
     <string name="add_petty_cash">Add Petty Cash</string>
     <string name="add">Add</string>
     <string name="search_trucks">Search Trucks</string>
+    <string name="search_accounts">Search Accounts</string>
+
     <string name="add_truck">Add Truck</string>
     <string name="this_search_bar_provides_search_functionality_that_is_used_to_search_for_trucks">This search bar provides search functionality that is used to search for trucks</string>
     <string name="this_search_bar_provides_search_functionality_that_is_used_to_search_for_companies">This search bar provides search functionality that is used to search for companies or owners</string>
     <string name="this_search_bar_provides_search_functionality_that_is_used_to_search_for_transactors">This search bar provides search functionality that is used to search for transactors</string>
+    <string name="this_search_bar_provides_search_functionality_that_is_used_to_search_for_accounts">This search bar provides search functionality that is used to search for accounts</string>
+
 
     <string name="truck_no">Truck No.</string>
     <string name="owner">Owner</string>
@@ -95,4 +99,5 @@
     <string name="no_transactors_to_display">No Transactors to display</string>
     <string name="search_transactors">Search Transactors</string>
     <string name="transactor_name">Transactor Name</string>
+    <string name="no_accounts_to_show">No accounts to show!</string>
 </resources>

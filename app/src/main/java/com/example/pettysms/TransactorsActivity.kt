@@ -42,7 +42,6 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
     private var dbHelper: DbHelper? = null
     private var db: SQLiteDatabase? = null
     private var transactors: MutableList<Transactor>? = null
-    private var notCheckedTransactions:  MutableList<MpesaTransaction>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,10 +56,8 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
         dbHelper = DbHelper(this)
         db = dbHelper?.writableDatabase
 
-        notCheckedTransactions = dbHelper?.getTransactorNotCheckedTransactions()
-        var notCheckedTransactors = Transactor.getTransactorsFromTransactions(notCheckedTransactions!!)
 
-        syncNewTransactors(notCheckedTransactors, notCheckedTransactions!!)
+        setUpRecyclerView()
 
 
 
@@ -156,26 +153,6 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
         searchRecyclerview.adapter = filteredList?.let { dbHelper?.let { it1 ->
             SuggestedTransactorsAdapter(it, it1, supportFragmentManager, listener = this)
         } }
-    }
-
-    private fun syncNewTransactors(
-        notCheckedTransactors: List<Transactor>,
-        notCheckedTransactions: MutableList<MpesaTransaction>
-    ) {
-        val loadingDialog = createLoadingDialog()
-        loadingDialog.show()
-        var task = GlobalScope.launch(Dispatchers.Main) {
-            addTransactorsToDb(notCheckedTransactors)
-            for (transaction in notCheckedTransactions) {
-                updateTransactionCheck(transaction)
-            }
-            loadingDialog.dismiss()
-        }
-        task.invokeOnCompletion {
-
-            setUpRecyclerView()
-
-        }
     }
 
     private fun setUpRecyclerView() {
@@ -285,23 +262,6 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
             .create()
 
         return loadingDialog
-    }
-
-    private fun addTransactorsToDb(transactor: List<Transactor>) {
-        if (db?.isOpen == true) {
-            dbHelper?.insertTransactors(transactor)
-        }
-        else{
-            dbHelper = this.applicationContext?.let { DbHelper(it) }
-            db = dbHelper?.writableDatabase
-            dbHelper?.insertTransactors(transactor)
-        }
-
-    }
-
-    private fun updateTransactionCheck(mpesaTransaction: MpesaTransaction){
-        val dbHelper = DbHelper(this)
-        mpesaTransaction.id?.let { dbHelper.transactorCheckUpdateTransaction(it) }
     }
 
     fun showAddOrEditTransactorDialog(action: String, ownerJson: String = "") {

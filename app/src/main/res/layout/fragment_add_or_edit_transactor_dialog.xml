@@ -82,15 +82,15 @@
                     android:id="@+id/logoImageButton"
                     android:layout_width="50dp"
                     android:layout_height="50dp"
-                    android:layout_marginTop="196dp"
+                    android:layout_marginStart="-50dp"
+                    android:layout_marginTop="208dp"
                     android:background="@drawable/background_circle"
                     android:padding="2dp"
                     android:src="@drawable/outline_camera_alt_24"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintHorizontal_bias="0.728"
-                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintHorizontal_bias="0.0"
+                    app:layout_constraintStart_toEndOf="@+id/avatar_view"
                     app:layout_constraintTop_toTopOf="parent" />
-
 
                 <LinearLayout
                     android:id="@+id/transactorNameLayout"

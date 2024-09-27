@@ -45,8 +45,10 @@ class SuggestedTransactorsAdapter(val transactors: List<Transactor>, val dbHelpe
             currentTransactor.incrementTransactorInteraction(currentTransactor, dbHelper, supportFragmentManager =  supportFragmentManager, listener )
         }
 
-        if(!currentTransactor.transactorProfilePicturePath.isNullOrEmpty()){
-            setImageViewFromBase64(holder.transactorAvatarView, currentTransactor.transactorProfilePicturePath!!)
+        if(currentTransactor.transactorProfilePicturePath != null){
+            setImageViewFromBase64(holder.transactorAvatarView , currentTransactor.transactorProfilePicturePath!!)
+        }else{
+            holder.transactorAvatarView.setImageResource(0) // Clears the image
         }
 
 

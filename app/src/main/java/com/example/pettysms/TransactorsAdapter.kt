@@ -53,8 +53,11 @@ class TransactorsAdapter(val transactors: List<Any>, val dbHelper: DbHelper, val
                 transactor.incrementTransactorInteraction(transactor, dbHelper = dbHelper, supportFragmentManager, listener)
             }
 
-            if(!transactor.transactorProfilePicturePath.isNullOrEmpty()){
+
+            if(transactor.transactorProfilePicturePath != null){
                 setImageViewFromBase64(avatarView, transactor.transactorProfilePicturePath!!)
+            }else{
+                avatarView.setImageResource(0) // Clears the image
             }
 
         }

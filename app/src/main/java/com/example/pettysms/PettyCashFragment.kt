@@ -29,6 +29,7 @@ import com.tbuonomo.viewpagerdotsindicator.WormDotsIndicator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -60,9 +61,12 @@ class PettyCashFragment : Fragment() {
     private lateinit var truckButton: Button
     private lateinit var ownerButton: Button
     private lateinit var transactorsButton: Button
+    private lateinit var accountsButton: Button
     private val binding get() = _binding!!
     private var dbStatus = false
     private var qbStatus = false
+    private var transactors: MutableList<Transactor>? = null
+    private var notCheckedTransactions:  MutableList<MpesaTransaction>? = null
 
     var dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
     var db = dbHelper?.writableDatabase
@@ -91,6 +95,7 @@ class PettyCashFragment : Fragment() {
         truckButton = binding.trucksButton
         ownerButton = binding.ownersButton
         transactorsButton = binding.transactorsButton
+        accountsButton = binding.accountsButton
 
         dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
         db = dbHelper?.writableDatabase
@@ -172,7 +177,20 @@ class PettyCashFragment : Fragment() {
         transactorsButton.setOnClickListener {
             transactorsButtonAction()
         }
+        accountsButton.setOnClickListener {
+            accountsButtonAction()
+        }
 
+
+    }
+
+    private fun accountsButtonAction() {
+        val intent = Intent(activity, AccountsActivity::class.java)
+
+        intent.putExtra("key", "value")
+
+
+        startActivity(intent)
     }
 
     private fun transactorsButtonAction() {
@@ -211,9 +229,124 @@ class PettyCashFragment : Fragment() {
         GlobalScope.launch(Dispatchers.Main) {
             fetchAndInsertOwners()
             fetchAndInsertTrucks()
+            fetchAndInsertAccounts()
+            fetchAndInsertTransactors()
             loadingDialog.dismiss()
         }
     }
+
+    private fun fetchAndInsertTransactors() {
+        notCheckedTransactions = dbHelper?.getTransactorNotCheckedTransactions()
+        var notCheckedTransactors = Transactor.getTransactorsFromTransactions(notCheckedTransactions!!)
+
+        syncNewTransactors(notCheckedTransactors, notCheckedTransactions!!)
+    }
+
+    private fun syncNewTransactors(notCheckedTransactors: List<Transactor>, notCheckedTransactions: MutableList<MpesaTransaction>) {
+        var task = GlobalScope.launch(Dispatchers.Main) {
+            addTransactorsToDb(notCheckedTransactors)
+            for (transaction in notCheckedTransactions) {
+                updateTransactionCheck(transaction)
+            }
+        }
+    }
+
+    private fun addTransactorsToDb(transactor: List<Transactor>) {
+        if (db?.isOpen == true) {
+            dbHelper?.insertTransactors(transactor)
+        }
+        else{
+            dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
+            db = dbHelper?.writableDatabase
+            dbHelper?.insertTransactors(transactor)
+        }
+
+    }
+
+    private fun updateTransactionCheck(mpesaTransaction: MpesaTransaction){
+        val dbHelper = DbHelper(requireContext())
+        mpesaTransaction.id?.let { dbHelper.transactorCheckUpdateTransaction(it) }
+    }
+
+    private fun fetchAndInsertAccounts() {
+        // Fetch remote accounts (this function needs to be defined)
+        val remoteAccounts = fetchRemoteAccounts()
+
+        remoteAccounts?.let { newAccounts ->
+            // Fetch local accounts from the database
+            val localAccounts = dbHelper?.getAllAccounts()
+
+            // Filter out the accounts that already exist locally
+            val accountsToInsert = newAccounts.filterNot { newAccount ->
+                localAccounts?.any { it.id == newAccount.id } == true
+            }
+
+            // Insert new accounts into the local database
+            if (db?.isOpen == true) {
+                dbHelper?.insertAccounts(accountsToInsert)
+            } else {
+                dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
+                db = dbHelper?.writableDatabase
+                dbHelper?.insertAccounts(accountsToInsert)
+            }
+        }
+    }
+
+    // Fetch remote accounts from server
+    private fun fetchRemoteAccounts(): List<Account>? {
+        return runBlocking {
+            withContext(Dispatchers.IO) {
+                val client = OkHttpClient()
+
+                val formBody = FormBody.Builder()
+                    .add("operation", "getallaccounts")
+                    .build()
+
+                val request = Request.Builder()
+                    .url("http://$SERVER_IP/api/index.php")
+                    .post(formBody)
+                    .build()
+
+                try {
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val jsonArray = JSONArray(response.body?.string() ?: "")
+                            val accounts = mutableListOf<Account>()
+                            for (i in 0 until jsonArray.length()) {
+                                val jsonObject = jsonArray.getJSONObject(i)
+                                val accountId = jsonObject.getInt("id")
+                                val accountName = jsonObject.getString("full_name")
+                                val accountType = jsonObject.getString("account_type")
+                                val accountCurrency = jsonObject.getString("currency")
+                                val accountNumber = jsonObject.getString("account_number")
+                                val ownerName = jsonObject.getString("company_name")
+
+                                // Fetch owner from the local database (if exists)
+                                var owner: Owner? = null
+                                if (db?.isOpen == true) {
+                                    owner = dbHelper?.getOwnerByName(ownerName)
+                                } else {
+                                    dbHelper = DbHelper(requireContext())
+                                    db = dbHelper?.writableDatabase
+                                    owner = dbHelper?.getOwnerByName(ownerName)
+                                }
+
+                                // Create account object
+                                accounts.add(Account(accountId, accountName, owner, accountType, accountCurrency, accountNumber = accountNumber))
+                            }
+                            accounts
+                        } else {
+                            null
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                }
+            }
+        }
+    }
+
 
     private suspend fun fetchAndInsertOwners() {
             val remoteOwners = fetchRemoteOwners()

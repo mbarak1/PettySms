@@ -216,7 +216,6 @@ class SmsServiceHelper() {
     private fun addTransactorsToDb(transactor: List<Transactor>, context: Context) {
         val dbHelper = DbHelper(context)
         dbHelper.insertTransactors(transactor)
-
     }
 
     private fun updateTransactionCheck(mpesaTransaction: MpesaTransaction, context: Context){

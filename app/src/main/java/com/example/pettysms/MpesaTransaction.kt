@@ -271,8 +271,10 @@ class MpesaTransaction(
                             account = Account(
                                 id = 1,
                                 name = "General Expenses",
-                                description = "General Expenses",
-                                type = "Expense"
+                                type = "Expense",
+                                accountNumber = null,
+                                currency = "Kenyan Shillings",
+                                owner = null
                             ),
                             amount = amount,
                             transactionType = transaction_type,
