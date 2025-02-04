@@ -165,6 +165,7 @@ class AddOrEditOwnerDialog : DialogFragment() {
         companyCodeTextView = binding.ownerCodeTextField
         saveButton = binding.saveButton
         logoImageBtn = binding.logoImageButton
+        dbHelper = DbHelper(requireContext())
         db = dbHelper?.writableDatabase
 
         val defaultLogoDrawable: Drawable? = ContextCompat.getDrawable(requireContext(), R.drawable.p_logo_cropped)
@@ -273,8 +274,14 @@ class AddOrEditOwnerDialog : DialogFragment() {
                     return@setOnClickListener
                 }else{
                     if(functionality == "Edit"){
-                        justification.remove("Company Name already exists")
-                        justification.remove("Company Code already exists")
+                        println("Ndo hapo")
+                        updateCompanyToDb(companyName, companyCode)
+                        createSaveSuccessfulDialog()
+                        successfulDialog.show()
+                        println("edited")
+                        onAddOwnerListener?.onAddOwner()
+                        closeDialog()
+                        return@setOnClickListener
                     }
                 }
 
@@ -297,7 +304,7 @@ class AddOrEditOwnerDialog : DialogFragment() {
 
     private fun updateCompanyToDb(companyName: String, companyCode: String) {
         db = dbHelper?.writableDatabase
-        db?.let { dbHelper?.updateOwner(it, Owner(id = owner?.id, companyName, companyCode, imageString)) }
+        db?.let { dbHelper?.updateOwner(it, Owner(id = owner?.id, companyName, companyCode, logoPath = imageString)) }
     }
 
     private fun saveCompanyToDb(companyName: String, companyCode: String) {

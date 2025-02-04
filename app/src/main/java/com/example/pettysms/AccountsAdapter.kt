@@ -33,7 +33,7 @@ class AccountsAdapter(private var accounts: MutableList<Account>) : RecyclerView
 
         holder.accountNameTextView.text = currentAccount.name
         holder.accountType.text = currentAccount.type
-        holder.ownerTextView.text = currentAccount.owner?.name
+        holder.ownerTextView.text = getFirstTwoWords(currentAccount.owner?.name.toString())
 
         if (currentAccount.currency == "Kenyan Shilling"){
             holder.currencyTextView.visibility = View.VISIBLE
@@ -49,6 +49,12 @@ class AccountsAdapter(private var accounts: MutableList<Account>) : RecyclerView
     fun updateAccounts(newAccounts: List<Account>) {
         accounts = newAccounts.toMutableList()
         notifyDataSetChanged()
+    }
+
+    private fun getFirstTwoWords(input: String): String {
+        return input.split(" ")
+            .take(2)
+            .joinToString(" ")
     }
 
     override fun getItemCount(): Int = accounts.size

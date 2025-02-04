@@ -73,6 +73,12 @@ class TrucksActivity : AppCompatActivity(), SortAndFilterTrucks.OnApplyClickList
         trucks = getTrucks() // Assuming getAllTrucks() retrieves all trucks from the database
         println("size of trucks in the beginning: " + trucks.size)
 
+        if (trucks.isEmpty() || trucks == null){
+            noTrucksMessageText.visibility = View.VISIBLE
+        }else{
+            noTrucksMessageText.visibility = View.GONE
+        }
+
         truckAdapter = TruckAdapter(this,trucks)
         trucksRecyclerView.adapter = truckAdapter
 
@@ -258,7 +264,13 @@ class TrucksActivity : AppCompatActivity(), SortAndFilterTrucks.OnApplyClickList
     }
 
     private fun loadSearchHistoryDb() {
+        if (dbHelper == null) {
+            dbHelper = DbHelper(this)
+        }
+
+        dbHelper?.openDatabase()
         val allSearchHistory = dbHelper?.getTruckSearchHistory() ?: emptyList()
+        dbHelper?.closeDatabase()
 
         // Take the first 5 items from the set and convert it to a mutable list
         searchHistory = allSearchHistory.toMutableList()
@@ -279,8 +291,13 @@ class TrucksActivity : AppCompatActivity(), SortAndFilterTrucks.OnApplyClickList
     }
 
     private fun getTrucks(): MutableList<Truck>{
-        val dbHelper = DbHelper(this)
-        return dbHelper.getLocalTrucks().toMutableList()
+        if (dbHelper == null) {
+            dbHelper = DbHelper(this)
+        }
+        dbHelper?.openDatabase()
+        val allTrucks = dbHelper?.getLocalTrucks() ?: emptyList()
+        dbHelper?.closeDatabase()
+        return allTrucks.toMutableList()
     }
 
     fun showDialog(mapToSend: MutableMap<String, MutableList<String>>) {

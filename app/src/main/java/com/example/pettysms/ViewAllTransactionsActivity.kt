@@ -60,7 +60,6 @@ import java.util.Locale
 
 class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragment.OnApplyClickListener {
     private lateinit var searchView: SearchView
-    private lateinit var binding: ActivityViewAllTransactionsBinding
     private lateinit var loadingDialog: AlertDialog
     private lateinit var loadingText: TextView
     private lateinit var clearAllTextView: TextView
@@ -75,6 +74,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     private lateinit var fadeInselectLayoutAnimation: Animation
     private lateinit var layoutSelectAll: LinearLayout
     private lateinit var selectAllCheckBox: CheckBox
+    private var _binding: ActivityViewAllTransactionsBinding? = null
 
 
 
@@ -93,6 +93,8 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
     private val activityName = this::class.simpleName
     private var searchHistory = mutableListOf<String>()
     private var keyValueMapToFilterAndSortFragment = mutableMapOf<String, MutableList<String>>()
+    private val binding get() = _binding!!
+
 
 
 
@@ -100,7 +102,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityViewAllTransactionsBinding.inflate(layoutInflater)
+        _binding = ActivityViewAllTransactionsBinding.inflate(layoutInflater)
         searchBar = binding.root.findViewById(R.id.search_bar)
         searchView = binding.searchView
         clearAllTextView = binding.clearAllHistoryLink
@@ -440,10 +442,10 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
                     val gson = Gson()
                     val mpesaTransactionJson = gson.toJson(selectedTransaction)
 
-                    val intent = Intent(this@ViewAllTransactionsActivity, TransactionViewer::class.java).apply {
+                    val intent = Intent(this@ViewAllTransactionsActivity, TransactionViewerActivity::class.java).apply {
                         putExtra("mpesaTransactionJson", mpesaTransactionJson)
                     }
-                    transactionViewerLauncher.launch(intent)
+                    transactionViewerActivityLauncher.launch(intent)
 
                 }
             }
@@ -481,9 +483,9 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
         }
     }
 
-    private val transactionViewerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    private val transactionViewerActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            // TransactionViewer activity is finished
+            // TransactionViewerActivity activity is finished
             // Execute your code here
             println("habari yako")
             allMpesaTransactions = db_helper?.getAllMpesaTransactions() ?: mutableListOf()
@@ -560,6 +562,11 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
             actionMode = null
             selectAllCheckBox.isChecked = false
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        _binding = null
     }
 
     @SuppressLint("RestrictedApi")

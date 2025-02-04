@@ -1,0 +1,968 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/pettyCashViewerMainLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".PettyCashViewerActivity">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/amountCard"
+        style="?attr/materialCardViewFilledStyle"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:layout_marginTop="-30dp"
+        app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+        app:cardCornerRadius="40dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <TextView
+                android:id="@+id/transactionAmount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:elevation="1dp"
+                android:fontFamily="@font/roboto_light"
+                android:letterSpacing="0.09"
+                android:text="100/-"
+                android:textColor="?attr/colorPrimary"
+                android:textFontWeight="1000"
+                android:textSize="31sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.500"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintVertical_bias="0.500" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/logoCard"
+        style="?attr/materialCardViewFilledStyle"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        app:strokeColor="?attr/colorSurface"
+        app:strokeWidth="5dp"
+        android:layout_marginTop="-30dp"
+        app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/amountCard">
+
+        <ImageView
+            android:id="@+id/logoImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/p_logo_cropped" />
+
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="80dp"
+        android:elevation="-1dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/amountCard">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/pettyCashIdChip"
+                style="@style/Widget.Material3.Chip.Suggestion.Elevated"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="30dp"
+                android:clickable="false"
+                android:fontFamily="@font/roboto_thin"
+                android:text="PettyCash ID"
+                android:textColor="?attr/colorOnPrimary"
+                android:textSize="12sp"
+                app:chipBackgroundColor="?attr/colorPrimary"
+                app:chipCornerRadius="20dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/transactorCard"
+                style="?attr/materialCardViewFilledStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="40dp"
+                android:layout_marginEnd="20dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/pettyCashIdChip">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/transactorDetailsLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_marginTop="20dp"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Transactor:"
+                        android:textFontWeight="1000"
+                        android:textSize="15sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <xyz.schwaab.avvylib.AvatarView
+                        android:id="@+id/avatarView"
+                        android:layout_width="100dp"
+                        android:layout_height="100dp"
+                        android:layout_marginTop="20dp"
+                        app:avvy_border_color="@android:color/darker_gray"
+                        app:avvy_border_highlight_color="?attr/colorPrimary"
+                        app:avvy_border_highlight_color_end="#3088ff"
+                        app:avvy_border_thickness="2dp"
+                        app:avvy_border_thickness_highlight="3dp"
+                        app:avvy_circle_background_color="?attr/colorSurfaceContainerLow"
+                        app:avvy_distance_to_border="2dp"
+                        app:avvy_highlighted="true"
+                        app:avvy_loading_arches="5"
+                        app:avvy_loading_arches_degree_area="90"
+                        app:avvy_text_color="?attr/colorAccent"
+                        app:avvy_text_size="30sp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/transactorDetailsLabel" />
+
+                    <TextView
+                        android:id="@+id/transactorName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="15dp"
+                        android:layout_marginBottom="20dp"
+                        android:fontFamily="@font/roboto_light"
+                        android:text="Mbarak Ahmed"
+                        android:textColor="?attr/colorPrimary"
+                        android:textFontWeight="1000"
+                        android:textSize="17sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@+id/avatarView" />
+
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/basicInformationCard"
+                style="?attr/materialCardViewFilledStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="40dp"
+                android:layout_marginEnd="20dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/transactorCard">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/basicInformationLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_marginTop="20dp"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Basic Information:"
+                        android:textFontWeight="1000"
+                        android:textSize="15sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashDateLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/basicInformationLabel">
+
+                        <TextView
+                            android:id="@+id/pettyCashDateLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Petty Cash Date"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashDateValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="Petty Cash Date"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashAccountLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashDateLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashAccountLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Account"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashAccountValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="Petty Cash Account"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashPaymentModeLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashAccountLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashPaymentModeLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Payment Mode"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashPaymentModeValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="Petty Cash Payment Mode"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashDescriptionLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashPaymentModeLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashDescriptionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Description"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashDescriptionValue"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end|top"
+                            android:text="Description"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp"
+                            android:ellipsize="none"
+                            android:maxLines="5"
+                            android:scrollHorizontally="false" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashMpesaTransactionLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashDescriptionLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashMpesaTransactionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Mpesa Transaction"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashMpesaTransactionValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="Petty Cash Payment Mode"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashTrucksLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashMpesaTransactionLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashTrucksLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Trucks"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashTrucksValue"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end|top"
+                            android:text="Trucks"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp"
+                            android:ellipsize="none"
+                            android:maxLines="5"
+                            android:scrollHorizontally="false" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashUserLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginEnd="17dp"
+                        android:layout_marginBottom="20dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashTrucksLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashUserLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Created By"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashUserValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="User"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/supportingDocumentCard"
+                style="?attr/materialCardViewFilledStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="40dp"
+                android:layout_marginEnd="20dp"
+                android:layout_marginBottom="20dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/basicInformationCard">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/supportingDocumentLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_marginTop="20dp"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Supporting Document:"
+                        android:textFontWeight="1000"
+                        android:textSize="15sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentIdLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/supportingDocumentLabel">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentIdLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Supporting Document ID"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentIdValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="ID"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentSupplierNameLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentIdLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentSupplierNameLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Supplier Name"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentSupplierNameValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="Supplier Name"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentTypeLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentSupplierNameLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentTypeLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Document Type"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentTypeValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="Document Type"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentCuNumberLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentTypeLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentCuNumberLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="CU Number"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentCuNumberValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="CU Number"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentNumberLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentCuNumberLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentNumberLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Document Number"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentNumberValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="Document Number"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentTaxableAmountLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentNumberLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentTaxableAmountLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Taxable Amount"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentTaxableAmountValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="0.00"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentTaxAmountLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentTaxableAmountLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentTaxAmountLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Tax Amount"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentTaxAmountValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="0.00"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentTotalAmountLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentTaxAmountLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentTotalAmountLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Total Amount"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentTotalAmountValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="0.00"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentDateLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentTotalAmountLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentDateLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto_light"
+                            android:text="Date"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentDateValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/roboto_light"
+                            android:gravity="end"
+                            android:text="Date"
+                            android:textColor="?attr/colorPrimary"
+                            android:textFontWeight="1000"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentImagesLabelLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginRight="17dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentDateLayout">
+
+                        <TextView
+                            android:id="@+id/pettyCashSupportingDocumentImagesLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/roboto"
+                            android:text="Images:"
+                            android:textFontWeight="1000"
+                            android:textSize="13sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/pettyCashSupportingDocumentImagesLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="17dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginEnd="17dp"
+                        android:layout_marginBottom="20dp"
+                        android:orientation="horizontal"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/pettyCashSupportingDocumentImagesLabelLayout"
+                        tools:layout_editor_absoluteX="17dp">
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/image1Card"
+                            style="?attr/materialCardViewFilledStyle"
+                            android:layout_width="75dp"
+                            android:layout_height="75dp"
+                            android:layout_marginTop="10dp"
+                            android:layout_marginEnd="10dp"
+                            android:layout_marginBottom="10dp"
+                            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
+
+                            <ImageView
+                                android:id="@+id/image1"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="centerCrop"
+                                android:src="@drawable/outline_image_black_24dp" />
+
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/image2Card"
+                            style="?attr/materialCardViewFilledStyle"
+                            android:layout_width="75dp"
+                            android:layout_height="75dp"
+                            android:layout_marginTop="10dp"
+                            android:layout_marginEnd="10dp"
+                            android:layout_marginBottom="10dp"
+                            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
+
+                            <ImageView
+                                android:id="@+id/image2"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="centerCrop"
+                                android:src="@drawable/outline_image_black_24dp" />
+
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/image3Card"
+                            style="?attr/materialCardViewFilledStyle"
+                            android:layout_width="75dp"
+                            android:layout_height="75dp"
+                            android:layout_marginTop="10dp"
+                            android:layout_marginEnd="10dp"
+                            android:layout_marginBottom="10dp"
+                            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
+
+                            <ImageView
+                                android:id="@+id/image3"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="centerCrop"
+                                android:src="@drawable/outline_image_black_24dp" />
+
+                        </com.google.android.material.card.MaterialCardView>
+
+
+                    </LinearLayout>
+
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/signatureCard"
+                style="?attr/materialCardViewFilledStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="40dp"
+                android:layout_marginEnd="20dp"
+                android:layout_marginBottom="20dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/supportingDocumentCard">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/signatureLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_marginTop="20dp"
+                        android:fontFamily="@font/montserrat_medium"
+                        android:text="Signature:"
+                        android:textFontWeight="1000"
+                        android:textSize="15sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <ImageView
+                        android:id="@+id/signatureImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginBottom="20dp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/signatureLabel">
+
+                    </ImageView>
+
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:id="@+id/actionButtonsLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/signatureCard">
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/editActionButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginStart="40dp"
+                    android:layout_marginTop="40dp"
+                    android:layout_marginBottom="40dp"
+                    android:src="@drawable/material_3_edit_24px" />
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/deleteActionButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginStart="50dp"
+                    android:layout_marginTop="40dp"
+                    android:layout_marginBottom="40dp"
+                    android:src="@drawable/ic_baseline_material_3_delete_action_button" />
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/shareActionButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginStart="50dp"
+                    android:layout_marginTop="40dp"
+                    android:layout_marginEnd="40dp"
+                    android:layout_marginBottom="40dp"
+                    android:src="@drawable/material_3_share_24px" />
+
+            </LinearLayout>
+
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+    </androidx.core.widget.NestedScrollView>
+
+
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

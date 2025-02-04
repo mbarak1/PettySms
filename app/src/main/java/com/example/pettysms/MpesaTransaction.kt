@@ -20,7 +20,6 @@ class MpesaTransaction(
     amount: Double? = 0.00,
     transactionType: String?,
     user: User? = User(1, "Mbarak", UserTypes(1, "admin")),
-    paymentMode: PaymentMode? = PaymentMode(1, "mpesa"),
     description: String? = "General Expenses",
     var mpesaBalance: Double? = 0.00,
     var transactionCost: Double? = 0.00,
@@ -29,7 +28,8 @@ class MpesaTransaction(
     var sender: Sender? = Sender("Non-sender", "Non-sender"),
     var smsText: String?,
     var isDeleted: Boolean = false,
-    var transactorCheck : Boolean = false
+    var transactorCheck : Boolean = false,
+    var isConvertedToPettyCash : Boolean = false
 ) : Transaction(
     id,
     msgDate,
@@ -41,7 +41,6 @@ class MpesaTransaction(
     amount,
     transactionType,
     user,
-    paymentMode,
     description
 ){
 
@@ -140,7 +139,9 @@ class MpesaTransaction(
                                 limit = recepient_arr?.size!! - 2,
                                 truncated = ""
                             ).toString()
-                            var phone_no = recepient_arr?.get(recepient_arr.size - 2)
+                            var phone_no = formatPhoneNumber(recepient_arr?.get(recepient_arr.size - 2)
+                                .toString())
+
                             recipient = Recepient(name, phone_no)
 
                         } else if (transaction_type == "till") {
@@ -176,7 +177,7 @@ class MpesaTransaction(
                                 limit = sender_arr?.size!! - 2,
                                 truncated = ""
                             ).toString()
-                            var phone_no = sender_arr?.get(sender_arr.size - 2)
+                            var phone_no = formatPhoneNumber(sender_arr?.get(sender_arr.size - 2).toString())
                             sender = Sender(name, phone_no)
                         }
                         else if (transaction_type == "withdraw"){
@@ -339,6 +340,10 @@ class MpesaTransaction(
             return dateFound
         }
 
+        fun formatPhoneNumber(phoneNumber: String): String {
+            return phoneNumber.replaceFirst("^\\+?254".toRegex(), "0")
+        }
+
         fun extractSubstringBetweenWords(text: String, startWord: String, endWord: String): String? {
             val patternString = "\\b$startWord\\b(.*?)\\b$endWord\\b"
             val pattern = Pattern.compile(patternString)
@@ -386,15 +391,30 @@ class MpesaTransaction(
 
         fun getTitleTextByTransactionType(transaction: MpesaTransaction): String {
             return when (transaction.transaction_type) {
-                "topup", "send_money", "paybill", "till", "withdraw", "reverse" -> ({
+                "topup", "send_money", "paybill", "till", "reverse" -> {
                     transaction.recipient?.name?.let { capitalizeEachWord(it) } ?: ""
-                }).toString()
-                "deposit" -> ({
+                }
+                "deposit", "withdraw"  -> {
                     transaction.mpesaDepositor?.let { capitalizeEachWord(it) } ?: ""
-                }).toString()
-                "receival" -> ({
+                }
+                "receival" -> {
                     transaction.sender?.name?.let { capitalizeEachWord(it) } ?: ""
-                }).toString()
+                }
+                else -> ""
+            }
+        }
+
+        fun getTitleTextByTransactionTypeWithoutFormatting(transaction: MpesaTransaction): String {
+            return when (transaction.transaction_type) {
+                "topup", "send_money", "paybill", "till", "reverse" -> {
+                    transaction.recipient?.name ?: ""
+                }
+                "deposit", "withdraw" -> {
+                    transaction.mpesaDepositor ?: ""
+                }
+                "receival" -> {
+                    transaction.sender?.name ?: ""
+                }
                 else -> ""
             }
         }

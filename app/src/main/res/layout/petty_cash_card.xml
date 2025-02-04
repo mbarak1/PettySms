@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="?attr/materialCardViewElevatedStyle"
+    android:id="@+id/pettyCashCard"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginLeft="8dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginRight="8dp"
+    app:cardElevation="0dp"
+    app:cardUseCompatPadding="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/pettyCashCardConstraintLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/logoWaterMark"
+            android:layout_width="match_parent"
+            android:layout_height="175dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            android:alpha="0.028" />
+
+        <LinearLayout
+            android:id="@+id/pettyCashSidebar"
+            android:layout_width="100dp"
+            android:layout_height="175dp"
+            android:gravity="center"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toTopOf="@+id/horizontalScrollView"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <FrameLayout
+                android:id="@+id/logoFrame"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_weight="1">
+
+                <ImageView
+                    android:id="@+id/mpesaImage"
+                    android:layout_width="100dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="0dp"
+                    android:layout_marginTop="8dp"
+                    android:src="@drawable/logo_mpesa"
+                    android:visibility="visible"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <ImageView
+                    android:id="@+id/cashImage"
+                    android:layout_width="25dp"
+                    android:layout_height="25dp"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginTop="2dp"
+                    android:src="@drawable/finance_chip_24px"
+                    android:visibility="gone"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <TextView
+                    android:id="@+id/cashLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="41dp"
+                    android:layout_marginTop="4dp"
+                    android:fontFamily="@font/montserrat_medium"
+                    android:text="Cash"
+                    android:textSize="16sp"
+                    android:visibility="gone" />
+
+
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/pettyCashAmountTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:fontFamily="@font/roboto_light"
+                android:text="Transaction Amount"
+                android:textAlignment="textEnd"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="20sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@+id/transactionTitleTextView" />
+
+            <TextView
+                android:id="@+id/pettyCashDateTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:layout_marginStart="4dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/roboto_light"
+                android:inputType="none"
+                android:maxLines="2"
+                android:text="Transaction Date"
+                android:textAlignment="textEnd"
+                android:textSize="12sp" />
+
+
+        </LinearLayout>
+
+
+        <TextView
+            android:id="@+id/accountChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:background="@drawable/chip_style_text_view_style"
+            android:ellipsize="end"
+            android:fontFamily="@font/roboto"
+            android:gravity="center"
+            android:maxLines="2"
+            android:text="Mileage Expence"
+            android:textColor="?attr/colorOnPrimary"
+            android:textFontWeight="1000"
+            android:textSize="8sp"
+            android:visibility="visible"
+            app:layout_constraintBottom_toBottomOf="@+id/logoWaterMark"
+            app:layout_constraintEnd_toStartOf="@+id/pettyCashSidebar"
+            app:layout_constraintStart_toEndOf="@+id/ownerName" />
+
+        <TextView
+            android:id="@+id/ownerName"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginBottom="8dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/rubik"
+            android:gravity="center"
+            android:letterSpacing="0.03"
+            android:maxLines="1"
+            android:text="Abdulcon Enterprises"
+            android:textAllCaps="true"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="@+id/logoWaterMark"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <LinearLayout
+            android:id="@+id/linearLayout4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <xyz.schwaab.avvylib.AvatarView
+                android:id="@+id/transactorAvatarView"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                app:avvy_border_color="@android:color/darker_gray"
+                app:avvy_border_highlight_color="?attr/colorPrimary"
+                app:avvy_border_highlight_color_end="#3088ff"
+                app:avvy_border_thickness="2dp"
+                app:avvy_border_thickness_highlight="3dp"
+                app:avvy_distance_to_border="2dp"
+                app:avvy_highlighted="true"
+                app:avvy_loading_arches="5"
+                app:avvy_loading_arches_degree_area="90"
+                app:avvy_text_color="?attr/colorAccent"
+                app:avvy_text_size="15sp"
+                app:layout_constraintStart_toEndOf="@+id/card_color"
+                app:layout_constraintTop_toTopOf="@+id/guideline" />
+
+            <TextView
+                android:id="@+id/transactorNameTextView"
+                android:layout_width="150dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginStart="16dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/roboto_light"
+                android:maxLines="1"
+                android:text="Transactor Name"
+                android:textColor="?attr/colorPrimary"
+                android:textFontWeight="600"
+                android:textSize="19sp"
+                app:layout_constraintStart_toEndOf="@+id/avatar_view"
+                app:layout_constraintTop_toTopOf="@+id/guideline" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/pettyCashDescriptionTextView"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="36dp"
+            android:layout_marginBottom="36dp"
+            android:fontFamily="@font/roboto"
+            android:text="Mileage and road user to Kampala"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toTopOf="@+id/ownerName"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/linearLayout4" />
+
+        <HorizontalScrollView
+            android:id="@+id/horizontalScrollView"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:fillViewport="true"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/logoWaterMark"
+            android:scrollbars="horizontal">
+
+            <LinearLayout
+                android:id="@+id/linearLayoutChips"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="?attr/colorPrimaryFixed"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                >
+
+            </LinearLayout>
+        </HorizontalScrollView>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+
+</com.google.android.material.card.MaterialCardView>

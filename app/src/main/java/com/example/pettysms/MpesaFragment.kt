@@ -40,6 +40,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.Toolbar
@@ -48,6 +49,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.vectordrawable.graphics.drawable.ArgbEvaluator
@@ -70,6 +72,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -91,36 +94,42 @@ interface OnActionModeInteraction {
 class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
     private var _binding: FragmentMpesaBinding? = null
-    private lateinit var progressBar: ProgressBar
-    private lateinit var currency_label: TextView
-    private lateinit var balance_text: TextView
-    private lateinit var mpesa_balance_label: TextView
-    private lateinit var mpesa_sync_label: TextView
-    private lateinit var handler: Handler
-    private lateinit var verticalShrinkAnimation: Animation
-    private lateinit var fadeInAnimation: Animation
-    private lateinit var fadeOutAnimation: Animation
-    private lateinit var verticalShrinkFadeOut: Animation
-    private lateinit var fadeInselectLayoutAnimation: Animation
-    private lateinit var updateTextBox : TextView
-    private lateinit var netSpendTextBox: TextView
-    private lateinit var viewAlLink: TextView
-    private lateinit var appBar: AppBarLayout
-    private lateinit var circularProgressDrawable: CircularProgressIndicator
-    private lateinit var bigResult: MpesaTransaction.Companion.MpesaTransactionResult
-    private lateinit var layoutSelectAll: LinearLayout
-    private lateinit var adapter: MpesaTransactionAdapter
-    private lateinit var lineChart: LineChart
-    private lateinit var selectAllCheckBox: CheckBox
+    private var progressBar: ProgressBar? = null
+    private var currency_label: TextView? = null
+    private var balance_text: TextView? = null
+    private var mpesa_balance_label: TextView? = null
+    private var mpesa_sync_label: TextView? = null
+    private var handler: Handler? = null
+    private var verticalShrinkAnimation: Animation? = null
+    private var fadeInAnimation: Animation? = null
+    private var fadeOutAnimation: Animation? = null
+    private var verticalShrinkFadeOut: Animation? = null
+    private var fadeInselectLayoutAnimation: Animation? = null
+    private var updateTextBox: TextView? = null
+    private var netSpendTextBox: TextView? = null
+    private var viewAlLink: TextView? = null
+    private var appBar: AppBarLayout? = null
+    private var circularProgressDrawable: CircularProgressIndicator? = null
+    private var bigResult: MpesaTransaction.Companion.MpesaTransactionResult? = null
+    private var layoutSelectAll: LinearLayout? = null
+    private var lineChart: LineChart? = null
+    private var selectAllCheckBox: CheckBox? = null
+    private var loadingDialog: AlertDialog? = null
+    private var loadingText: TextView? = null
+    private var recyclerView: RecyclerView? = null
+
+
 
 
 
 
     private var actionMode: ActionMode? = null
+    private var progressAnimator: ValueAnimator? = null // Single ValueAnimator instance
+    private var adapter: MpesaTransactionAdapter? = null
 
 
-    private val selectedTransactions = HashSet<Int>()
-    private val removedTransactions = HashSet<Int>()
+    private var selectedTransactions = HashSet<Int>()
+    private var removedTransactions = HashSet<Int>()
     private var rejectedSmsList = mutableListOf<MutableList<String>>()
     private val dataViewModel: DataViewModel by activityViewModels()
 
@@ -141,6 +150,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     // onDestroyView.
     private val binding get() = _binding!!
 
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -152,13 +162,13 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         progressBar = binding.progressBar2
 
         mpesa_balance_label = binding.root.findViewById(R.id.mpesa_balance_label)
-        mpesa_balance_label.text = "Balance: "
+        mpesa_balance_label?.text = "Balance: "
         currency_label = binding.root.findViewById(R.id.currency_label)
-        currency_label.text = "Ksh."
+        currency_label?.text = "Ksh."
         balance_text = binding.root.findViewById(R.id.balance_text)
-        balance_text.text = "0.00"
+        balance_text?.text = "0.00"
         mpesa_sync_label = binding.root.findViewById(R.id.sync_progress_label)
-        mpesa_sync_label.text = "Sync Progress:"
+        mpesa_sync_label?.text = "Sync Progress:"
         updateTextBox = binding.transactionsThisMonth
         netSpendTextBox= binding.netSpendThisMonth
         circularProgressDrawable = binding.circularProgress
@@ -180,6 +190,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
         CallbackSingleton.refreshCallback = this
 
+        TaskPreferences.setTaskRunning(requireContext(), true)  // Set to true at start
+
 
 
 
@@ -194,42 +206,60 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         fadeInselectLayoutAnimation = AnimationUtils.loadAnimation(activity, R.anim.fade_in_select_all_layout)
         fadeOutAnimation = AnimationUtils.loadAnimation(activity, R.anim.fade_out)
 
+        viewAlLink?.setOnClickListener{
+            Toast.makeText(
+                activity?.baseContext,
+                "Just need to setup an intent to the new activity",
+                Toast.LENGTH_SHORT
+            ).show()
+            // Create an Intent to start SecondActivity
+            val intent = Intent(activity, ViewAllTransactionsActivity::class.java)
+
+            // Optionally, you can pass data to the second activity using extras
+            intent.putExtra("key", "value")
+
+            // Start the second activity
+            startActivity(intent)
+
+        }
+        createLoadingDialog()
+        loadingDialog?.show()
+
+
+        val task = lifecycleScope.launch(Dispatchers.IO) {
+            beginOperations()
+        }
+
+        task.invokeOnCompletion {
+            loadingDialog?.dismiss()
+        }
+
+
+
+        //getSmsFrom2023(requireContext())
+
         return binding.root
 
     }
 
-    override fun onPrepareOptionsMenu(menu: Menu) {
-        //(activity as AppCompatActivity).invalidateOptionsMenu()
-        (activity as AppCompatActivity).menuInflater.inflate(R.menu.menu_mpesa, menu)
-        var toolbar = binding.toolbar
-        var menu = toolbar.menu
-        //var filter = menu.findItem(R.id.filter)
-        //val month = SimpleDateFormat("MMMM").format(Calendar.getInstance().time)
-        //filter.setTitle(month)
-        //super.onPrepareOptionsMenu(menu)
+    @SuppressLint("SetTextI18n")
+    private fun createLoadingDialog(): AlertDialog {
+        // Create a custom view for the loading dialog
+        val customView = LayoutInflater.from(requireContext()).inflate(R.layout.loading_dialog, null)
+        loadingText = customView.findViewById(R.id.loading_text)
+        loadingText?.text = "Loading... Please Wait"
+
+        // Show loading dialog
+        loadingDialog = MaterialAlertDialogBuilder(requireContext())
+            .setView(customView)
+            .setCancelable(false)
+            .create()
+
+
+        return loadingDialog as AlertDialog
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-       /*if (item.itemId == R.id.filter){
-            Toast.makeText(activity?.baseContext, "Clicked", Toast.LENGTH_SHORT).show()
-        }
-        return when (item.itemId) {
-            R.id.filter -> true
-            else -> super.onOptionsItemSelected(item)
-        }*/
-        return true
-    }
-
-
-
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
+    private fun beginOperations() {
         var msg_str: ArrayList<MutableList<String>>? = null
         var tableExists = false
 
@@ -260,23 +290,29 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                 all_mpesa_transactions = retrieveArrayFromViewModel() ?: mutableListOf()
 
                 if(all_mpesa_transactions.isNullOrEmpty()){
-                    println("Start conversion")
+                    Log.d("MpesaFragment","Start conversion")
                     all_mpesa_transactions = startConversionTask(msg_str)
                     saveArrayToViewModel(all_mpesa_transactions)
                 }
 
-                Toast.makeText(activity?.baseContext, "Table Exists but Empty", Toast.LENGTH_SHORT).show()
+                    Log.d("MpesaFragment", "Table Exists but Empty")
+
             }
             else{
-                Toast.makeText(activity?.baseContext, "Table Exists", Toast.LENGTH_SHORT).show()
-                progressBar.visibility = View.INVISIBLE
 
-                all_mpesa_transactions = retrieveArrayFromViewModel() ?: mutableListOf()
+                Log.d("MpesaFragment", "Table Exists")
+                progressBar?.visibility = View.INVISIBLE
 
-                if(all_mpesa_transactions.isNullOrEmpty() && all_mpesa_transactions.isNullOrEmpty()) {
+                val all_mpesa_transactions_from_db = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
+
+                val all_mpesa_transactions_from_view_model= retrieveArrayFromViewModel() ?: mutableListOf()
+
+                if(all_mpesa_transactions_from_view_model.isNullOrEmpty() || all_mpesa_transactions_from_db.size > all_mpesa_transactions_from_view_model.size) {
                     println("check DB")
-                    all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
+                    all_mpesa_transactions = all_mpesa_transactions_from_db
                     saveArrayToViewModel(all_mpesa_transactions)
+                }else{
+                    all_mpesa_transactions = all_mpesa_transactions_from_view_model
                 }
 
 
@@ -288,7 +324,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             }
 
         } else {
-            Toast.makeText(activity?.baseContext, "Table Does not Exist", Toast.LENGTH_SHORT).show()
+
+            Log.d("MpesaFragment" , "Table Does not Exist")
             msg_str = getAllSmsFromProvider()
             all_mpesa_transactions=startConversionTask(msg_str)
             //balance_text.text = all_mpesa_transactions.first().mpesa_balance.toString()
@@ -301,8 +338,85 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                 db_helper?.createInitialTables(db!!)
             }
         }
-
     }
+
+    override fun onStart() {
+        super.onStart()
+        FragmentVisibilityTracker.isMpesaFragmentVisible = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        FragmentVisibilityTracker.isMpesaFragmentVisible = false
+    }
+
+    private fun getSmsFrom2023(context: Context) {
+        val smsList = mutableListOf<SmsMessage>()
+        val contentResolver = context.contentResolver
+
+        // Start and end timestamps for the year 2023
+        val startOf2023 = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse("2023-01-01")!!.time
+        val endOf2023 = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse("2023-12-31")!!.time
+
+        if(ContextCompat.checkSelfPermission(requireContext(), "android.permission.READ_SMS") == PackageManager.PERMISSION_GRANTED) {
+            val cursor = contentResolver.query(
+                Telephony.Sms.Inbox.CONTENT_URI,
+                arrayOf(Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.ADDRESS, Telephony.Sms.Inbox.DATE, Telephony.Sms.Inbox._ID),
+                Telephony.Sms.Inbox.DATE + " BETWEEN ? AND ?",
+                arrayOf(startOf2023.toString(), endOf2023.toString()),
+                Telephony.Sms.Inbox.DEFAULT_SORT_ORDER
+            )
+
+            cursor?.use {
+                while (it.moveToNext()) {
+                    val body = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.Inbox.BODY))
+                    val address = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.Inbox.ADDRESS))
+                    val date = it.getLong(it.getColumnIndexOrThrow(Telephony.Sms.Inbox.DATE))
+                    val id = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.Inbox._ID))
+
+                    smsList.add(SmsMessage(id, address, body, date))
+                }
+            }
+        } else {
+            Log.e("SMS Retrieval", "Permission to read SMS not granted")
+        }
+
+        println("Retrieved SMS from 2023: ${smsList.size} messages")
+        smsList.forEach { sms ->
+            println("${sms.date}: ${sms.address} - ${sms.body}")
+        }
+    }
+
+
+    data class SmsMessage(val id: String, val address: String, val body: String, val date: Long)
+
+
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        //(activity as AppCompatActivity).invalidateOptionsMenu()
+        (activity as AppCompatActivity).menuInflater.inflate(R.menu.menu_mpesa, menu)
+        var toolbar = binding.toolbar
+        var menu = toolbar.menu
+        //var filter = menu.findItem(R.id.filter)
+        //val month = SimpleDateFormat("MMMM").format(Calendar.getInstance().time)
+        //filter.setTitle(month)
+        //super.onPrepareOptionsMenu(menu)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
+       /*if (item.itemId == R.id.filter){
+            Toast.makeText(activity?.baseContext, "Clicked", Toast.LENGTH_SHORT).show()
+        }
+        return when (item.itemId) {
+            R.id.filter -> true
+            else -> super.onOptionsItemSelected(item)
+        }*/
+        return true
+    }
+
 
     private fun saveArrayToViewModel(array: MutableList<MpesaTransaction>) {
         dataViewModel?.dataArray = array
@@ -314,142 +428,132 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
     private fun updateTransactionThisMonth(mpesa_transactions: MutableList<MpesaTransaction>) {
         updateTextBox = binding.transactionsThisMonth
-        netSpendTextBox= binding.netSpendThisMonth
+        netSpendTextBox = binding.netSpendThisMonth
         val no_transactions_textbox: TextView = binding.noTransactionsMessage
-
-        if (mpesa_transactions.isEmpty()){
-            no_transactions_textbox.visibility = View.VISIBLE
-        }else{
-            no_transactions_textbox.visibility = View.INVISIBLE
-        }
-
-        var sorted_mpesa_transactions = sortTransactions(mpesa_transactions)
-        activeTransactions = sorted_mpesa_transactions
-
-        viewAlLink.setOnClickListener{
-            Toast.makeText(
-                activity?.baseContext,
-                "Just need to setup an intent to the new activity",
-                Toast.LENGTH_SHORT
-            ).show()
-            // Create an Intent to start SecondActivity
-            val intent = Intent(activity, ViewAllTransactionsActivity::class.java)
-
-            // Optionally, you can pass data to the second activity using extras
-            intent.putExtra("key", "value")
-
-            // Start the second activity
-            startActivity(intent)
-
-        }
-
-        // Get the current month and year programmatically
-        val currentMonth = Calendar.getInstance().get(Calendar.MONTH) + 1
-        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-        val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
         val currentDate = Calendar.getInstance().time
 
+        // Check if there are any transactions to display
+        no_transactions_textbox.visibility = if (mpesa_transactions.isEmpty()) View.VISIBLE else View.INVISIBLE
 
-        // Define the date format
+        val sortedTransactions = sortTransactions(mpesa_transactions)
+        activeTransactions = sortedTransactions
+
+        // Get current month and year
+        val calendar = Calendar.getInstance()
+        val currentMonth = calendar.get(Calendar.MONTH) + 1
+        val currentYear = calendar.get(Calendar.YEAR)
         val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
 
-        // Filter transactions for the current month and year
-        val transactions_today = sorted_mpesa_transactions.filter { transaction ->
-            // Assuming transactionDate is a String property in the format "dd/MM/yyyy HH:mm:ss"
-            isSameDay(transaction.transaction_date.toString(), currentDate)
-        }.toMutableList()
-
-        if(!transactions_today.isNullOrEmpty()){
+        // Filter transactions for today and this month
+        val todayTransactions = sortedTransactions.filter {
+            it.transaction_date?.let { date -> isSameDay(date, currentDate) } ?: false
         }
 
-        val totalExpensesThisMonth = sorted_mpesa_transactions
-            .filter { !it.transaction_date?.isEmpty()!! && isValidDate(it.transaction_date!!, dateFormat, currentMonth, currentYear) && (it.transaction_type != "deposit" && it.transaction_type != "receival" && it.transaction_type != "reverse") }
-            .sumOf { it.amount!! }
-
-        val totalIncomeThisMonth = sorted_mpesa_transactions
-            .filter { !it.transaction_date?.isEmpty()!! && isValidDate(it.transaction_date!!, dateFormat, currentMonth, currentYear) && (it.transaction_type == "deposit" || it.transaction_type == "receival" || it.transaction_type == "reverse") }
-            .sumOf { it.amount!! }
-
-        val netSpendThisMonth = totalIncomeThisMonth - totalExpensesThisMonth
-
-
-        updateTextBox.text = totalExpensesThisMonth.toString()
-        netSpendTextBox.text = netSpendThisMonth.toString()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            chartUpdate(sorted_mpesa_transactions)
-        }
-
-        val recyclerView: RecyclerView = binding.transactionsRecycler
-        adapter = MpesaTransactionAdapter(requireContext(),sorted_mpesa_transactions, object : MpesaTransactionAdapter.OnItemClickListener{
-
-            override fun onItemClick(transactionId: Int?) {
-                if (actionMode != null) {
-                    toggleSelection(transactionId)
+        val (expensesThisMonth, incomeThisMonth) = sortedTransactions.fold(0.0 to 0.0) { acc, transaction ->
+            val amount = transaction.amount ?: 0.0
+            if (transaction.transaction_date?.let {
+                    isValidDate(it, dateFormat, currentMonth, currentYear)
+                } == true) {
+                when (transaction.transaction_type) {
+                    "deposit", "receival", "reverse" -> acc.first to acc.second + amount
+                    else -> acc.first + amount to acc.second
                 }
-                else{
-                    val selectedTransaction = sorted_mpesa_transactions.find { it.id == transactionId }
-                    val gson = Gson()
-                    val mpesaTransactionJson = gson.toJson(selectedTransaction)
+            } else acc
+        }
 
-                    val intent = Intent(requireContext(), TransactionViewer::class.java).apply {
-                        putExtra("mpesaTransactionJson", mpesaTransactionJson)
+        val netSpendThisMonth = incomeThisMonth - expensesThisMonth
+
+        // Update Text Views
+        val decimalFormat = DecimalFormat("#.0")
+        updateTextBox?.text = decimalFormat.format(expensesThisMonth)
+        netSpendTextBox?.text = decimalFormat.format(netSpendThisMonth)
+
+
+
+        // Initialize RecyclerView with adapter and listeners
+        recyclerView = binding.transactionsRecycler
+        requireActivity().runOnUiThread {
+
+            adapter = MpesaTransactionAdapter(
+                requireContext(),
+                sortedTransactions,
+                object : MpesaTransactionAdapter.OnItemClickListener {
+                    override fun onItemClick(transactionId: Int?) {
+                        if (actionMode != null) {
+                            toggleSelection(transactionId)
+                        } else {
+                            sortedTransactions.find { it.id == transactionId }
+                                ?.let { selectedTransaction ->
+                                    val intent = Intent(
+                                        requireContext(),
+                                        TransactionViewerActivity::class.java
+                                    ).apply {
+                                        putExtra(
+                                            "mpesaTransactionJson",
+                                            Gson().toJson(selectedTransaction)
+                                        )
+                                    }
+                                    transactionViewerActivityLauncher.launch(intent)
+                                }
+                        }
                     }
-                    transactionViewerLauncher.launch(intent)
 
-                }
+                    override fun onItemLongClick(transactionId: Int?) {
+                        (view?.context as? AppCompatActivity)?.let { context ->
+                            if (actionMode == null) {
+                                actionMode = context.startSupportActionMode(actionModeCallback)!!
+                                toggleSelection(transactionId)
+                            } else {
+                                actionMode?.finish()
+                            }
+                        }
+                    }
+                })
+
+            // Configure RecyclerView
+            recyclerView?.layoutManager = LinearLayoutManager(activity)
+            recyclerView?.adapter = adapter
+
+
+
+            updatesyncCircularProgress()
+
+        }
+
+        // Set balance text based on available transactions
+        val balanceText = if (sortedTransactions.isNotEmpty()) {
+            sortedTransactions.first().mpesaBalance
+        } else {
+            db_helper?.getMostRecentTransaction()?.firstOrNull()?.mpesaBalance
+        }
+        balance_text?.text = String.format("%,.2f", balanceText ?: 0.0)
+
+        // Update chart if supported
+        lifecycleScope.launch(Dispatchers.IO) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                chartUpdate(sortedTransactions)
             }
-
-            override fun onItemLongClick(transactionId: Int?) {
-                val context = view?.context
-                if (context is AppCompatActivity) {
-                    if (actionMode == null) {
-                        actionMode = context.startSupportActionMode(actionModeCallback)!!
-                        //println("hello")
-                        toggleSelection(transactionId)
-                    }
-                    else{
-                        actionMode!!.finish()
-                    }
-
-                }
-            }
-        } )
-
-        //Log.d(this.activity.toString(), "stuff: " + sorted_mpesa_transactions.first().transaction_date)
-
-
-
-        if(sorted_mpesa_transactions.isNullOrEmpty()){
-            var latest_mpesa_transaction = mutableListOf<MpesaTransaction>()
-            latest_mpesa_transaction = db_helper?.getMostRecentTransaction()!!
-            //println("size ya hii mpya ni:" + latest_mpesa_transaction_last_month.size + " " + latest_mpesa_transaction_last_month.first().transaction_date)
-
-            balance_text.text = String.format("%,.2f", latest_mpesa_transaction.first().mpesaBalance)
-
-        }else{
-            balance_text.text = String.format("%,.2f", sorted_mpesa_transactions.first().mpesaBalance)
         }
 
-        /*balance_text.hideSkeleton()
-        currency_label.hideSkeleton()
-        mpesa_sync_label.hideSkeleton()
-        mpesa_balance_label.hideSkeleton()
-        mpesa_sync_label.hideSkeleton()
-        updateTextBox.hideSkeleton()
-        netSpendTextBox.hideSkeleton()*/
+        TaskPreferences.setTaskRunning(requireContext(), false)  // Set to true at start
 
-        updatesyncCircularProgress()
 
-        recyclerView.layoutManager = LinearLayoutManager(activity)
-        recyclerView.adapter = adapter
 
 
     }
 
-    private val transactionViewerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    fun restartApp() {
+        val intent = Intent(requireActivity(), MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        requireActivity().finish() // Optional: Close the current fragment/activity
+    }
+
+
+    private val transactionViewerActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            // TransactionViewer activity is finished
+            // TransactionViewerActivity activity is finished
             // Execute your code here
             println("habari yako")
             all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
@@ -510,55 +614,57 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         dataSet.mode = LineDataSet.Mode.LINEAR // Smooth line
 
         val lineData = LineData(dataSet)
-        lineChart.data = lineData
+        lineChart?.data = lineData
 
         // Set XAxis formatter to display dates
-        val xAxis = lineChart.xAxis
+        val xAxis = lineChart?.xAxis
         println("malabel: " + xAxisLabels.toString())
-        xAxis.valueFormatter = IndexAxisValueFormatter(xAxisLabels)
-        xAxis.position = XAxis.XAxisPosition.BOTTOM
-        xAxis.setGranularity(1f) // Ensure all x-axis values are shown
+        xAxis?.valueFormatter = IndexAxisValueFormatter(xAxisLabels)
+        xAxis?.position = XAxis.XAxisPosition.BOTTOM
+        xAxis?.setGranularity(1f) // Ensure all x-axis values are shown
 
 
         // Hide Y axis grid lines
-        val leftAxis: YAxis = lineChart.axisLeft
-        leftAxis.setDrawGridLines(false)
+        val leftAxis: YAxis? = lineChart?.axisLeft
+        leftAxis?.setDrawGridLines(false)
 
         // Hide right Y axis
-        val rightAxis: YAxis = lineChart.axisRight
-        rightAxis.isEnabled = false
+        val rightAxis: YAxis? = lineChart?.axisRight
+        rightAxis?.isEnabled = false
 
         //lineChart.setTouchEnabled(false) // Disable touch gestures (including zooming)
-        lineChart.isDragEnabled = false // Disable dragging (panning)
-        lineChart.setScaleEnabled(false) // Disable scaling (zooming)
-        lineChart.isDoubleTapToZoomEnabled = false // Disable double-tap zoom
-        lineChart.getDescription().setEnabled(false);
+        lineChart?.isDragEnabled = false // Disable dragging (panning)
+        lineChart?.setScaleEnabled(false) // Disable scaling (zooming)
+        lineChart?.isDoubleTapToZoomEnabled = false // Disable double-tap zoom
+        lineChart?.getDescription()?.setEnabled(false);
 
         // Set text color for x-axis and y-axis labels
-        lineChart.xAxis.textColor = colorControlNormal
-        lineChart.axisLeft.textColor = colorControlNormal
-        lineChart.axisRight.textColor = colorControlNormal
+        lineChart?.xAxis?.textColor = colorControlNormal
+        lineChart?.axisLeft?.textColor = colorControlNormal
+        lineChart?.axisRight?.textColor = colorControlNormal
 
 // Set text color for legend
-        val legend = lineChart.legend
-        legend.textColor = colorControlNormal
+        val legend = lineChart?.legend
+        legend?.textColor = colorControlNormal
 
 
 
         // Set animation
         // Set the initial alpha to 0
-        lineChart.alpha = 0f
+        lineChart?.alpha = 0f
 
         // Animate the alpha to 1 (fully visible) over a specified duration
-        lineChart.animate()
-            .alpha(1f)
-            .setDuration(1000) // Adjust the duration as needed
-            .start()
+        requireActivity().runOnUiThread {
+            lineChart?.animate()
+                ?.alpha(1f)
+                ?.setDuration(1000) // Adjust the duration as needed
+                ?.start()
+        }
         //lineChart.animateX(1500, Easing.EaseInOutExpo)
-        lineChart.invalidate()
+        lineChart?.invalidate()
 
         // Display marker when clicked
-        lineChart.setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
+        lineChart?.setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
             override fun onValueSelected(e: Entry?, h: Highlight?) {
                 val formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy", Locale.ENGLISH)
                 val date = e?.x?.toInt()?.let { index ->
@@ -643,7 +749,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         updateActionModeTitle()
 
         // Notify the adapter about the change
-        adapter.setSelectedTransactions(selectedTransactions, false)
+        adapter?.setSelectedTransactions(selectedTransactions, false)
     }
 
 
@@ -658,12 +764,14 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             }
             .setPositiveButton("Confirm") { dialog, which ->
                 // Respond to positive button press
-                adapter.setRemovedTransactions(selectedTransactions, selectAllCheckBox.isChecked)
+                adapter?.setRemovedTransactions(selectedTransactions,
+                    selectAllCheckBox?.isChecked == true
+                )
                 Log.d(this.activity.toString(), "deleted utilised")
 
-                if(selectAllCheckBox.isChecked){
+                if(selectAllCheckBox?.isChecked == true){
                     deleteAllTransactions()
-                    selectAllCheckBox.isChecked = false
+                    selectAllCheckBox?.isChecked = false
                 }
                 else{
                     deleteSeletectedTransactionsFromDb(selectedTransactions)
@@ -706,6 +814,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         }
 
         updateDeletedTransactionsArray()
+        actionMode?.finish()
 
     }
 
@@ -730,7 +839,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
     private fun clearSelection() {
         selectedTransactions.clear()
-        adapter.clearSelection()
+        adapter?.clearSelection()
     }
 
     private fun clearSelectionWithoutNotifyingAdapter(){
@@ -794,22 +903,22 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
             //mode?.customView = customView
             mode?.menuInflater?.inflate(R.menu.context_menu, menu)
 
-            layoutSelectAll.startAnimation(fadeInselectLayoutAnimation)
-            layoutSelectAll.visibility = View.VISIBLE
+            layoutSelectAll?.startAnimation(fadeInselectLayoutAnimation)
+            layoutSelectAll?.visibility = View.VISIBLE
             changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurfaceContainer)
-            selectAllCheckBox.setOnCheckedChangeListener { buttonView, isChecked ->
+            selectAllCheckBox?.setOnCheckedChangeListener { buttonView, isChecked ->
                 if(isChecked){
                     selectedTransactions.clear()
                     for (activetransaction in activeTransactions){
                         selectedTransactions.add(activetransaction.id!!)
                     }
                     updateActionModeTitle()
-                    adapter.setSelectedTransactions(selectedTransactions,true)
+                    adapter?.setSelectedTransactions(selectedTransactions,true)
 
                 }else{
                     selectedTransactions.clear()
                     updateActionModeTitle()
-                    adapter.setSelectedTransactions(selectedTransactions, true)
+                    adapter?.setSelectedTransactions(selectedTransactions, true)
 
                 }
             }
@@ -840,53 +949,53 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         override fun onDestroyActionMode(mode: ActionMode?) {
             // Clear the selection and finish ActionMode
             selectedTransactions.clear()
-            adapter.reinitializeAdapter()
-            adapter.setActionModeStatus(true)
+            adapter?.reinitializeAdapter()
+            adapter?.setActionModeStatus(true)
             changeStatusBarColorWithAnimation(com.google.android.material.R.attr.colorSurface)
-            layoutSelectAll.startAnimation(verticalShrinkFadeOut)
-            layoutSelectAll.visibility = View.GONE
+            layoutSelectAll?.startAnimation(verticalShrinkFadeOut)
+            layoutSelectAll?.visibility = View.GONE
             actionMode = null
-            selectAllCheckBox.isChecked = false
+            selectAllCheckBox?.isChecked = false
 
         }
     }
 
 
     private fun updatesyncCircularProgress() {
-        var totalSMS:Int = 0
+        var totalSMS = 0
         val cr: ContentResolver = requireActivity().contentResolver
-        if(ContextCompat.checkSelfPermission(requireContext(), "android.permission.READ_SMS") == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(requireContext(), "android.permission.READ_SMS") == PackageManager.PERMISSION_GRANTED) {
             val c = cr.query(
                 Telephony.Sms.Inbox.CONTENT_URI,
-                arrayOf(Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.ADDRESS,Telephony.Sms.Inbox.DATE),  // Select body text
+                arrayOf(Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.ADDRESS, Telephony.Sms.Inbox.DATE),
                 Telephony.Sms.ADDRESS + " = ?",
                 arrayOf("MPESA"),
                 Telephony.Sms.Inbox.DEFAULT_SORT_ORDER
-            ) // Default sort order
-            totalSMS = c!!.count
-            c.close()
+            )
+            totalSMS = c?.count ?: 0
+            c?.close()
         }
 
+        val transactionCount = db_helper?.getCountAllTransactions() ?: 0
+        val rejectedSmsCount = db_helper?.getCountAllRejectedSms() ?: 0
+        val progressPercentage = ((transactionCount.toDouble() + rejectedSmsCount.toDouble()) / totalSMS.toDouble()) * 100
 
-        var transactionCount = db_helper?.getCountAllTransactions()!! ?: 0
+        // Check if there's an ongoing animation and cancel it
+        progressAnimator?.cancel()
 
-        var rejectedSmsCount = db_helper?.getCountAllRejectedSms()!! ?: 0
-
-        var progressPercentage = (transactionCount.toDouble() + rejectedSmsCount.toDouble()) / totalSMS.toDouble() * 100
-
-        println("Values Zake:" + totalSMS.toInt() )
-        println("Values Zake:" + transactionCount.toInt() )
-        println("Values Zake:" + rejectedSmsCount.toInt() )
-
-
-
-
-        circularProgressDrawable.setProgress(progressPercentage.toDouble(), 100.00)
-
-
-
-
+        // Initialize the animator with the new progress percentage
+        progressAnimator = circularProgressDrawable?.progress?.toFloat()?.let {
+            ValueAnimator.ofFloat(it, progressPercentage.toFloat()).apply {
+                duration = 1000
+                addUpdateListener { animation ->
+                    val animatedValue = animation.animatedValue as Float
+                    circularProgressDrawable?.setProgress(animatedValue.toDouble(), 100.0)
+                }
+                start()
+            }
+        }
     }
+
 
     private fun isValidDate(date: String, dateFormat: SimpleDateFormat, currentMonth: Int, currentYear: Int): Boolean {
         try {
@@ -923,9 +1032,40 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+        adapter = null
+        recyclerView?.adapter = null
+        selectedTransactions = HashSet<Int>()
+        removedTransactions = HashSet<Int>()
+        rejectedSmsList = mutableListOf<MutableList<String>>()
+        progressBar = null
+        currency_label = null
+        balance_text = null
+        mpesa_balance_label = null
+        mpesa_sync_label = null
+        handler = null
+        verticalShrinkAnimation = null
+        fadeInAnimation = null
+        fadeOutAnimation = null
+        verticalShrinkFadeOut = null
+        fadeInselectLayoutAnimation = null
+        updateTextBox = null
+        netSpendTextBox = null
+        viewAlLink = null
+        appBar = null
+        circularProgressDrawable = null
+        bigResult = null
+        layoutSelectAll = null
+        lineChart = null
+        selectAllCheckBox = null
+        loadingDialog = null
+        loadingText = null
+        recyclerView = null
+
+
     }
 
     private fun getAllSmsFromProvider(): ArrayList<MutableList<String>> {
+        Log.d("MpesaFragment", "Getting all sms from provider")
         val sms = ArrayList<MutableList<String>>()
         val lstSms: MutableList<String> = ArrayList()
         val lstRcvr: MutableList<String> = ArrayList()
@@ -940,9 +1080,13 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                 arrayOf(Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.ADDRESS,Telephony.Sms.Inbox.DATE,Telephony.Sms.Inbox._ID),  // Select body text
                 Telephony.Sms.ADDRESS + " = ?",
                 arrayOf("MPESA"),
-                Telephony.Sms.Inbox.DEFAULT_SORT_ORDER
+                "${Telephony.Sms.Inbox.DATE} ASC"
             ) // Default sort order
             val totalSMS = c!!.count
+
+            println("Total SMS: $totalSMS")
+
+
             if (c.moveToFirst()) {
                 for (i in 0 until totalSMS) {
                     lstSms.add(c.getString(0))
@@ -960,35 +1104,44 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         sms.add(lstRcvr)
         sms.add(lstDate)
         sms.add(lstId)
-        println("Hodi: " + sms[0].first() + " " + sms[1].first() +" " + sms[2].first() + " " + sms[3].first())
         addAllSmsToDb(sms)
         println("size ya maana: " + sms.size)
         return sms
     }
 
     private fun addAllSmsToDb(sms: ArrayList<MutableList<String>>) {
-        // Check if the database is open
-        if (db?.isOpen == true) {
-            val tableExists = doesTableExist("all_sms", db!!)
+        Log.d("MpesaFragment", "Adding all SMS to db")
+
+        if (db_helper == null) {
+            db_helper = DbHelper(requireContext())
+        }
+
+        if (db == null || !db!!.isOpen) {
+            db = db_helper?.writableDatabase
+        }
+
+        db?.let { database ->
+            val tableExists = doesTableExist("all_sms", database)
 
             if (!tableExists) {
-                // If the table does not exist, create it
-                db_helper?.createInitialTables(db!!)
+                Log.d("MpesaFragment", "Table does not exist, creating table")
+                db_helper?.createInitialTables(database)
+            } else {
+                Log.d("MpesaFragment", "Table exists, proceeding to insert SMS")
             }
 
-            // Begin the transaction
-            db?.beginTransaction()
-
+            database.beginTransaction()
             try {
-                // Insert SMS into the database
+                Log.d("MpesaFragment", "Inserting SMS into db")
                 doInsert(sms)
-                // Mark the transaction as successful if it reaches this point
-                db?.setTransactionSuccessful()
+                database.setTransactionSuccessful()
+            } catch (e: Exception) {
+                Log.e("MpesaFragment", "Error during insertion: ${e.message}")
             } finally {
-                // End the transaction (either commit or rollback)
-                db?.endTransaction()
+                database.endTransaction()
+                Log.d("MpesaFragment", "Transaction ended")
             }
-        }
+        } ?: Log.e("MpesaFragment", "Database is null or closed, cannot add SMS")
     }
 
     private fun doInsert(sms: ArrayList<MutableList<String>>) {
@@ -1012,16 +1165,11 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         }
     }
 
-    fun doesTableExist(tableName: String, db: SQLiteDatabase): Boolean {
+    private fun doesTableExist(tableName: String, db: SQLiteDatabase): Boolean {
         val query = "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
-        val cursor: Cursor? = db.rawQuery(query, arrayOf(tableName))
-        var tableExists = false
-
-        cursor?.use {
-            tableExists = it.count > 0
+        db.rawQuery(query, arrayOf(tableName)).use { cursor ->
+            return cursor.count > 0
         }
-
-        return tableExists
     }
 
     fun isTableEmpty(tableName: String, dbHelper: DbHelper): Boolean {
@@ -1384,8 +1532,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                     val currentProgress = (progress * 100 / totalWork)
 
                     // Update the ProgressBar on the main thread
-                    handler.post {
-                        progressBar.progress = currentProgress
+                    handler?.post {
+                        progressBar?.progress = currentProgress
                     }
 
 
@@ -1411,18 +1559,18 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         val rootLayout: CoordinatorLayout? = _binding?.root?.findViewById(R.id.coordinator_layout_appbar)
 
         // Apply the fade-in transition to show the ProgressBar
-        progressBar.startAnimation(fadeInAnimation)
-        progressBar.visibility = View.VISIBLE
+        progressBar?.startAnimation(fadeInAnimation)
+        progressBar?.visibility = View.VISIBLE
 
         // Start the task in a Coroutine
         var task = GlobalScope.launch(Dispatchers.IO) {
             bigResult = MpesaTransaction.convertSmstoMpesaTransactions(msg_str = msg_str, progressBar)
-            result = bigResult.transactionsList
+            result = bigResult?.transactionsList!!
 
             withContext(Dispatchers.Main) {
                 // Hide the ProgressBar with vertical shrink transition
-                progressBar.startAnimation(verticalShrinkAnimation)
-                progressBar.visibility = View.INVISIBLE
+                progressBar?.startAnimation(verticalShrinkAnimation)
+                progressBar?.visibility = View.INVISIBLE
 
 
                 // Process the result or update UI as needed
@@ -1441,8 +1589,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
     private fun onConversionTaskCompletion(convertedTransactions: MutableList<MpesaTransaction> ) {
         // Show the ProgressBar
-        progressBar.visibility = View.VISIBLE
-        progressBar.startAnimation(fadeInAnimation)
+        progressBar?.visibility = View.VISIBLE
+        progressBar?.startAnimation(fadeInAnimation)
         val dateFrmt = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
 
         requireActivity().runOnUiThread {
@@ -1457,7 +1605,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         println("progress bar resetting")
         var i = 0
 
-        progressBar.progress = i
+        progressBar?.progress = i
 
 
 
@@ -1473,7 +1621,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                 val currentProgress = (i * 100 / convertedTransactions.size)
 
 
-                progressBar.progress = currentProgress
+                progressBar?.progress = currentProgress
             }
 
             val transactors = Transactor.getTransactorsFromTransactions(convertedTransactions)
@@ -1485,20 +1633,20 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         }
 
 
-        println("End: " + progressBar.progress)
+        println("End: " + progressBar?.progress)
 
-        progressBar.startAnimation(verticalShrinkAnimation)
-        progressBar.visibility = View.INVISIBLE
+        progressBar?.startAnimation(verticalShrinkAnimation)
+        progressBar?.visibility = View.INVISIBLE
 
-        progressBar.visibility = View.VISIBLE
-        progressBar.startAnimation(fadeInAnimation)
+        progressBar?.visibility = View.VISIBLE
+        progressBar?.startAnimation(fadeInAnimation)
 
         i = 0
 
-        progressBar.progress = i
+        progressBar?.progress = i
 
         if (db != null) {
-            for (rejectedMessage in bigResult.rejectedSmsList) {
+            for (rejectedMessage in bigResult?.rejectedSmsList!!) {
                 i++
                 val dateObjct = Date(rejectedMessage[0].toLong())
                 var msg_date = dateFrmt.format(dateObjct)
@@ -1507,12 +1655,12 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
                 val currentProgress = (i * 100 / convertedTransactions.size)
 
 
-                progressBar.progress = currentProgress
+                progressBar?.progress = currentProgress
             }
         }
 
-        progressBar.startAnimation(verticalShrinkAnimation)
-        progressBar.visibility = View.INVISIBLE
+        progressBar?.startAnimation(verticalShrinkAnimation)
+        progressBar?.visibility = View.INVISIBLE
 
 
 
@@ -1527,6 +1675,8 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
         requireActivity().runOnUiThread {
             updateTransactionThisMonth(all_mpesa_transactions)
+            val prefs = requireActivity().applicationContext.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("mpesa_first_launch", true).apply()
 
         }
 
@@ -1543,7 +1693,7 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
     private fun updateTransactionCheck(mpesaTransaction: MpesaTransaction){
 
         db_helper = this.activity?.applicationContext?.let { DbHelper(it) }
-        mpesaTransaction.id?.let { db_helper?.transactorCheckUpdateTransaction(it) }
+        mpesaTransaction.let { db_helper?.transactorCheckUpdateTransaction(it) }
     }
 
     override fun onRefresh() {
@@ -1561,6 +1711,18 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         // viewAllTransactionsActivity?.refreshRecyclerView()
     }
 
+    override fun onResume() {
+        if (db_helper == null) {
+            db_helper = DbHelper(requireContext())
+        }
+        all_mpesa_transactions = db_helper?.getThisMonthMpesaNonDeletedTransactions()!!
+        requireActivity().runOnUiThread {
+            updateTransactionThisMonth(all_mpesa_transactions)
+
+        }
+        super.onResume()
+    }
+
     fun destroyActionMode() {
         println("its been called dah")
         actionMode?.finish()
@@ -1569,6 +1731,25 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
     object CallbackSingleton {
         var refreshCallback: RefreshRecyclerViewCallback? = null
+    }
+
+    object FragmentVisibilityTracker {
+        var isMpesaFragmentVisible: Boolean = false
+    }
+
+    object TaskPreferences {
+        private const val PREFERENCE_NAME = "task_preferences"
+        private const val CONVERSION_TASK_RUNNING = "conversion_task_running"
+
+        fun setTaskRunning(context: Context, isRunning: Boolean) {
+            val prefs = context.getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putBoolean(CONVERSION_TASK_RUNNING, isRunning).apply()
+        }
+
+        fun isTaskRunning(context: Context): Boolean {
+            val prefs = context.getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE)
+            return prefs.getBoolean(CONVERSION_TASK_RUNNING, false)
+        }
     }
 
 

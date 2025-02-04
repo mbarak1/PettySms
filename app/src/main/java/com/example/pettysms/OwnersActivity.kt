@@ -184,7 +184,11 @@ class OwnersActivity : AppCompatActivity(), AddOrEditOwnerDialog.OnAddOwnerListe
         if (dbHelper == null) {
             dbHelper = DbHelper(this)
         }
-        return dbHelper?.getAllOwners()?.toMutableList() ?: mutableListOf<Owner>()
+        dbHelper?.openDatabase()
+        val owners = dbHelper?.getAllOwners() ?: emptyList()
+        Toast.makeText(this, "owners: " + owners.size, Toast.LENGTH_SHORT).show()
+        dbHelper?.closeDatabase()
+        return owners.toMutableList()
 
     }
 

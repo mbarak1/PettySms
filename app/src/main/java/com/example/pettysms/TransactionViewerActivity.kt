@@ -49,7 +49,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.properties.Delegates
 
-class TransactionViewer : AppCompatActivity(), EditTransactionFragment.OnDescriptionChangeListener {
+class TransactionViewerActivity : AppCompatActivity(), EditTransactionFragment.OnDescriptionChangeListener {
     private lateinit var binding: ActivityTransactionViewerBinding
     private lateinit var amountCard: MaterialCardView
     private lateinit var avatarView: AvatarView
@@ -146,7 +146,7 @@ class TransactionViewer : AppCompatActivity(), EditTransactionFragment.OnDescrip
         val gson = Gson()
         val mpesaTransaction = gson.fromJson(mpesaTransactionJson, MpesaTransaction::class.java)
 
-        val transactionColor = getColorAvatar(this@TransactionViewer, mpesaTransaction.transaction_type.toString())
+        val transactionColor = getColorAvatar(this@TransactionViewerActivity, mpesaTransaction.transaction_type.toString())
 
         this.transactionColor = transactionColor
 
@@ -376,7 +376,7 @@ class TransactionViewer : AppCompatActivity(), EditTransactionFragment.OnDescrip
         shareIntent.type = "application/pdf"
 
         // Get the URI for the file using FileProvider
-        val fileUri = FileProvider.getUriForFile(this, "com.example.pdfgenerator.fileprovider", file)
+        val fileUri = FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.provider", file)
         grantUriPermission(packageName, fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
         // Add the file URI as an extra stream to the intent
@@ -539,10 +539,10 @@ class TransactionViewer : AppCompatActivity(), EditTransactionFragment.OnDescrip
 
     fun getTitleTextByTransactionType(transaction: MpesaTransaction): String {
         return when (transaction.transaction_type) {
-            "topup", "send_money", "paybill", "till", "withdraw", "reverse" -> {
+            "topup", "send_money", "paybill", "till", "reverse" -> {
                 transaction.recipient?.name?.let { capitalizeEachWord(it) } ?: ""
             }
-            "deposit" -> {
+            "deposit", "withdraw" -> {
                 transaction.mpesaDepositor?.let { capitalizeEachWord(it) } ?: ""
             }
             "receival" -> {

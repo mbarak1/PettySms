@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.google.android.material.color.DynamicColors
+//import leakcanary.LeakCanary
 
 class App: Application() {
     override fun onCreate() {
@@ -12,7 +13,6 @@ class App: Application() {
         DynamicColors.applyToActivitiesIfAvailable(this)
         // Create notification channel
         createNotificationChannel()
-
     }
 
     private fun createNotificationChannel() {

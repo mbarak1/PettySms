@@ -22,9 +22,12 @@ import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.pettysms.databinding.ActivityMainBinding
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.color.DynamicColors
+import java.util.concurrent.TimeUnit
 
 
 class MainActivity : AppCompatActivity(), OnActionModeInteraction {
@@ -38,9 +41,30 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
     private val READ_EXTERNAL_STORAGE_CODE = 1
     private val WRITE_EXTERNAL_STORAGE_CODE = 2
     private val INTERNET_CODE = 3
+    private val PERMISSIONS_REQUEST_CODE = 1
     private var check_fragment = "home"
     private var activityName = "MainActivity"
     private var isServiceScheduled = false
+
+
+    private val requiredPermissions = arrayOf(
+        Manifest.permission.READ_SMS,
+        Manifest.permission.RECEIVE_BOOT_COMPLETED,
+        Manifest.permission.RECEIVE_SMS,
+        Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE,
+        Manifest.permission.SEND_SMS,
+        Manifest.permission.INTERNET,
+        Manifest.permission.ACCESS_NETWORK_STATE,
+        Manifest.permission.CHANGE_NETWORK_STATE,
+        Manifest.permission.USE_FULL_SCREEN_INTENT,
+        Manifest.permission.POST_NOTIFICATIONS,
+        Manifest.permission.FOREGROUND_SERVICE,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        Manifest.permission.READ_MEDIA_IMAGES,  // Change to specific media types if necessary
+        Manifest.permission.READ_MEDIA_VIDEO,
+        Manifest.permission.READ_MEDIA_AUDIO,
+        Manifest.permission.CAMERA
+    )
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +84,7 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
         //DynamicColors.isDynamicColorAvailable()
 
         // Check and request runtime permissions
-        if (ContextCompat.checkSelfPermission(
+        /*if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.RECEIVE_SMS
             ) != PackageManager.PERMISSION_GRANTED
@@ -71,7 +95,9 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
                 arrayOf(Manifest.permission.RECEIVE_SMS),
                 REQUEST_SMS_PERMISSION
             )
-        }
+        }*/
+
+        checkAndRequestPermissions()
 
         Log.d(activityName, "Inside Main Activity")
 
@@ -91,6 +117,8 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
         }else{
             Log.d(activityName, "Camera Permission Denied")
         }
+
+
 
 
 
@@ -183,11 +211,20 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
 
         println("balla gani:" + dbHelper.hasTables(db))
 
+
+
+
         if (dbHelper.hasTables(db) && !isServiceScheduled) {
             println("ola cela")
-            scheduleJob()
-            isServiceScheduled = true
+                scheduleJob()
+                scheduleSyncMainPettyCashValues()
+                isServiceScheduled = true
         }
+
+        val prefs = getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+        val isFirstLaunch = prefs.getBoolean("mpesa_first_launch", false)
+
+        println("Mpesa First Launch: " + isFirstLaunch)
 
         setContentView(binding.root)
 
@@ -196,7 +233,26 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
 
 
 
+
+
     }
+
+    private fun scheduleSyncMainPettyCashValues() {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val alarmIntent = Intent(this, AlarmReceiverSyncValues::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(this, 0, alarmIntent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+
+        // Set the alarm to trigger every minute
+        alarmManager.setRepeating(
+            AlarmManager.RTC_WAKEUP,
+            System.currentTimeMillis(),
+            300 * 1000,  // 15 minute interval
+            pendingIntent
+        )
+
+    }
+
 
     private fun scheduleJob() {
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -211,6 +267,51 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
             60 * 1000,  // 1 minute interval
             pendingIntent
         )
+    }
+
+    private fun checkAndRequestPermissions() {
+        val permissionsNeeded = requiredPermissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (permissionsNeeded.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                this,
+                permissionsNeeded.toTypedArray(),
+                PERMISSIONS_REQUEST_CODE
+            )
+        } else {
+            // All permissions are granted, proceed with your logic
+            proceedWithAppLogic()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSIONS_REQUEST_CODE) {
+            if (grantResults.isNotEmpty()) {
+                val allGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+                if (allGranted) {
+                    // All permissions are granted, proceed with your logic
+                    proceedWithAppLogic()
+                } else {
+                    // Handle the case where permissions are not granted
+                    showPermissionDeniedMessage()
+                }
+            }
+        }
+    }
+
+    private fun proceedWithAppLogic() {
+        // Your logic when permissions are granted
+    }
+
+    private fun showPermissionDeniedMessage() {
+        Toast.makeText(this, "Some permissions are denied. The app may not function correctly.", Toast.LENGTH_SHORT).show()
     }
 
 
@@ -253,6 +354,7 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
             println("ole celuza")
             scheduleJob()
             isServiceScheduled = true
+
         }
         super.onResume()
     }
@@ -273,7 +375,7 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
         }
     }
 
-    override fun onRequestPermissionsResult(
+    /*override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String?>,
         grantResults: IntArray
@@ -312,7 +414,7 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
                     .show()
             }
         }
-    }
+    }*/
 
     override fun onDestroyActionMode() {
         // Code to destroy the ActionMode in the fragment

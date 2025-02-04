@@ -343,10 +343,10 @@ class MpesaTransactionAdapter(private val context: Context, private val mpesaTra
 
     fun getTitleTextByTransactionType(transaction: MpesaTransaction): String {
         return when (transaction.transaction_type) {
-            "topup", "send_money", "paybill", "till", "withdraw", "reverse" -> {
+            "topup", "send_money", "paybill", "till", "reverse" -> {
                 transaction.recipient?.name?.let { capitalizeEachWord(it) } ?: ""
             }
-            "deposit" -> {
+            "deposit", "withdraw" -> {
                 transaction.mpesaDepositor?.let { capitalizeEachWord(it) } ?: ""
             }
             "receival" -> {

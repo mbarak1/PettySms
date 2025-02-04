@@ -44,7 +44,7 @@ class SuggestionsAdapter(
                     val selectedTransaction = suggestions[position]
                     val gson = Gson()
                     val mpesaTransactionJson = gson.toJson(selectedTransaction)
-                    val intent = Intent(context, TransactionViewer::class.java).apply {
+                    val intent = Intent(context, TransactionViewerActivity::class.java).apply {
                         putExtra("mpesaTransactionJson", mpesaTransactionJson)
                     }
                     context.startActivity(intent)

@@ -12,18 +12,18 @@
         style="@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Primary"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="120dp"
-        android:layout_gravity="bottom|end"
-        android:text="@string/add"
-        app:layout_anchor="@id/nestedScrollView"
-        android:textColor="?attr/colorOnPrimaryContainer"
-        app:iconTint="?attr/colorOnPrimaryContainer"
         android:clickable="true"
+        android:contentDescription="@string/add_petty_cash"
+        android:text="@string/add"
+        android:textColor="?attr/colorOnPrimaryContainer"
         app:icon="@drawable/outline_add_24"
+        app:iconTint="?attr/colorOnPrimaryContainer"
+        app:layout_anchor="@id/nestedScrollView"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:contentDescription="@string/add_petty_cash" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayoutPettyCash"
@@ -31,35 +31,31 @@
         android:layout_height="wrap_content"
         android:layout_marginLeft="0dp"
         android:layout_marginRight="0dp"
-        android:fitsSystemWindows="true"
-        app:liftOnScroll="false"
         android:background="@color/colorTransparent"
+        android:fitsSystemWindows="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toTopOf="parent"
+        app:liftOnScroll="false">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/pettyCashToolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:titleTextAppearance="@style/ToolbarTitleTextAppearance"
-            android:elevation="4dp">
-
-        </com.google.android.material.appbar.MaterialToolbar>
+            android:elevation="4dp"
+            app:titleTextAppearance="@style/ToolbarTitleTextAppearance" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/nestedScrollView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="85dp"
+        android:layout_height="0dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintTop_toBottomOf="@id/appBarLayoutPettyCash"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/appBarLayoutPettyCash"
-        >
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
@@ -70,8 +66,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="220dp"
                 android:layout_marginStart="8dp"
-                android:layout_marginEnd="8dp"
                 android:layout_marginTop="30dp"
+                android:layout_marginEnd="8dp"
                 android:layout_weight="1"
                 android:orientation="horizontal"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -119,8 +115,8 @@
                         android:orientation="horizontal">
 
                         <ImageView
-                            android:layout_width="27dp"
-                            android:layout_height="27dp"
+                            android:layout_width="23dp"
+                            android:layout_height="23dp"
                             android:layout_gravity="center_vertical"
                             android:layout_marginStart="16dp"
                             android:src="@drawable/database_24px"
@@ -128,10 +124,10 @@
 
                         <ImageView
                             android:id="@+id/dbDotImageView"
-                            android:layout_width="13dp"
-                            android:layout_height="13dp"
+                            android:layout_width="11dp"
+                            android:layout_height="11dp"
                             android:layout_gravity="center_vertical"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="5dp"
                             android:layout_marginTop="0.5dp"
                             android:src="@drawable/dot_shape"
                             android:visibility="visible"
@@ -144,7 +140,7 @@
                             android:layout_gravity="center_vertical"
                             android:layout_marginStart="8dp"
                             android:text="Offline"
-                            android:textSize="18sp" />
+                            android:textSize="13sp" />
 
 
                     </LinearLayout>
@@ -167,8 +163,8 @@
                         android:orientation="horizontal">
 
                         <ImageView
-                            android:layout_width="27dp"
-                            android:layout_height="27dp"
+                            android:layout_width="23dp"
+                            android:layout_height="23dp"
                             android:layout_gravity="center_vertical"
                             android:layout_marginStart="16dp"
                             android:src="@drawable/brand_quickbooks"
@@ -176,10 +172,10 @@
 
                         <ImageView
                             android:id="@+id/qbDotImageView"
-                            android:layout_width="13dp"
-                            android:layout_height="13dp"
+                            android:layout_width="11dp"
+                            android:layout_height="11dp"
                             android:layout_gravity="center_vertical"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="5dp"
                             android:layout_marginTop="0.5dp"
                             android:src="@drawable/dot_shape"
                             android:visibility="visible"
@@ -192,7 +188,7 @@
                             android:layout_gravity="center_vertical"
                             android:layout_marginStart="8dp"
                             android:text="Offline"
-                            android:textSize="18sp" />
+                            android:textSize="13sp" />
 
 
                     </LinearLayout>
@@ -229,10 +225,10 @@
                         android:fontFamily="@font/montserrat_medium"
                         android:text="Company Center"
                         android:textAlignment="center"
-                        android:textSize="8sp"
+                        android:textSize="6sp"
                         app:icon="@drawable/corporate_fare_24px"
                         app:iconGravity="top"
-                        app:iconSize="33dp" />
+                        app:iconSize="30dp" />
 
                     <com.google.android.material.button.MaterialButton
                         style="@style/Widget.Material3.Button.TonalButton"
@@ -245,10 +241,10 @@
                         android:fontFamily="@font/montserrat_medium"
                         android:text="Reports"
                         android:textAlignment="center"
-                        android:textSize="8sp"
+                        android:textSize="6sp"
                         app:icon="@drawable/lab_profile_24px"
                         app:iconGravity="top"
-                        app:iconSize="33dp" />
+                        app:iconSize="30dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/transactorsButton"
@@ -261,10 +257,10 @@
                         android:background="@drawable/pc_button_background"
                         android:fontFamily="@font/montserrat_medium"
                         android:text="Transactors"
-                        android:textSize="8sp"
+                        android:textSize="6sp"
                         app:icon="@drawable/manage_accounts_24px"
                         app:iconGravity="top"
-                        app:iconSize="33dp" />
+                        app:iconSize="30dp" />
 
                 </LinearLayout>
 
@@ -288,10 +284,10 @@
                         android:fontFamily="@font/montserrat_medium"
                         android:text="Accounts"
                         android:textAlignment="center"
-                        android:textSize="8sp"
+                        android:textSize="6sp"
                         app:icon="@drawable/account_tree_24px"
                         app:iconGravity="top"
-                        app:iconSize="33dp" />
+                        app:iconSize="30dp" />
 
                     <com.google.android.material.button.MaterialButton
                         style="@style/Widget.Material3.Button.TonalButton"
@@ -304,10 +300,10 @@
                         android:fontFamily="@font/montserrat_medium"
                         android:text="Queue"
                         android:textAlignment="center"
-                        android:textSize="8sp"
+                        android:textSize="6sp"
                         app:icon="@drawable/list_alt_24px"
                         app:iconGravity="top"
-                        app:iconSize="33dp" />
+                        app:iconSize="30dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/trucksButton"
@@ -320,10 +316,10 @@
                         android:background="@drawable/pc_button_background"
                         android:fontFamily="@font/montserrat_medium"
                         android:text="Trucks"
-                        android:textSize="7.5sp"
+                        android:textSize="6sp"
                         app:icon="@drawable/outline_local_shipping_black_24dp"
                         app:iconGravity="top"
-                        app:iconSize="33dp" />
+                        app:iconSize="30dp" />
 
                 </LinearLayout>
 
@@ -331,6 +327,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/recentPettyCashLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="30dp"
@@ -343,8 +340,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="15dp"
                     android:layout_weight="1"
-                    android:gravity="start"
                     android:fontFamily="@font/montserrat_medium"
+                    android:gravity="start"
                     android:text="Recent Petty Cash"
                     android:textFontWeight="600"
                     android:textSize="17sp" />
@@ -363,6 +360,39 @@
 
 
             </LinearLayout>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/linearLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="15dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/recentPettyCashLayout">
+
+                <TextView
+                    android:id="@+id/noPettyCashMessage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="30dp"
+                    android:text="No petty cash to show."
+                    android:visibility="visible"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="@+id/pettyCashRecycler"
+                    app:layout_constraintStart_toStartOf="@+id/pettyCashRecycler"
+                    app:layout_constraintTop_toTopOf="@+id/pettyCashRecycler"
+                    app:layout_constraintVertical_bias="0.795" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/pettyCashRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="100dp"
+                    app:layout_behavior="@string/appbar_scrolling_view_behavior"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+            </androidx.constraintlayout.widget.ConstraintLayout>
 
 
         </androidx.constraintlayout.widget.ConstraintLayout>

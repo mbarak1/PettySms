@@ -11,7 +11,10 @@ import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -20,20 +23,16 @@ import java.util.*
 class SmsForegroundService : Service() {
 
     private val NOTIFICATION_CHANNEL_ID = "SmsForegroundServiceChannel"
-    // Declare a variable to hold the callback interface
-    private var refreshRecyclerViewCallback: RefreshRecyclerViewCallback? = null
-
-    // Method to set the callback interface
-    fun setRefreshRecyclerViewCallback(callback: RefreshRecyclerViewCallback) {
-        refreshRecyclerViewCallback = callback
-    }
+    private val notificationId = 1
+    private lateinit var serviceJob: Job
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(1, createNotification())
+        createNotificationChannel()
+        startForeground(notificationId, createNotification())
 
-        GlobalScope.launch(Dispatchers.IO) {
-            // Implement your logic to check for new SMS and insert into the database
-            println("ndo laanza")
+        serviceJob = Job()
+        val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+        serviceScope.launch {
             checkAndInsertNewSms()
         }
 
@@ -44,17 +43,13 @@ class SmsForegroundService : Service() {
         val sms = ArrayList<MutableList<String>>()
         val lstSms: MutableList<String> = ArrayList()
         val lstRcvr: MutableList<String> = ArrayList()
-        var lstDate: MutableList<String> = ArrayList()
-        var lstId: MutableList<String> = ArrayList()
-        var smsServiceHelper = SmsServiceHelper()
-
-        // Get SharedPreferences using the provided context
-        val prefs = this.getSharedPreferences("YourPrefsName", Context.MODE_PRIVATE)
-        val isForegroundServiceRunning = prefs.getBoolean("isForegroundServiceRunning", false)
+        val lstDate: MutableList<String> = ArrayList()
+        val lstId: MutableList<String> = ArrayList()
+        val smsServiceHelper = SmsServiceHelper()
 
         val cr: ContentResolver = contentResolver
         if (ContextCompat.checkSelfPermission(this, "android.permission.READ_SMS") == PackageManager.PERMISSION_GRANTED) {
-            val c = cr.query(
+            val cursor = cr.query(
                 Telephony.Sms.Inbox.CONTENT_URI,
                 arrayOf(Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.ADDRESS, Telephony.Sms.Inbox.DATE, Telephony.Sms.Inbox._ID),
                 Telephony.Sms.ADDRESS + " = ?",
@@ -65,52 +60,36 @@ class SmsForegroundService : Service() {
             val dbHelper = DbHelper(this)
             val db = dbHelper.writableDatabase
 
-            try {
-                if (c != null && c.moveToFirst()) {
-                    do {
-                        println()
-                        if (!dbHelper.isSmsExists(db, c.getString(0), c.getString(2).toLong())) {
-                            if (!isForegroundServiceRunning){
-                                println("balaa" + c.getString(0))
-                                lstSms.add(c.getString(0))
-                                lstRcvr.add(c.getString(1))
-                                lstDate.add(c.getString(2))
-                                lstId.add(c.getString(3))
-                            }
-                        }
-                    } while (c.moveToNext())
+            cursor?.use {
+                while (it.moveToNext()) {
+                    if (!dbHelper.isSmsExists(db, it.getString(0), it.getString(2).toLong())) {
+                        lstSms.add(it.getString(0))
+                        lstRcvr.add(it.getString(1))
+                        lstDate.add(it.getString(2))
+                        lstId.add(it.getString(3))
+                    }
                 }
-
-
-                sms.add(lstSms)
-                sms.add(lstRcvr)
-                sms.add(lstDate)
-                sms.add(lstId)
-
-                println("watha ushoga" + sms.toString())
-
-                if (!sms[0].isNullOrEmpty() && !sms[1].isNullOrEmpty() && !sms[2].isNullOrEmpty() && !sms[3].isNullOrEmpty()){
-                    smsServiceHelper.processSms(sms, this)
-                }
-
-            } finally {
-                c?.close()
-                db.close()
             }
+
+            sms.add(lstSms)
+            sms.add(lstRcvr)
+            sms.add(lstDate)
+            sms.add(lstId)
+
+            if (sms.all { it.isNotEmpty() }) {
+                smsServiceHelper.processSms(sms, this)
+            }
+
+            db.close()
+        } else {
+            Log.e("SmsForegroundService", "SMS read permission not granted")
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
-
     private fun createNotification(): Notification {
-        createNotificationChannel()
-
         val notificationIntent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
-            this, 0,
-            notificationIntent, PendingIntent.FLAG_IMMUTABLE  // Add FLAG_IMMUTABLE here
+            this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
@@ -118,7 +97,7 @@ class SmsForegroundService : Service() {
             .setContentText("Foreground service is running")
             .setSmallIcon(R.drawable.p_logo_cropped)
             .setContentIntent(pendingIntent)
-            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
     }
 
@@ -126,7 +105,7 @@ class SmsForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "SmsForegroundService Channel",
+                "SMS Service Channel",
                 NotificationManager.IMPORTANCE_DEFAULT
             )
             val manager = getSystemService(NotificationManager::class.java)
@@ -134,7 +113,16 @@ class SmsForegroundService : Service() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceJob.cancel() // Cancel any ongoing coroutines
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
+    }
 }
+
 
 class SmsServiceHelper() {
     fun processSms(sms: ArrayList<MutableList<String>>, context: Context) {
@@ -204,12 +192,40 @@ class SmsServiceHelper() {
                 updateTransactionCheck(transaction, context)
             }
 
+            result.forEach { transaction ->
+                if (!transaction.isConvertedToPettyCash && (transaction.transaction_type == "paybill" || transaction.transaction_type == "till" || transaction.transaction_type == "send_money" || transaction.transaction_type == "topup" || transaction.transaction_type == "withdraw")) {
+                    var pettyCash = transaction.let {
+                        PettyCash.convertMpesaTransactionToPettyCash(
+                            it,
+                            context
+                        )
+                    }
+                    var transactionCostPettyCash =
+                        transaction.let { PettyCash.getTransactionCostPettyCashObject(it, context) }
+
+                    dbHelper.insertPettyCash(pettyCash)
+                    dbHelper.insertPettyCash(transactionCostPettyCash)
+                    dbHelper.updateMpesaTransactionAsConverted(transaction)
+
+
+                }
+            }
+
 
 
 
         }
-        // Check if the callback is set and invoke the onRefresh() method
-        MpesaFragment.CallbackSingleton.refreshCallback?.onRefresh()
+
+        Log.d("SmsServiceHelper", "MpesaFragment Visibility: " + MpesaFragment.FragmentVisibilityTracker.isMpesaFragmentVisible)
+
+        if (MpesaFragment.FragmentVisibilityTracker.isMpesaFragmentVisible) {
+            MpesaFragment.CallbackSingleton.refreshCallback?.onRefresh()
+        }
+
+        if (PettyCashFragment.FragmentVisibilityTracker.isPettyCashFragmentVisible){
+            PettyCashFragment.CallbackSingleton.refreshCallback?.onRefresh()
+        }
+
 
     }
 
@@ -220,7 +236,7 @@ class SmsServiceHelper() {
 
     private fun updateTransactionCheck(mpesaTransaction: MpesaTransaction, context: Context){
         val dbHelper = DbHelper(context)
-        mpesaTransaction.id?.let { dbHelper.transactorCheckUpdateTransaction(it) }
+        mpesaTransaction.let { dbHelper.transactorCheckUpdateTransaction(it) }
     }
 
 }

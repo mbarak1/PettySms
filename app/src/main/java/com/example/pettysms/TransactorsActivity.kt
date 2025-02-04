@@ -1,14 +1,11 @@
 package com.example.pettysms
 
-import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
-import android.view.inputmethod.EditorInfo
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -21,9 +18,7 @@ import com.google.android.material.floatingactionbutton.ExtendedFloatingActionBu
 import com.google.android.material.search.SearchBar
 import com.google.android.material.search.SearchView
 import com.l4digital.fastscroll.FastScrollRecyclerView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import java.util.Locale
 
 
 class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAddTransactorListener {
@@ -155,9 +150,14 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
         } }
     }
 
+
+
+
     private fun setUpRecyclerView() {
         // Fetch all transactors
         transactors = dbHelper?.getAllTransactors()?.toMutableList()
+
+        //transactors = transactors?.let { mergeTransactors(it).toMutableList() }
 
         // Filter out deleted transactors (where isDeleted == 1)
         val nonDeletedTransactors = transactors?.filter { it.isDeleted == false }?.toMutableList()
@@ -207,7 +207,7 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
 
     fun groupTransactors(transactors: List<Transactor>): List<Any> {
         val groupedTransactors = mutableListOf<Any>()
-        val sortedTransactors = transactors.sortedBy { it.name }
+        val sortedTransactors = transactors.sortedBy { capitalizeEachWord(it.name.toString().trim().replace("  ", "")) }
         var currentHeader: Char? = null
 
         for (transactor in sortedTransactors) {
@@ -221,6 +221,34 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
 
         return groupedTransactors
     }
+
+    fun capitalizeEachWord(input: String): String? {
+        val words = input.split(" ".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+        val result = StringBuilder()
+
+        for (word in words) {
+            if (!word.isEmpty()) {
+                // Replace special characters with space
+                val cleanedWord = word.replace(Regex("[^A-Za-z0-9]"), " ")
+
+                val capitalizedWord = cleanedWord.split(" ").joinToString(" ") {
+                    if (it.isNotEmpty()) {
+                        val firstLetter = it.substring(0, 1).uppercase(Locale.getDefault())
+                        val rest = it.substring(1).lowercase(Locale.getDefault())
+                        "$firstLetter$rest"
+                    } else {
+                        ""
+                    }
+                }
+
+                result.append(capitalizedWord).append(" ")
+            }
+        }
+
+        return result.toString().trim()
+    }
+
+
 
     fun generateRandomTransactors(): List<Transactor> {
         val transactors = mutableListOf<Transactor>()
@@ -264,13 +292,13 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
         return loadingDialog
     }
 
-    fun showAddOrEditTransactorDialog(action: String, ownerJson: String = "") {
+    fun showAddOrEditTransactorDialog(action: String, transactorJson: String = "") {
         val dialog = AddOrEditTransactorDialog()
 
         val args = Bundle()
         args.putString("Action", action)
-        if (ownerJson != "") {
-            args.putString("TransactorJson", ownerJson)
+        if (transactorJson != "") {
+            args.putString("TransactorJson", transactorJson)
         }
         dialog.arguments = args
 
@@ -279,7 +307,7 @@ class TransactorsActivity : AppCompatActivity(), AddOrEditTransactorDialog.OnAdd
 
     }
 
-    override fun onAddTransactor() {
+    override fun onAddTransactor(transactor: Transactor) {
         println("Back to Activity")
         setUpRecyclerView()
         searchView.hide()

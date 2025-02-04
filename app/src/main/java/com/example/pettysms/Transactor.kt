@@ -16,6 +16,7 @@ class Transactor(
     var transactorType: String?,
     var transactorProfilePicturePath: String? = null,
     var interactions: Int? = 0,
+    var kraPin: String? = null,
     var isDeleted: Boolean? = false,
     var isImported: Boolean? = false,
     var avatarColor: String? = null,
@@ -68,10 +69,10 @@ class Transactor(
                 val transactor = Transactor(id = null, name = transaction.mpesaDepositor?.trim(), phoneNumber = null, idCard = null, transactorType = transactorType, avatarColor = avatarColor, isImported = true)
                 return transactor
             }
-            else if (senderJson != "{}") {
+            else if (senderJson != "{}" && senderJson != null) {
                 val transactor = Transactor(id = null, name = transaction.sender?.name?.trim(), phoneNumber = transaction.sender?.phone_no, idCard = null, transactorType = transactorType, avatarColor = avatarColor, isImported = true)
                 return transactor
-            } else if (recepientJson != "{}"){
+            } else if (recepientJson != "{}" && recepientJson != null){
                 val transactor = Transactor(id = null, name = transaction.recipient?.name?.trim(), phoneNumber = transaction.recipient?.phone_no, idCard = null, transactorType = transactorType, avatarColor = avatarColor, isImported = true)
                 return transactor
             }else{

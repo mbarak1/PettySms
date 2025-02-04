@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Outer glow shape -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@android:color/transparent" /> <!-- Transparent background -->
+            <stroke
+                android:width="20dp"
+                android:color="#33FFFFFF"
+                />
+        </shape>
+    </item>
+
+    <!-- Inner circular gradient -->
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:startColor="?attr/colorSurfaceContainerHigh"
+                android:endColor="?attr/colorSurfaceContainerLow"
+                android:type="linear"
+                android:angle="45"
+                />
+        </shape>
+    </item>
+
+    <!-- Check icon -->
+    <item android:drawable="@drawable/baseline_close_24" android:gravity="center" />
+
+</layer-list>
