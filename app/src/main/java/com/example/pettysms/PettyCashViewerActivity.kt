@@ -1,7 +1,10 @@
 package com.example.pettysms
 
+import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.database.sqlite.SQLiteDatabase
@@ -45,14 +48,28 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.gson.Gson
 import xyz.schwaab.avvylib.AvatarView
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
 import kotlin.properties.Delegates
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.core.os.bundleOf
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
 
-class PettyCashViewerActivity : AppCompatActivity() {
+// Add this interface at the top of the class
+interface OnPettyCashDeletedListener {
+    fun onPettyCashDeleted(pettyCashId: Int)
+}
+
+class PettyCashViewerActivity : AppCompatActivity(), AddPettyCashFragment.OnAddPettyCashListener {
 
     private var binding: ActivityPettyCashViewerBinding? = null
     private var amountCard: MaterialCardView? = null
@@ -140,6 +157,28 @@ class PettyCashViewerActivity : AppCompatActivity() {
     private var pettyCash: PettyCash? = null
     private var db_helper: DbHelper? = null
     private var db: SQLiteDatabase? = null
+
+    private val pettyCashUpdateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d("PettyCashViewer", "Received broadcast: ${intent?.action}")
+            if (intent?.action == "pettycash_updated_action") {
+                val updatedPettyCashJson = intent.getStringExtra("updated_petty_cash")
+                Log.d("PettyCashViewer", "Received updated petty cash: $updatedPettyCashJson")
+                updatedPettyCashJson?.let {
+                    try {
+                        val gson = Gson()
+                        val updatedPettyCash = gson.fromJson(it, PettyCash::class.java)
+                        Log.d("PettyCashViewer", "Successfully parsed petty cash, updating UI")
+                        updateUI(updatedPettyCash)
+                    } catch (e: Exception) {
+                        Log.e("PettyCashViewer", "Error updating UI: ${e.message}")
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPettyCashViewerBinding.inflate(layoutInflater)
@@ -220,12 +259,11 @@ class PettyCashViewerActivity : AppCompatActivity() {
         db_helper = DbHelper(this)
         db = db_helper?.writableDatabase
 
-        // Retrieve JSON string from intent extras
-        val pettyCashNumber = intent.getStringExtra("pettyCash")
+        // Fix how we get the petty cash number
+        val pettyCashNumber = intent.getStringExtra("petty_cash_number")
+        Log.d("PettyCashViewerActivity", "Received petty cash number: $pettyCashNumber")
 
-        Log.d("PettyCashViewerActivity", "PettyCash Number: $pettyCashNumber")
-
-        pettyCash = pettyCashNumber.let { db_helper?.getPettyCashByPettyCashNumber(it.toString()) }
+        pettyCash = pettyCashNumber?.let { db_helper?.getPettyCashByPettyCashNumber(it) }
 
         Log.d("PettyCashViewerActivity", "PettyCash Number: ${pettyCash?.pettyCashNumber}")
 
@@ -266,11 +304,102 @@ class PettyCashViewerActivity : AppCompatActivity() {
 
 
         setContentView(binding!!.root)
+
+        // Register broadcast receiver with intent filter
+        val filter = IntentFilter("pettycash_updated_action")
+        LocalBroadcastManager.getInstance(this)
+            .registerReceiver(pettyCashUpdateReceiver, filter)
+        
+        Log.d("PettyCashViewer", "Registered broadcast receiver")
     }
 
     private fun setUpActionButtons() {
         shareActionButton?.setOnClickListener {
             showPettyCashViewPickerDialog()
+        }
+        editActionButton?.setOnClickListener {
+            showAddOrEditPettyCashDialog(pettyCash)
+        }
+        deleteActionButton?.setOnClickListener {
+            showDeleteConfirmationDialog()
+        }
+    }
+
+    private fun showAddOrEditPettyCashDialog(pettyCash: PettyCash?, actionType: String = "Edit") {
+        val existingFragment = supportFragmentManager.findFragmentByTag("fragment_add_petty_cash")
+
+        if (existingFragment != null && existingFragment.isVisible) {
+            return
+        }
+
+        val dialogFragment = AddPettyCashFragment()
+
+        // Set the listener
+        dialogFragment.setOnAddPettyCashListener(this)
+
+        val bundle = Bundle().apply {
+            if (pettyCash != null) {
+                pettyCash.id?.let { putInt("pettyCash", it) }
+            }
+            putString("action", actionType)
+        }
+
+        dialogFragment.arguments = bundle
+        dialogFragment.show(supportFragmentManager, "fragment_add_petty_cash")
+    }
+
+    // Implement the interface method
+    override fun onAddPettyCash(pettyCash: PettyCash, transactionCostPettyCash: PettyCash?) {
+        Log.d("PettyCashViewer", "onAddPettyCash called with ID: ${pettyCash.id}")
+        
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Update main petty cash
+                db_helper?.updatePettyCash(pettyCash)
+                
+                // Update transaction cost if present
+                transactionCostPettyCash?.let { 
+                    db_helper?.updatePettyCash(it)
+                }
+
+                withContext(Dispatchers.Main) {
+                    // Update the UI directly
+                    updateUI(pettyCash)
+                    
+                    // Store the updated petty cash
+                    this@PettyCashViewerActivity.pettyCash = pettyCash
+
+                    // Set result with just the IDs
+                    val resultIntent = Intent().apply {
+                        putExtra("updated_petty_cash_id", pettyCash.id)
+                        putExtra("transaction_cost_id", transactionCostPettyCash?.id)
+                    }
+                    setResult(Activity.RESULT_OK, resultIntent)
+
+                    // Send broadcast with just the IDs
+                    val broadcastIntent = Intent("pettycash_updated_action")
+                    broadcastIntent.putExtra("updated_petty_cash_id", pettyCash.id)
+                    transactionCostPettyCash?.let {
+                        broadcastIntent.putExtra("transaction_cost_id", it.id)
+                    }
+                    LocalBroadcastManager.getInstance(this@PettyCashViewerActivity)
+                        .sendBroadcast(broadcastIntent)
+                    
+                    Toast.makeText(this@PettyCashViewerActivity, 
+                        "Petty cash updated successfully", 
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } catch (e: Exception) {
+                Log.e("PettyCashViewer", "Error updating petty cash: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@PettyCashViewerActivity,
+                        "Error updating petty cash: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         }
     }
 
@@ -989,10 +1118,10 @@ class PettyCashViewerActivity : AppCompatActivity() {
                 paint.isFakeBoldText = true
                 paint.textSize = 11f
                 val title = "Supporting Document"
-                canvas2.drawText(title, 20f, yPosition-140f, paint)
+                canvas2.drawText(title, 20f, yPosition-260f, paint)
 
                 // Supporting Document Details Table
-                var yPosition2 = yPosition-120f
+                var yPosition2 = yPosition-240f
                 paint.isFakeBoldText = false
                 paint.textSize = 10f
 
@@ -1365,12 +1494,19 @@ class PettyCashViewerActivity : AppCompatActivity() {
         pettyCashPaymentModeValue?.text = pettyCash?.paymentMode
         pettyCashDescriptionValue?.text = pettyCash?.description
         pettyCashMpesaTransactionValue?.text = pettyCash?.mpesaTransaction?.mpesa_code ?: "N/A"
-        if (pettyCash?.trucks?.size == db_helper?.getTruckCountByOwner(pettyCash?.owner?.ownerCode!!)) {
-            pettyCashTrucksValue?.text = "All Trucks"
-        }else{
-            pettyCashTrucksValue?.text = pettyCash?.trucks?.joinToString(", ") { it.truckNo.toString() }
+        
+        // Check if all trucks for the owner are selected
+        val ownerTruckCount = db_helper?.getTruckCountByOwner(pettyCash?.owner?.ownerCode!!) ?: 0
+        val selectedTruckCount = pettyCash?.trucks?.size ?: 0
 
+        println("OwnerTruckCount: $ownerTruckCount, SelectedTruckCount: $selectedTruckCount")
+        
+        pettyCashTrucksValue?.text = if (selectedTruckCount == ownerTruckCount) {
+            "All Trucks"
+        } else {
+            pettyCash?.trucks?.joinToString(", ") { it.truckNo.toString() }
         }
+        
         pettyCashUserValue?.text = pettyCash?.user?.name
     }
 
@@ -1535,6 +1671,224 @@ class PettyCashViewerActivity : AppCompatActivity() {
         return result.toString().trim()
     }
 
+    private fun updateUI(pettyCash: PettyCash) {
+        try {
+            // Update amount
+            pettyCash.amount?.let { setupAmountTextView(it) }
+            
+            // Update petty cash ID chip
+            pettyCashIdChip?.text = "${pettyCash.pettyCashNumber}"
+
+            // Update basic information
+            pettyCashDateValue?.text = pettyCash.date
+            pettyCashAccountValue?.text = pettyCash.account?.name ?: "-"
+            pettyCashPaymentModeValue?.text = pettyCash.paymentMode
+            pettyCashDescriptionValue?.text = pettyCash.description
+            pettyCashTrucksValue?.text = pettyCash.trucks?.joinToString(", ") { it.truckNo ?: "" }
+            pettyCashUserValue?.text = pettyCash.user?.name ?: "-"
+
+            // Update transactor information
+            pettyCash.transactor?.let { transactor ->
+                transactorNameTextView?.text = transactor.name?.let { capitalizeEachWord(it) }
+                setUpAvatarView()
+                avatarView?.text = transactor.name?.firstOrNull()?.toString() ?: ""
+            }
+
+            // Update M-Pesa transaction if exists
+            pettyCash.mpesaTransaction?.let { mpesa ->
+                pettyCashMpesaTransactionLayout?.visibility = View.VISIBLE
+                pettyCashMpesaTransactionValue?.text = pettyCash.mpesaTransaction?.mpesa_code ?: "N/A".trimIndent()
+            } ?: run {
+                pettyCashMpesaTransactionLayout?.visibility = View.GONE
+            }
+
+            // Update supporting document if exists
+            pettyCash.supportingDocument?.let { doc ->
+                // Show supporting document section
+                supportingDocumentCard?.visibility = View.VISIBLE
+                
+                // Update supporting document fields
+                pettyCashSupportingDocumentIdValue?.text = doc.id?.toString() ?: ""
+                pettyCashSupportingDocumentSupplierNameValue?.text = doc.supplierName ?: ""
+                pettyCashSupportingDocumentTypeValue?.text = doc.type ?: ""
+                pettyCashSupportingDocumentCuNumberValue?.text = doc.cuNumber ?: ""
+                pettyCashSupportingDocumentNumberValue?.text = doc.documentNo ?: ""
+                pettyCashSupportingDocumentTaxableAmountValue?.text = doc.taxableTotalAmount?.toString() ?: ""
+                pettyCashSupportingDocumentTaxAmountValue?.text = doc.taxAmount?.toString() ?: ""
+                pettyCashSupportingDocumentTotalAmountValue?.text = doc.totalAmount?.toString() ?: ""
+                pettyCashSupportingDocumentDateValue?.text = doc.documentDate ?: ""
+
+                // Handle images
+                image1?.setImageDrawable(null)
+                image2?.setImageDrawable(null)
+                image3?.setImageDrawable(null)
+
+                //Clear image onClickListeners
+                image1?.setOnClickListener(null)
+                image2?.setOnClickListener(null)
+                image3?.setOnClickListener(null)
+
+                // Load and display images
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        // Load image 1
+                        doc.imagePath1?.let { path ->
+                            val bitmap1 = getImageFromPath(path)
+                            withContext(Dispatchers.Main) {
+                                bitmap1?.let {
+                                    image1?.setImageBitmap(it)
+                                    image1?.visibility = View.VISIBLE
+                                    image1?.setOnClickListener {
+                                        viewImageInGallery(bitmap1)
+                                    }
+                                    
+                                } ?: run {
+                                    image1?.visibility = View.GONE
+                                }
+                            }
+                        }
+
+                        // Load image 2
+                        doc.imagePath2?.let { path ->
+                            val bitmap2 = getImageFromPath(path)
+                            withContext(Dispatchers.Main) {
+                                bitmap2?.let {
+                                    image2?.setImageBitmap(it)
+                                    image2?.visibility = View.VISIBLE
+                                    image2?.setOnClickListener {
+                                        viewImageInGallery(bitmap2)
+                                    }
+                                } ?: run {
+                                    image2?.visibility = View.GONE
+                                }
+                            }
+                        }
+
+                        // Load image 3
+                        doc.imagePath3?.let { path ->
+                            val bitmap3 = getImageFromPath(path)
+                            withContext(Dispatchers.Main) {
+                                bitmap3?.let {
+                                    image3?.setImageBitmap(it)
+                                    image3?.visibility = View.VISIBLE
+                                    image3?.setOnClickListener {
+                                        viewImageInGallery(bitmap3)
+                                    }
+                                } ?: run {
+                                    image3?.visibility = View.GONE
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("PettyCashViewer", "Error loading supporting document images: ${e.message}")
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(
+                                this@PettyCashViewerActivity,
+                                "Error loading images: ${e.message}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            } ?: run {
+                // Hide supporting document section if no document
+                supportingDocumentCard?.visibility = View.GONE
+            }
+
+            // Update signature if exists
+            pettyCash.signature?.let { signature ->
+                signatureCard?.visibility = View.VISIBLE
+                signatureImageView?.let { imageView ->
+                    base64ToBitmap(signature)?.let { bitmap ->
+                        imageView.setImageBitmap(bitmap)
+                        signatureBitmap = bitmap
+                    }
+                }
+            } ?: run {
+                signatureCard?.visibility = View.GONE
+            }
+
+            // Update owner logo if exists
+            pettyCash.owner?.let { owner ->
+                logoCard?.visibility = View.VISIBLE
+                owner.logoPath?.let { logo ->
+                    base64ToBitmap(logo)?.let { bitmap ->
+                        logoImage?.setImageBitmap(bitmap)
+                        companyLogoImageBitmap = bitmap
+                    }
+                }
+            } ?: run {
+                logoCard?.visibility = View.GONE
+            }
+
+            // Store the updated petty cash
+            this.pettyCash = pettyCash
+
+            // Handle trucks display
+            pettyCash.trucks?.let { trucks ->
+                if (trucks.isNotEmpty()) {
+                    // Get the owner's total truck count
+                    val ownerTruckCount = db_helper?.getTruckCountByOwner(pettyCash.owner?.ownerCode!!) ?: 0
+
+                    // Set trucks text
+                    pettyCashTrucksValue?.text = if (trucks.size == ownerTruckCount && ownerTruckCount > 0) {
+                        "All Trucks"
+                    } else {
+                        trucks.joinToString(", ") { it.truckNo ?: "" }
+                    }
+                } else {
+                    pettyCashTrucksValue?.text = ""
+                }
+            } ?: run {
+                pettyCashTrucksValue?.text = ""
+            }
+        } catch (e: Exception) {
+            Log.e("PettyCashViewer", "Error updating UI: ${e.message}")
+            Toast.makeText(
+                this,
+                "Error updating display: ${e.message}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun base64ToImageView(base64String: String, imageView: ImageView) {
+        try {
+            val bitmap = base64ToBitmap(base64String)
+            imageView.setImageBitmap(bitmap)
+            imageView.visibility = View.VISIBLE
+        } catch (e: Exception) {
+            Log.e("PettyCashViewer", "Error loading image: ${e.message}")
+            imageView.visibility = View.GONE
+        }
+    }
+
+    private fun base64ToBitmap(base64String: String): Bitmap? {
+        return try {
+            // Decode the Base64 string to byte array
+            val decodedBytes = Base64.decode(base64String, Base64.DEFAULT)
+            
+            // Convert byte array to Bitmap
+            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)?.let { originalBitmap ->
+                // Create a copy that's mutable
+                originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+            }
+        } catch (e: Exception) {
+            Log.e("PettyCashViewer", "Error converting base64 to bitmap: ${e.message}")
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun getImageFromPath(path: String): Bitmap? {
+        return try {
+            BitmapFactory.decodeFile(path)
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error loading image from path $path: ${e.message}")
+            null
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
 
@@ -1611,5 +1965,78 @@ class PettyCashViewerActivity : AppCompatActivity() {
         deleteActionButton = null
         shareActionButton = null
         binding = null
+
+        // Unregister broadcast receiver
+        LocalBroadcastManager.getInstance(this)
+            .unregisterReceiver(pettyCashUpdateReceiver)
+    }
+
+    private fun showDeleteConfirmationDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Delete Petty Cash")
+            .setMessage("Are you sure you want to delete this petty cash? This action cannot be undone.")
+            .setIcon(R.drawable.baseline_warning_amber_white_24dp)
+            .setPositiveButton("Delete") { dialog, _ ->
+                deletePettyCash()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun deletePettyCash() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                pettyCash?.id?.let { id ->
+                    // Delete from database
+                    db_helper?.deletePettyCash(id)
+
+                    // Handle transaction cost deletion if this is an M-Pesa petty cash
+                    var transactionCostId: Int? = null
+                    pettyCash?.mpesaTransaction?.mpesa_code?.let { mpesaCode ->
+                        val transactionCostPettyCash = db_helper?.getTransactionCostPettyCashByMpesaTransaction(mpesaCode)
+                        transactionCostId = transactionCostPettyCash?.id
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        // Send broadcast to update lists with both IDs
+                        val intent = Intent("pettycash_deleted_action")
+                        intent.putExtra("deleted_petty_cash_id", id)
+                        transactionCostId?.let {
+                            intent.putExtra("deleted_transaction_cost_id", it)
+                        }
+                        LocalBroadcastManager.getInstance(this@PettyCashViewerActivity)
+                            .sendBroadcast(intent)
+
+                        // Set result and finish activity
+                        setResult(Activity.RESULT_OK, Intent().apply {
+                            putExtra("deleted_petty_cash_id", id)
+                            transactionCostId?.let {
+                                putExtra("deleted_transaction_cost_id", it)
+                            }
+                        })
+
+                        Toast.makeText(
+                            this@PettyCashViewerActivity,
+                            "Petty cash deleted successfully",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        finish()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PettyCashViewer", "Error deleting petty cash: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@PettyCashViewerActivity,
+                        "Error deleting petty cash: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
     }
 }

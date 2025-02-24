@@ -10,16 +10,11 @@ import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Rect
 import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.MediaStore
 import android.text.Editable
 import android.text.InputFilter
 import android.text.TextWatcher
@@ -57,6 +52,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import cdflynn.android.library.checkview.CheckView
 import com.example.pettysms.MpesaTransaction.Companion.getTitleTextByTransactionTypeWithoutFormatting
@@ -73,13 +69,9 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.gson.Gson
-import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
-import com.google.mlkit.vision.objects.DetectedObject
-import com.google.mlkit.vision.objects.ObjectDetection
-import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.google.zxing.integration.android.IntentIntegrator
 import okhttp3.OkHttpClient
 import kotlinx.coroutines.CoroutineScope
@@ -99,11 +91,13 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import com.gu.toolargetool.TooLargeTool
 
 
 class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTransactorListener {
 
     private var _binding: FragmentAddPettyCashBinding? = null
+
     // Nullable views
     private var toolbar: Toolbar? = null
     private var amountEditText: EditText? = null
@@ -154,14 +148,12 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     private var linearLayoutImages: LinearLayout? = null
 
 
-
-
-
-
     private val binding get() = _binding!!
     private var functionality = "Add"
-    private val initialUrl = "https://itax.kra.go.ke/KRA-Portal/main.htm?actionCode=showHomePageLnclick"
-    private val postUrl = "https://itax.kra.go.ke/KRA-Portal/middlewareController.htm?actionCode=fetchInvoiceDtl"
+    private val initialUrl =
+        "https://itax.kra.go.ke/KRA-Portal/main.htm?actionCode=showHomePageLnclick"
+    private val postUrl =
+        "https://itax.kra.go.ke/KRA-Portal/middlewareController.htm?actionCode=fetchInvoiceDtl"
     private lateinit var sessionCookie: String
     private val TAG = "AddPettyCashFragment"
     private var gloablResponse: String? = null
@@ -172,17 +164,15 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     private var trucks = mutableListOf<Truck>()
     private var selectedTrucks = mutableListOf<Truck>() // Holds the currently selected trucks
     private val accounts = mutableListOf<Account>()
-    private var globalSelectedOwner = Owner(0,"", "")
+    private var globalSelectedOwner = Owner(0, "", "")
     private var globalTransactor: Transactor? = null
     private var globalAccount: Account? = null
     private var globalMpesaTransaction: MpesaTransaction? = null
     private var onAddPettyCashListener: OnAddPettyCashListener? = null
     private var pettyCash: PettyCash? = null
+    private var pettyCashId = 0
     private var pettyCashString: String = ""
     private var updateSupportingDocumentFlag: Boolean = false
-
-
-
 
 
     private val selectedImagesPath = mutableListOf<String>() // List of selected images
@@ -192,37 +182,37 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     private val QR_CODE_REQUEST_CODE = 1003
 
 
-    private val scannerLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            // Handle scanning result
-            val result = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
-            if (result != null) {
-                result.getPages()?.let { pages ->
-                    for (page in pages) {
-                        val imageUri = page.getImageUri() // JPEG URI
-                        // Save image as a file and store its path
-                        if (selectedImagesPath.size < 3) {
-                            val savedFilePath = saveImageAsFile(imageUri)
-                            if (savedFilePath != null) {
-                                selectedImagesUri.add(imageUri)
-                                selectedImagesPath.add(savedFilePath)
-                                addImageToLayout(Uri.fromFile(File(savedFilePath))) // Pass Uri for display if needed
+    private val scannerLauncher =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val scanningResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
+                scanningResult?.getPages()?.let { pages ->
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        for (page in pages) {
+                            if (selectedImagesPath.size < 3) {
+                                val imageUri = page.getImageUri()
+                                Log.d("Scanner", "Image URI: $imageUri")  // 🔍 Log image URI
+
+                                val savedFilePath = compressAndSaveImage(imageUri)
+                                Log.d(
+                                    "Scanner",
+                                    "Saved File Path: $savedFilePath"
+                                )  // 🔍 Log file path
+
+                                savedFilePath?.let {
+                                    withContext(Dispatchers.Main) {
+                                        selectedImagesPath.add(it)
+                                        selectedImagesUri.add(imageUri)
+                                        addImageToLayout(Uri.fromFile(File(it)))
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-
-            // Handle PDF result if available
-            result?.getPdf()?.let { pdf ->
-                val pdfUri = pdf.getUri() // PDF URI
-                val pageCount = pdf.getPageCount() // PDF page count
-                // Handle the PDF URI (e.g., display, save, etc.)
-            }
-        } else {
-            Toast.makeText(requireContext(), "Document scanning failed", Toast.LENGTH_SHORT).show()
         }
-    }
+
 
     // Save the image as a file and return the file path
     private fun saveImageAsFile(imageUri: Uri): String? {
@@ -232,9 +222,14 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             val originalBitmap = BitmapFactory.decodeStream(inputStream)
 
             // Save the Bitmap to a file
-            val savedFile = File(requireContext().cacheDir, "scanned_image_${System.currentTimeMillis()}.jpg")
+            val savedFile =
+                File(requireContext().cacheDir, "scanned_image_${System.currentTimeMillis()}.jpg")
             savedFile.outputStream().use { fos ->
-                originalBitmap.compress(Bitmap.CompressFormat.JPEG, 80, fos) // Compress with 80% quality
+                originalBitmap.compress(
+                    Bitmap.CompressFormat.JPEG,
+                    80,
+                    fos
+                ) // Compress with 80% quality
             }
 
             savedFile.absolutePath // Return the file path
@@ -244,33 +239,155 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         }
     }
 
+    // Add this function to compress images before saving
+    private fun compressAndSaveImage(imageUri: Uri): String? {
+        return try {
+            // Open the image and decode it into a Bitmap
+            val inputStream = requireContext().contentResolver.openInputStream(imageUri)
+            val originalBitmap = BitmapFactory.decodeStream(inputStream)
 
+            // Calculate new dimensions while maintaining aspect ratio
+            val ratio = minOf(
+                MAX_IMAGE_SIZE.toFloat() / originalBitmap.width,
+                MAX_IMAGE_SIZE.toFloat() / originalBitmap.height
+            )
+            val newWidth = (originalBitmap.width * ratio).toInt()
+            val newHeight = (originalBitmap.height * ratio).toInt()
 
+            // Create scaled bitmap
+            val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+            originalBitmap.recycle()
 
+            // Save the scaled bitmap
+            val savedFile =
+                File(requireContext().cacheDir, "scanned_image_${System.currentTimeMillis()}.jpg")
+            savedFile.outputStream().use { fos ->
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, fos)
+            }
+            scaledBitmap.recycle()
+
+            savedFile.absolutePath
+        } catch (e: Exception) {
+            Log.e("AddPettyCashFragment", "Error compressing image: ${e.message}")
+            null
+        }
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true) // Enable options menu in fragment
+        setHasOptionsMenu(true)
         setStyle(STYLE_NORMAL, R.style.PrefsTheme)
+
+        // Get the ID from arguments or saved state
+        pettyCashId = savedInstanceState?.getInt(PETTY_CASH_ID_KEY)
+            ?: arguments?.getInt(PETTY_CASH_ID_KEY, -1)
+                    ?: -1
+
+        functionality = savedInstanceState?.getString("functionality")
+            ?: arguments?.getString("action", "Add")
+                    ?: "Add"
+
+        // Initialize database helper
+        dbHelper = DbHelper(requireContext())
+
+        // Load PettyCash data if editing
+        if (pettyCashId != -1) {
+            loadPettyCashData()
+        }
+    }
+
+    private fun loadPettyCashData() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Load PettyCash from database
+                val loadedPettyCash = dbHelper?.getPettyCashById(pettyCashId)
+
+                withContext(Dispatchers.Main) {
+                    loadedPettyCash?.let {
+                        pettyCash = it
+                        setupPettyCashForEdit()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading petty cash: ${e.message}")
+            }
+        }
+    }
+
+    private fun setupPettyCashForEdit() {
+        pettyCash?.let { pc ->
+            // Setup UI with PettyCash data
+            amountEditText?.setText(pc.amount?.toString())
+            descriptionTextInputEditText?.setText(pc.description)
+            pettyCashNumberInputEditText?.setText(pc.pettyCashNumber)
+            pettyCashDateEditText?.setText(pc.date)
+
+            // Set transactor
+            pc.transactor?.let { transactor ->
+                transactorAutoCompleteTextView?.setText(transactor.name)
+                globalTransactor = transactor
+
+                if (transactor.transactorType == "Individual") {
+                    showSignatureLayout()
+                    pc.signature?.let { loadSignature(it) }
+                } else {
+                    hideSignatureLayout()
+                }
+            }
+
+            // Set account
+            pc.account?.let { account ->
+                accountsAutoCompleteTextView?.setText(account.name)
+                globalAccount = account
+            }
+
+            // Set payment mode
+            pc.paymentMode?.let { paymentMode ->
+                when (paymentMode) {
+                    "Cash" -> defaultChip?.isChecked = true
+                    "M-Pesa" -> chipGroup?.findViewWithTag<Chip>("M-Pesa")?.isChecked = true
+                }
+            }
+
+            // Set Mpesa transaction if exists
+            pc.mpesaTransaction?.let { mpesaTransaction ->
+                mpesaTransactionAutoCompleteTextView?.setText(mpesaTransaction.mpesa_code)
+                globalMpesaTransaction = mpesaTransaction
+            }
+
+            // Load supporting document images if they exist
+            pc.supportingDocument?.let { doc ->
+                supportingDocumentSwitch?.isChecked = true
+                // ... load supporting document data ...
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(PETTY_CASH_ID_KEY, pettyCashId)
+        outState.putString("functionality", functionality)
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        //menu.clear() // Clear the menu to prevent stacking of items
+        menu.clear() // Clear the menu to prevent stacking of items
         println("Functionality: $functionality")
         inflater.inflate(R.menu.add_or_edit_petty_cash_menu, menu)
         val scanEtr = menu.findItem(R.id.scanEtr)
         val deleteItem = menu.findItem(R.id.deletePettyCash)
         val syncMenu = menu.findItem(R.id.syncPettyCash)
 
-        syncMenu.isVisible = false
+        if (syncMenu != null) {
+            syncMenu.isVisible = false
+        }
+
 
 
         if (functionality == "Edit") {
             scanEtr.isVisible = true
             deleteItem.isVisible = true
-        }
-        else{
+        } else {
             scanEtr.isVisible = true
             deleteItem.isVisible = false
         }
@@ -285,6 +402,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 }
                 true
             }
+
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -341,13 +459,15 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         mpesaTransactionAutoCompleteTextView = binding.mpesaTransactionAutoCompleteTextView
         supportingDocumentNumberEditText = binding.supportingDocumentNumberTextInputEditText
         supportingDocumentNumberTextInputLayout = binding.supportingDocumentNumberTextInputLayout
-        supportingDocumentTypeAutoCompleteTextView = binding.supportingDocumentTypeAutoCompleteTextView
+        supportingDocumentTypeAutoCompleteTextView =
+            binding.supportingDocumentTypeAutoCompleteTextView
         supportingDocumentDateEditText = binding.supportingDocumentDateInputEditText
         supportingDocumentDateTextInputLayout = binding.supportingDocumentDateTextInputLayout
         supportingDocumentSupplierName = binding.supplierNameTextInputEditText
         supportingDocumentSupplierNameTextInputLayout = binding.supplierNameTextInputLayout
         supportingDocumentTotalTaxableAmountEditText = binding.totalTaxableAmountTextInputEditText
-        supportingDocumentTotalTaxableAmountTextInputLayout = binding.totalTaxableAmountTextInputLayout
+        supportingDocumentTotalTaxableAmountTextInputLayout =
+            binding.totalTaxableAmountTextInputLayout
         supportingDocumentTotalTaxEditText = binding.taxAmountTextInputEditText
         supportingDocumentTotalTaxTextInputLayout = binding.taxAmountTextInputLayout
         supportingDocumentTotalAmountEditText = binding.totalAmountTextInputEditText
@@ -361,13 +481,17 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         linearLayoutImages = binding.linearLayoutImages
         functionality = arguments?.getString("action").toString()
 
-        if(functionality != "Edit"){
+        TooLargeTool.startLogging(requireActivity().application)
+
+
+        if (functionality != "Edit") {
             functionality = "Add"
         }
-        pettyCashString = arguments?.getString("pettyCash").toString()
 
-        if(pettyCashString != null || pettyCashString != ""){
-            pettyCash = Gson().fromJson(pettyCashString, PettyCash::class.java)
+        pettyCashId = arguments?.getInt("pettyCash") ?: -1
+
+        if (pettyCashId != null) {
+            pettyCash = dbHelper!!.getPettyCashById(pettyCashId)
         }
 
         pettyCashNumberInputEditText?.isEnabled = false
@@ -390,20 +514,19 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 // Update the previously selected chip ID
                 previouslySelectedChipId = checkedId
             }
-            if(previouslySelectedChipId == R.id.chipMpesa){
+            if (previouslySelectedChipId == R.id.chipMpesa) {
                 mpesaTransactionLabel?.visibility = View.VISIBLE
                 mpesaTransactionTextInputLayout?.visibility = View.VISIBLE
                 mpesaTransactionAutoCompleteTextView?.visibility = View.VISIBLE
                 hideSignatureLayout()
-            }else{
+            } else {
                 mpesaTransactionLabel?.visibility = View.GONE
                 mpesaTransactionTextInputLayout?.visibility = View.GONE
                 mpesaTransactionAutoCompleteTextView?.visibility = View.GONE
-                if(globalTransactor != null){
-                    if(globalTransactor!!.transactorType == "Individual"){
+                if (globalTransactor != null) {
+                    if (globalTransactor!!.transactorType == "Individual") {
                         showSignatureLayout()
-                    }
-                    else{
+                    } else {
                         hideSignatureLayout()
                     }
                 }
@@ -441,21 +564,31 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
         setUpSupportingDocumentSection()
 
-        setupDatePickerForField(pettyCashDateTextInputLayout!!,
-            pettyCashDateEditText!!, requireActivity().supportFragmentManager)
+        setupDatePickerForField(
+            pettyCashDateTextInputLayout!!,
+            pettyCashDateEditText!!, requireActivity().supportFragmentManager
+        )
 
         addImageIcon?.setOnClickListener {
             if (selectedImagesPath.size < 3) {
                 showImageSourceDialog()
             } else {
-                Toast.makeText(requireContext(), "You can upload a maximum of 3 images.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    "You can upload a maximum of 3 images.",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
         dottedBox?.setOnClickListener {
             if (selectedImagesPath.size < 3) {
                 showImageSourceDialog()
             } else {
-                Toast.makeText(requireContext(), "You can upload a maximum of 3 images.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    "You can upload a maximum of 3 images.",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
 
@@ -467,15 +600,16 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
 
         saveButton?.setOnClickListener {
-            if (functionality == "Add"){
-                if(pettyCashValidation()){
+            if (functionality == "Add") {
+                if (pettyCashValidation()) {
                     val pettyCash = createPettyCashObject()
                     var transactionCostPettyCash: PettyCash? = null
 
                     savePettyCashToDb(pettyCash)
                     if (pettyCash.paymentMode == "M-Pesa") {
-                        if(pettyCash.mpesaTransaction?.transactionCost!! > 0){
-                            transactionCostPettyCash = createPettyCashTransactionCostObject(pettyCash)
+                        if (pettyCash.mpesaTransaction?.transactionCost!! > 0) {
+                            transactionCostPettyCash =
+                                createPettyCashTransactionCostObject(pettyCash)
                             savePettyCashToDb(transactionCostPettyCash)
                             println(transactionCostPettyCash.toJson())
                         }
@@ -486,20 +620,20 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                     this.onAddPettyCashListener?.onAddPettyCash(pettyCash, transactionCostPettyCash)
                     closeDialog()
                 }
-            }else{
-                if (pettyCashValidation()){
+            } else {
+                if (pettyCashValidation()) {
                     val pettyCash = createPettyCashObject()
                     var transactionCostPettyCash: PettyCash? = null
                     println(pettyCash.toJson())
                     updatePettyCashInDb(pettyCash)
                     if (pettyCash.paymentMode == "M-Pesa") {
                         transactionCostPettyCash = updatePettyCashTransactionCostObject(pettyCash)
-                        if (transactionCostPettyCash != null){
+                        if (transactionCostPettyCash != null) {
                             updatePettyCashInDb(transactionCostPettyCash)
                             println(transactionCostPettyCash.toJson())
                         }
                     }
-                    Log.d("AddPettyCashFragment" , "In Edit Petty Cash")
+                    Log.d("AddPettyCashFragment", "In Edit Petty Cash")
                     println("OnAddPettyCashListener" + onAddPettyCashListener)
                     if (onAddPettyCashListener == null) {
                         Log.e("AddPettyCashFragment", "onAddPettyCashListener is null in edit mode")
@@ -508,7 +642,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                     onAddPettyCashListener?.onAddPettyCash(pettyCash, transactionCostPettyCash)
 
 
-                    Log.d("AddPettyCashFragment" , "After Calling listener")
+                    Log.d("AddPettyCashFragment", "After Calling listener")
                     closeDialog()
                 }
             }
@@ -516,18 +650,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         }
 
 
-
-
-
-
         // Add trucks as chips to the ChipsInput
         // Add trucks as chips to the ChipsInput
-
-
-
-
-
-
 
 
         (requireActivity() as AppCompatActivity).setSupportActionBar(toolbar)
@@ -541,7 +665,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             closeDialog()
         }
 
-        if (functionality == "Edit"){
+        if (functionality == "Edit") {
             fillFields(pettyCash)
         }
 
@@ -641,6 +765,15 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         onAddPettyCashListener = null
         pettyCash = null
         MpesaFragment.CallbackSingleton.refreshCallback = null
+
+        // Clean up temporary image files
+        selectedImagesPath.forEach { path ->
+            try {
+                File(path).delete()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting temp file: $path")
+            }
+        }
     }
 
     private fun updatePettyCashTransactionCostObject(pettyCash: PettyCash): PettyCash? {
@@ -658,20 +791,22 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             println("in here in change")
         }
 
-        if(dbHelper == null){
+        if (dbHelper == null) {
             dbHelper = DbHelper(requireContext())
         }
 
-        val transactionCostAccount: Account? = dbHelper!!.getTransactionCostAccountByOwner(ownerCode)
+        val transactionCostAccount: Account? =
+            dbHelper!!.getTransactionCostAccountByOwner(ownerCode)
 
-        val nonUpdatedTransactionCostPettyCashObject = dbHelper!!.getTransactionCostPettyCashByMpesaTransaction(pettyCash.mpesaTransaction?.mpesa_code)
+        val nonUpdatedTransactionCostPettyCashObject =
+            dbHelper!!.getTransactionCostPettyCashByMpesaTransaction(pettyCash.mpesaTransaction?.mpesa_code)
 
-        if (nonUpdatedTransactionCostPettyCashObject == null){
+        if (nonUpdatedTransactionCostPettyCashObject == null) {
             return null
         }
 
-        if (nonUpdatedTransactionCostPettyCashObject?.pettyCashNumber != null){
-            if (nonUpdatedTransactionCostPettyCashObject.owner?.ownerCode == pettyCash.owner?.ownerCode){
+        if (nonUpdatedTransactionCostPettyCashObject?.pettyCashNumber != null) {
+            if (nonUpdatedTransactionCostPettyCashObject.owner?.ownerCode == pettyCash.owner?.ownerCode) {
                 nextPettyCashNo = nonUpdatedTransactionCostPettyCashObject.pettyCashNumber!!
             }
         }
@@ -710,7 +845,15 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             mpesaTransactionAutoCompleteTextView?.setText(it.mpesaTransaction?.mpesa_code)
             globalAccount = it.account
             accountsAutoCompleteTextView?.setText(it.account?.name ?: "")
-            trucksAutoCompleteTextView?.setText(it.trucks?.joinToString(", ") ?: "")
+            trucksAutoCompleteTextView?.setText(
+                it.trucks?.let { trucks ->
+                    when {
+                        trucks.isEmpty() -> ""
+                        trucks.size == 1 -> "${trucks[0].truckNo ?: ""} , "
+                        else -> trucks.joinToString(" , ") { truck -> truck.truckNo ?: "" }
+                    }
+                } ?: ""
+            )
             if (pettyCash.paymentMode != "Cash") {
                 amountEditText?.isEnabled = false
                 pettyCashDateEditText?.isEnabled = false
@@ -718,18 +861,56 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 mpesaTransactionAutoCompleteTextView?.isEnabled = false
                 chipGroup?.let { it1 -> selectMpesaAndDisableOthers(it1) }
 
-            }else{
+            } else {
                 chipGroup?.let { it1 -> selectCashAndDisableOthers(it1) }
             }
 
-            if (it.owner != null){
-                selectOwner(it.owner!!)
-                globalSelectedOwner= it.owner!!
+            // Select owner in carousel
+            it.owner?.let { owner ->
+                // Find the owner in the list and select it
+                val ownerPosition = owners.indexOfFirst { listOwner ->
+                    listOwner.id == owner.id
+                }
+                if (ownerPosition != -1) {
+                    ownerCarouselRecyclerView?.post {
+                        ownerCarouselRecyclerView?.scrollToPosition(ownerPosition)
+                        ownerCarouselAdapter?.setSelectedPosition(ownerPosition)
+                    }
+                    globalSelectedOwner = owner
+
+                    // Get trucks for this owner
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            trucks = dbHelper?.getLocalTrucksByOwner(owner)?.toMutableList()!!
+                            withContext(Dispatchers.Main) {
+                                setupTrucksAutoCompleteTextView()
+
+                                // Store the selected trucks before setting up the autocomplete
+                                selectedTrucks = it.trucks?.toMutableList() ?: mutableListOf()
+
+                                // Set the text after setup to show current trucks
+                                trucksAutoCompleteTextView?.setText(
+                                    it.trucks?.let { trucks ->
+                                        when {
+                                            trucks.isEmpty() -> ""
+                                            trucks.size == 1 -> "${trucks[0].truckNo ?: ""} , "
+                                            else -> trucks.joinToString(" , ") { truck ->
+                                                truck.truckNo ?: ""
+                                            }
+                                        }
+                                    } ?: ""
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error loading trucks: ${e.message}")
+                        }
+                    }
+                }
             }
 
-            if (it.supportingDocument?.id != null){
+            if (it.supportingDocument?.id != null) {
                 updateSupportingDocumentFlag = true
-                supportingDocumentSwitch?.isChecked = true
+                //supportingDocumentSwitch?.isChecked = true
                 supportingDocumentTypeAutoCompleteTextView?.setText(it.supportingDocument!!.type)
                 supportingDocumentNumberEditText?.setText(it.supportingDocument!!.documentNo)
                 supportingDocumentDateEditText?.setText(it.supportingDocument!!.documentDate)
@@ -739,36 +920,62 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 supportingDocumentTotalAmountEditText?.setText(it.supportingDocument!!.totalAmount.toString())
                 supportingDocumentCuNumberEditText?.setText(it.supportingDocument!!.cuNumber)
 
-                if (it.supportingDocument!!.imagePath1 != null){
-                    val image1 = it.supportingDocument!!.imagePath1?.let { it1 -> base64ToUri(it1) }
-                    if (image1 != null) {
-                        addImageToLayout(image1)
+                // Handle supporting document images
+                pettyCash.supportingDocument?.let { doc ->
+                    //supportingDocumentSwitch?.isChecked = true
+                    //supportingDocumentSwitch?.performClick()
+
+                    setUpSupportingDocumentSection()
+
+                    // Clear existing images
+                    selectedImagesPath.clear()
+                    selectedImagesUri.clear()
+                    linearLayoutImages?.removeAllViews()
+
+                    // Load images one by one
+                    Log.d(
+                        TAG,
+                        "Image paths: ${doc.imagePath1}, ${doc.imagePath2}, ${doc.imagePath3}"
+                    )
+                    doc.imagePath1?.let { path ->
+                        Log.d(TAG, "Image path 1: $path")
+                        base64ToUri(path)?.let { uri ->
+                            selectedImagesPath.add(path)
+                            selectedImagesUri.add(uri)
+                            addImageToLayout(uri)
+                        }
                     }
-                }
-                if (it.supportingDocument!!.imagePath2 != null){
-                    val image2 = it.supportingDocument!!.imagePath2?.let { it1 -> base64ToUri(it1) }
-                    if (image2 != null) {
-                        addImageToLayout(image2)
+
+                    doc.imagePath2?.let { path ->
+                        base64ToUri(path)?.let { uri ->
+                            selectedImagesPath.add(path)
+                            selectedImagesUri.add(uri)
+                            addImageToLayout(uri)
+                        }
                     }
-                }
-                if (it.supportingDocument!!.imagePath3 != null){
-                    val image3 = it.supportingDocument!!.imagePath3?.let { it1 -> base64ToUri(it1) }
-                    if (image3 != null) {
-                        addImageToLayout(image3)
+
+                    doc.imagePath3?.let { path ->
+                        base64ToUri(path)?.let { uri ->
+                            selectedImagesPath.add(path)
+                            selectedImagesUri.add(uri)
+                            addImageToLayout(uri)
+                        }
                     }
+
+
                 }
 
-
-
-
+                supportingDocumentSwitch?.post {
+                    supportingDocumentSwitch!!.isChecked = true
+                }
             }
 
-            if (it.signature != null){
+            if (it.signature != null) {
+                showSignatureLayout()
                 base64ToBitmap(it.signature!!)?.let { it1 -> signatureView?.setSignatureBitmap(it1) }
+            } else {
+                hideSignatureLayout()
             }
-
-
-
 
 
         }
@@ -788,20 +995,50 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         }
     }
 
-    private fun base64ToUri(base64Image: String): Uri? {
-        return try {
-            // Decode Base64 string into a Bitmap
-            val decodedBytes = Base64.decode(base64Image, Base64.DEFAULT)
-            val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+    private fun base64ToUri(input: String?): Uri? {
+        if (input.isNullOrEmpty()) {
+            Log.d(TAG, "Input string is null or empty")
+            return null
+        }
 
-            // Save the bitmap to a temporary file and return its Uri
-            val tempFile = File(requireContext().cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
-            FileOutputStream(tempFile).use { outputStream ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
-                outputStream.flush()
+        return try {
+            if (input.startsWith("/")) {
+                // Input is a file path
+                val file = File(input)
+                if (file.exists()) {
+                    Uri.fromFile(file)
+                } else {
+                    Log.e(TAG, "File does not exist: $input")
+                    null
+                }
+            } else {
+                // Input is base64
+                val decodedBytes = Base64.decode(input, Base64.DEFAULT)
+                val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+
+                if (bitmap == null) {
+                    Log.e(TAG, "Failed to decode bitmap from base64")
+                    return null
+                }
+
+                // Create a file to store the image
+                val file =
+                    File(requireContext().cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
+
+                // Save bitmap to file
+                FileOutputStream(file).use { fos ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+                    fos.flush()
+                }
+
+                // Add file path to track for cleanup
+                selectedImagesPath.add(file.absolutePath)
+
+                // Convert file to Uri
+                Uri.fromFile(file)
             }
-            Uri.fromFile(tempFile)
-        } catch (e: IOException) {
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing image: ${e.message}")
             e.printStackTrace()
             null
         }
@@ -870,26 +1107,6 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         }
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        // Save the signature bitmap
-        val bitmap = signatureView?.getSignatureBitmap()
-        if (bitmap != null) {
-            outState.putByteArray("signatureBitmap", bitmapToByteArray(bitmap))
-            Log.d("AddPettyCashFragment", "Signature saved")
-        }
-    }
-
-    private fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
-        val stream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-        return stream.toByteArray()
-    }
-
-    private fun byteArrayToBitmap(byteArray: ByteArray): Bitmap? {
-        return BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
-    }
-
     override fun onPause() {
         super.onPause()
         Log.d("AddPettyCashFragment", "onPause called")
@@ -902,7 +1119,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
         println("ownerCode: $ownerCode")
 
-        val latestPettyCash = ownerCode?.let { dbHelper!!.getLatestPettyCashByOwnerAndPettyCashNumber(it) }
+        val latestPettyCash =
+            ownerCode?.let { dbHelper!!.getLatestPettyCashByOwnerAndPettyCashNumber(it) }
         println("Latest Petty Cash: ${latestPettyCash?.pettyCashNumber}")
 
         // Get the current year dynamically
@@ -932,7 +1150,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
         }
 
-        if (pettyCash?.pettyCashNumber != null){
+        if (pettyCash?.pettyCashNumber != null) {
             nextPettyCashNo = pettyCash?.pettyCashNumber!!
         }
 
@@ -968,7 +1186,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         val amountValidation = amountEditText?.let {
             validateField(
                 it,
-                !amountEditText?.text.isNullOrEmpty() && amountEditText?.text.toString().substringBefore(" KES").replace(",", "").toDouble() > 0.00,
+                !amountEditText?.text.isNullOrEmpty() && amountEditText?.text.toString()
+                    .substringBefore(" KES").replace(",", "").toDouble() > 0.00,
                 "Amount is required",
                 justification
             )
@@ -1024,7 +1243,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 mpesaTransactionAutoCompleteTextView?.let { it1 -> removeEditTextError(it1) }
                 true
             } ?: run {
-                mpesaTransactionAutoCompleteTextView?.error = "Mpesa Transaction selection is required"
+                mpesaTransactionAutoCompleteTextView?.error =
+                    "Mpesa Transaction selection is required"
                 justification.add("Mpesa Transaction selection is required")
                 false
             }
@@ -1076,41 +1296,50 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 )
             }
 
-            val taxInvoiceValidations = if (supportingDocumentTypeAutoCompleteTextView?.text.toString() in listOf("Tax Invoice", "Tax Cash Receipt")) {
-                val cuNumberValidation = supportingDocumentCuNumberEditText?.let {
-                    validateField(
-                        it,
-                        !supportingDocumentCuNumberEditText?.text.isNullOrEmpty(),
-                        "CU Number is required",
-                        justification
+            val taxInvoiceValidations =
+                if (supportingDocumentTypeAutoCompleteTextView?.text.toString() in listOf(
+                        "Tax Invoice",
+                        "Tax Cash Receipt"
                     )
-                }
+                ) {
+                    val cuNumberValidation = supportingDocumentCuNumberEditText?.let {
+                        validateField(
+                            it,
+                            !supportingDocumentCuNumberEditText?.text.isNullOrEmpty(),
+                            "CU Number is required",
+                            justification
+                        )
+                    }
 
-                val taxableAmountValidation = supportingDocumentTotalTaxableAmountEditText?.let {
-                    validateField(
-                        it,
-                        supportingDocumentTotalTaxableAmountEditText?.text.toString().toDoubleOrNull()?.let { it > 0 } ?: false,
-                        "Total Taxable Amount is required",
-                        justification
-                    )
-                }
+                    val taxableAmountValidation =
+                        supportingDocumentTotalTaxableAmountEditText?.let {
+                            validateField(
+                                it,
+                                supportingDocumentTotalTaxableAmountEditText?.text.toString()
+                                    .toDoubleOrNull()?.let { it > 0 } ?: false,
+                                "Total Taxable Amount is required",
+                                justification
+                            )
+                        }
 
-                val taxValidation = supportingDocumentTotalTaxEditText?.let {
-                    validateField(
-                        it,
-                        supportingDocumentTotalTaxEditText?.text.toString().toDoubleOrNull()?.let { it > 0 } ?: false,
-                        "Total Tax is required",
-                        justification
-                    )
-                }
+                    val taxValidation = supportingDocumentTotalTaxEditText?.let {
+                        validateField(
+                            it,
+                            supportingDocumentTotalTaxEditText?.text.toString().toDoubleOrNull()
+                                ?.let { it > 0 } ?: false,
+                            "Total Tax is required",
+                            justification
+                        )
+                    }
 
-                cuNumberValidation == true && taxableAmountValidation == true && taxValidation == true
-            } else true
+                    cuNumberValidation == true && taxableAmountValidation == true && taxValidation == true
+                } else true
 
             val totalAmountValidation = supportingDocumentTotalAmountEditText?.let {
                 validateField(
                     it,
-                    supportingDocumentTotalAmountEditText?.text.toString().toDoubleOrNull()?.let { it > 0 } ?: false,
+                    supportingDocumentTotalAmountEditText?.text.toString().toDoubleOrNull()
+                        ?.let { it > 0 } ?: false,
                     "Total Amount is required",
                     justification
                 )
@@ -1119,7 +1348,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
             val amountsEquality =
                 amountValidation?.let { checkAmountsEquality(it, totalAmountValidation == true) }
-            if(!amountsEquality!!){
+            if (!amountsEquality!!) {
                 justification.add("Total Amount In Support Document and Amount fields do not match")
             }
 
@@ -1138,29 +1367,33 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             false
         }
 
-        val overallValidation = amountValidation == true && dateValidation == true && companyValidation &&
-                pettyCashNoValidation == true && transactorValidation && accountValidation && descriptionValidation == true &&
-                supportingDocumentValidations && mpesaTransactionValidation && trucksValidation == true
+        val overallValidation =
+            amountValidation == true && dateValidation == true && companyValidation &&
+                    pettyCashNoValidation == true && transactorValidation && accountValidation && descriptionValidation == true &&
+                    supportingDocumentValidations && mpesaTransactionValidation && trucksValidation == true
 
         return if (overallValidation) {
             createSaveSuccessfulDialog("Petty Cash Saved Successfully")
             successfulDialog?.show()
             true
         } else {
-            createSaveErrorDialog(R.drawable.baseline_warning_amber_white_24dp, "Error", justification)
+            createSaveErrorDialog(
+                R.drawable.baseline_warning_amber_white_24dp,
+                "Error",
+                justification
+            )
             saveErrorDialog?.show()
             false
         }
     }
 
-    private fun savePettyCashToDb(pettyCash: PettyCash){
+    private fun savePettyCashToDb(pettyCash: PettyCash) {
         PettyCash.insertPettyCashToDb(pettyCash, requireContext())
     }
 
-    private fun updatePettyCashInDb(pettyCash: PettyCash){
+    private fun updatePettyCashInDb(pettyCash: PettyCash) {
         PettyCash.updatePettyCashInDb(pettyCash, requireContext(), updateSupportingDocumentFlag)
     }
-
 
 
     private fun createPettyCashObject(): PettyCash {
@@ -1180,7 +1413,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
         var supportingDocumentId = dbHelper!!.getLatestSupportingDocumentId() + 1
 
-        if (pettyCash?.supportingDocument?.id != null){
+        if (pettyCash?.supportingDocument?.id != null) {
             supportingDocumentId = pettyCash?.supportingDocument?.id!!
         }
 
@@ -1191,9 +1424,12 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 documentNo = supportingDocumentNumberEditText?.text.toString(),
                 documentDate = supportingDocumentDateEditText?.text.toString(),
                 supplierName = supportingDocumentSupplierName?.text.toString(),
-                taxableTotalAmount = supportingDocumentTotalTaxableAmountEditText?.text.toString().toDoubleOrNull() ?: 0.0,
-                taxAmount = supportingDocumentTotalTaxEditText?.text.toString().toDoubleOrNull() ?: 0.0,
-                totalAmount = supportingDocumentTotalAmountEditText?.text.toString().toDoubleOrNull() ?: 0.0,
+                taxableTotalAmount = supportingDocumentTotalTaxableAmountEditText?.text.toString()
+                    .toDoubleOrNull() ?: 0.0,
+                taxAmount = supportingDocumentTotalTaxEditText?.text.toString().toDoubleOrNull()
+                    ?: 0.0,
+                totalAmount = supportingDocumentTotalAmountEditText?.text.toString()
+                    .toDoubleOrNull() ?: 0.0,
                 cuNumber = supportingDocumentCuNumberEditText?.text.toString(),
                 imagePath1 = selectedImagesPath.getOrNull(0),
                 imagePath2 = selectedImagesPath.getOrNull(1),
@@ -1203,13 +1439,16 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             null
         }
 
-        var amount = amountEditText?.text.toString().substringBefore(" KES").replace(",", "").toDouble()
-        if (chipGroup?.checkedChipId?.let { chipGroup?.findViewById<Chip>(it)?.text.toString().trim() } == "M-Pesa") {
+        var amount =
+            amountEditText?.text.toString().substringBefore(" KES").replace(",", "").toDouble()
+        if (chipGroup?.checkedChipId?.let {
+                chipGroup?.findViewById<Chip>(it)?.text.toString().trim()
+            } == "M-Pesa") {
             //amount += globalMpesaTransaction?.transactionCost!!
         }
 
         var pettyCashId: Int? = null
-        if(pettyCash?.id != null){
+        if (pettyCash?.id != null) {
             pettyCashId = pettyCash!!.id
         }
 
@@ -1247,11 +1486,12 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             println("in here in change")
         }
 
-        if(dbHelper == null){
+        if (dbHelper == null) {
             dbHelper = DbHelper(requireContext())
         }
 
-        val transactionCostAccount: Account? = dbHelper!!.getTransactionCostAccountByOwner(ownerCode)
+        val transactionCostAccount: Account? =
+            dbHelper!!.getTransactionCostAccountByOwner(ownerCode)
 
 
 
@@ -1282,12 +1522,14 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
         println("Selected Trucks String: $selectedTrucksString")
 
-        if (selectedTrucksString.trim() == "Select All ,"){
+        if (selectedTrucksString.trim() == "Select All ,") {
             return dbHelper!!.getLocalTrucksByOwner(globalSelectedOwner).toMutableList()
         }
 
         return selectedTrucksString.split(" ,")
-            .mapNotNull { it.trim().takeIf { it.isNotEmpty() }?.let { dbHelper?.getTruckByTruckNumber(it) } }
+            .mapNotNull {
+                it.trim().takeIf { it.isNotEmpty() }?.let { dbHelper?.getTruckByTruckNumber(it) }
+            }
             .toMutableList()
     }
 
@@ -1330,11 +1572,15 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     }
 
 
-    private fun checkAmountsEquality(amountValidation: Boolean, totalAmountValidation: Boolean): Boolean {
-        if(amountValidation && totalAmountValidation){
+    private fun checkAmountsEquality(
+        amountValidation: Boolean,
+        totalAmountValidation: Boolean
+    ): Boolean {
+        if (amountValidation && totalAmountValidation) {
             println("here we go")
-            return amountEditText?.text.toString().substringBefore(" KES").replace(",", "").toDouble() == supportingDocumentTotalAmountEditText?.text.toString().toDouble()
-        }else{
+            return amountEditText?.text.toString().substringBefore(" KES").replace(",", "")
+                .toDouble() == supportingDocumentTotalAmountEditText?.text.toString().toDouble()
+        } else {
             return false
         }
 
@@ -1351,15 +1597,24 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             }
         }
 
-        val documentTypes = listOf("Tax Invoice", "Non-Tax Invoice", "Tax Cash Receipt", "Non-Tax Cash Receipt")
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, documentTypes)
+        val documentTypes =
+            listOf("Tax Invoice", "Non-Tax Invoice", "Tax Cash Receipt", "Non-Tax Cash Receipt")
+        val adapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_dropdown_item_1line,
+            documentTypes
+        )
 
         supportingDocumentTypeAutoCompleteTextView?.setAdapter(adapter)
 
-        supportingDocumentDateTextInputLayout?.let { supportingDocumentDateEditText?.let { it1 ->
-            setupDatePickerForField(it,
-                it1, requireActivity().supportFragmentManager)
-        } }
+        supportingDocumentDateTextInputLayout?.let {
+            supportingDocumentDateEditText?.let { it1 ->
+                setupDatePickerForField(
+                    it,
+                    it1, requireActivity().supportFragmentManager
+                )
+            }
+        }
 
     }
 
@@ -1423,21 +1678,32 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                         val selectedTransaction = adapter.getItem(position)
                         globalMpesaTransaction = selectedTransaction
 
-                        mpesaTransactionAutoCompleteTextView?.setText(selectedTransaction?.mpesa_code, false)
-                        selectedTransaction?.amount?.let { amountEditText?.let { it1 ->
-                            simulateTyping(
-                                it1, it)
-                        } }
+                        mpesaTransactionAutoCompleteTextView?.setText(
+                            selectedTransaction?.mpesa_code,
+                            false
+                        )
+                        selectedTransaction?.amount?.let {
+                            amountEditText?.let { it1 ->
+                                simulateTyping(
+                                    it1, it
+                                )
+                            }
+                        }
                         amountEditText?.isEnabled = false
                         pettyCashDateEditText?.setText(selectedTransaction?.transaction_date)
-                        pettyCashDateTextInputLayout?.let { pettyCashDateEditText?.let { it1 ->
-                            showDatePickerCorrespondingToEditText(it,
-                                it1, requireActivity().supportFragmentManager)
-                        } }
-                        val name = getTitleTextByTransactionTypeWithoutFormatting(selectedTransaction!!)
+                        pettyCashDateTextInputLayout?.let {
+                            pettyCashDateEditText?.let { it1 ->
+                                showDatePickerCorrespondingToEditText(
+                                    it,
+                                    it1, requireActivity().supportFragmentManager
+                                )
+                            }
+                        }
+                        val name =
+                            getTitleTextByTransactionTypeWithoutFormatting(selectedTransaction!!)
 
                         println(name)
-                        if(dbHelper == null){
+                        if (dbHelper == null) {
                             dbHelper = DbHelper(requireContext())
                         }
                         val selectedTransactor = dbHelper!!.getTransactorByName(name.trim())
@@ -1467,8 +1733,10 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     private fun expandLayout(layout: View) {
         layout.visibility = View.VISIBLE
 
-        val matchParentMeasureSpec = View.MeasureSpec.makeMeasureSpec((view?.width ?: 0), View.MeasureSpec.EXACTLY)
-        val wrapContentMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        val matchParentMeasureSpec =
+            View.MeasureSpec.makeMeasureSpec((view?.width ?: 0), View.MeasureSpec.EXACTLY)
+        val wrapContentMeasureSpec =
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         layout.measure(matchParentMeasureSpec, wrapContentMeasureSpec)
 
         val targetHeight = layout.measuredHeight
@@ -1528,8 +1796,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         // Set up the scanner options for document scanning
         val options = GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(false)  // Disable gallery import
-            .setPageLimit(2)                 // Limit number of pages
-            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG, GmsDocumentScannerOptions.RESULT_FORMAT_PDF)  // Output formats
+            .setPageLimit(3)                 // Limit number of pages
+            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)  // Output formats
             .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)  // Full page scanning
             .build()
 
@@ -1541,7 +1809,11 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
             }
             .addOnFailureListener {
-                Toast.makeText(requireContext(), "Failed to start document scanner", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    "Failed to start document scanner",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
     }
 
@@ -1555,7 +1827,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                     val result = IntentIntegrator.parseActivityResult(Activity.RESULT_OK, data)
                     println("Result: $result")
                     result?.contents?.let { qrContent ->
-                        val invoiceNoPattern = "https://itax.kra.go.ke/KRA-Portal/invoiceChk.htm\\?actionCode=loadPage&invoiceNo=([\\d]+)"
+                        val invoiceNoPattern =
+                            "https://itax.kra.go.ke/KRA-Portal/invoiceChk.htm\\?actionCode=loadPage&invoiceNo=([\\d]+)"
                         val regex = Regex(invoiceNoPattern)
                         val matchResult = regex.find(qrContent)
 
@@ -1565,18 +1838,45 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                             println("Invoice No: $invoiceNo")
                             getNewSessionCookie(invoiceNo)
                         } else {
-                            Toast.makeText(requireContext(), "Invalid QR Code", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(requireContext(), "Invalid QR Code", Toast.LENGTH_SHORT)
+                                .show()
                         }
                     } ?: run {
-                        Toast.makeText(requireContext(), "Invalid QR Code", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), "Invalid QR Code", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 }
+
                 IMAGE_REQUEST_CODE -> {
-                    val imageUri: Uri? = data.data
-                    imageUri?.let {
-                        handleAndSaveImage(it)
+
+                    val imageUri = data.data
+                    imageUri?.let { uri ->
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            try {
+                                // First compress the image
+                                val compressedPath = compressAndSaveImage(uri)
+
+                                compressedPath?.let { path ->
+                                    withContext(Dispatchers.Main) {
+                                        // Now handle the compressed image
+                                        handleAndSaveImage(uri)
+                                    }
+                                } ?: run {
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(context, "Failed to process image", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error processing gallery image: ${e.message}")
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "Error processing image", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     }
+
                 }
+
                 CAMERA_REQUEST_CODE -> {
                     val imageUri: Uri? = data.getParcelableExtra("imageUri")
                     imageUri?.let {
@@ -1587,17 +1887,69 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         }
     }
 
-    private fun handleAndSaveImage(imageUri: Uri) {
-        val savedFilePath = saveImageAsFile(imageUri)
-        if (savedFilePath != null) {
-            selectedImagesPath.add(savedFilePath) // Add file path instead of URI
-            addImageToLayout(Uri.fromFile(File(savedFilePath))) // Pass Uri for display if needed
+    private fun handleAndSaveImage(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Get input stream from URI
+                requireContext().contentResolver.openInputStream(uri)?.use { input ->
+                    // Decode image bounds without loading full image
+                    val options = BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
+                    }
+                    BitmapFactory.decodeStream(input, null, options)
+                    
+                    // Calculate scale factor
+                    val targetSize = 800 // Max dimension
+                    val scaleFactor = calculateScaleFactor(options.outWidth, options.outHeight, targetSize)
+                    
+                    // Decode scaled bitmap
+                    requireContext().contentResolver.openInputStream(uri)?.use { input2 ->
+                        val bitmap = BitmapFactory.Options().apply {
+                            inSampleSize = scaleFactor
+                        }.let { scaleOptions ->
+                            BitmapFactory.decodeStream(input2, null, scaleOptions)
+                        }
+
+                        // Save scaled bitmap
+                        val savedFilePath = compressAndSaveImage(uri)
+                        
+                        withContext(Dispatchers.Main) {
+                            savedFilePath?.let { path ->
+                                selectedImagesPath.add(path)
+                                selectedImagesUri.add(uri)
+                                addImageToLayout(uri)
+                                
+                                Log.d(TAG, """
+                                    Image processed successfully:
+                                    Original size: ${options.outWidth}x${options.outHeight}
+                                    Scale factor: $scaleFactor
+                                    Path: $path
+                                """.trimIndent())
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling image: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error processing image", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
+    }
+
+    private fun calculateScaleFactor(width: Int, height: Int, targetSize: Int): Int {
+        var scale = 1
+        while (width / scale > targetSize || height / scale > targetSize) {
+            scale *= 2
+        }
+        return scale
     }
 
 
     // This function will detect the document and return the modified Bitmap
     private fun addImageToLayout(imageUri: Uri) {
+
         // Create a new FrameLayout to hold the image and the close icon
         val frameLayout = FrameLayout(requireContext())
 
@@ -1613,6 +1965,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         val imageView = ShapeableImageView(requireContext())
         imageView.layoutParams = FrameLayout.LayoutParams(110.dpToPx(), 110.dpToPx())
         imageView.scaleType = ImageView.ScaleType.CENTER_CROP
+
+
         imageView.setImageURI(imageUri)
 
         // Set rounded corners using ShapeAppearanceModel
@@ -1652,7 +2006,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         if (selectedImagesUri.isNotEmpty()) {
             addImageIcon?.visibility = View.GONE
             horizontalScrollView?.visibility = View.VISIBLE
-        }else{
+        } else {
             addImageIcon?.visibility = View.VISIBLE
             horizontalScrollView?.visibility = View.GONE
         }
@@ -1682,7 +2036,10 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         val initialSelection = if (existingDateText.isNotBlank()) {
             // Parse the existing date string to milliseconds
             try {
-                val existingDate = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).parse(existingDateText)
+                val existingDate =
+                    SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).parse(
+                        existingDateText
+                    )
                 existingDate?.time ?: today // Use existing date or fallback to today
             } catch (e: ParseException) {
                 today // If parsing fails, fallback to today's date
@@ -1704,20 +2061,19 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         // Handle the selected date
         datePicker.addOnPositiveButtonClickListener { selection ->
             // Convert the selected date (in milliseconds) to a formatted string
-            val selectedDate = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date(selection))
+            val selectedDate =
+                SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date(selection))
             // Set the selected date to the EditText
             dateEditText.setText(selectedDate)
         }
 
         // Set today's date by default in the TextInputEditText if no other date is set
         if (existingDateText.isBlank()) {
-            val defaultDate = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date(today))
+            val defaultDate =
+                SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date(today))
             dateEditText.setText(defaultDate)
         }
     }
-
-
-
 
 
     private fun setUpAccountsAutoCompleteTextView() {
@@ -1774,16 +2130,14 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     }
 
 
-
-
-
     private fun setupTrucksAutoCompleteTextView() {
         var truckNoList = trucks.map { it.truckNo }.toMutableList()
         println("Trucks: $truckNoList")
-        if (trucks.size > 1){
-            truckNoList.add("All")
+        if (trucks.size > 1) {
+            truckNoList.add("Select All")
         }
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, truckNoList)
+        val adapter =
+            ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, truckNoList)
         trucksAutoCompleteTextView?.setAdapter(adapter)
 
         // Use a custom tokenizer to simulate "chips"
@@ -1819,11 +2173,15 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         // Check if the text ends with a comma and space
         if (trimmedText.endsWith(",") || trimmedText.endsWith(", ") || trimmedText.endsWith(".")) {
             // Find the index of the last truck number before the comma
-            val lastCommaIndex = trimmedText.lastIndexOf(", ", trimmedText.length - 3) // Second-last comma
+            val lastCommaIndex =
+                trimmedText.lastIndexOf(", ", trimmedText.length - 3) // Second-last comma
 
             // If there is a second-last comma, remove the last truck number
             if (lastCommaIndex != -1) {
-                val updatedText = trimmedText.substring(0, lastCommaIndex + 2) // Keep text up to the second-last comma and space
+                val updatedText = trimmedText.substring(
+                    0,
+                    lastCommaIndex + 2
+                ) // Keep text up to the second-last comma and space
                 autoCompleteTextView.setText(updatedText)
                 autoCompleteTextView.setSelection(updatedText.length) // Move cursor to end
             } else {
@@ -1886,8 +2244,6 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     }
 
 
-
-
     private fun getOwners(): MutableList<Owner> {
         if (dbHelper == null) {
             dbHelper = DbHelper(requireContext())
@@ -1896,7 +2252,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
     }
 
-    private fun getTrucks(): MutableList<Truck>{
+    private fun getTrucks(): MutableList<Truck> {
 
         if (dbHelper == null) {
             dbHelper = DbHelper(requireContext())
@@ -1904,7 +2260,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         return dbHelper?.getLocalTrucks()!!.toMutableList()
     }
 
-    private fun setupCompanyCarousel() { val carouselLayoutManager = CarouselLayoutManager()
+    private fun setupCompanyCarousel() {
+        val carouselLayoutManager = CarouselLayoutManager()
         ownerCarouselRecyclerView?.layoutManager = carouselLayoutManager
 
         // Attach CarouselSnapHelper to RecyclerView
@@ -1920,24 +2277,32 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             }
 
             globalSelectedOwner = selectedOwner
-            Toast.makeText(requireContext(), "Selected: ${selectedOwner.name}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Selected: ${selectedOwner.name}", Toast.LENGTH_SHORT)
+                .show()
             trucks = getTrucksByOwner(selectedOwner)
             setUpPettyCashNo(selectedOwner.ownerCode)
             var truckNoList = trucks.map { it.truckNo }.toMutableList()
             println("Trucks: $truckNoList")
-            if (trucks.size > 1){
+            if (trucks.size > 1) {
                 truckNoList.add("Select All")
             }
-            val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, truckNoList )
+            val adapter = ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_dropdown_item_1line,
+                truckNoList
+            )
             trucksAutoCompleteTextView?.setAdapter(adapter)
             ownerCarouselAdapter?.setSelectedPosition(position) // Update selected position
         }
 
         ownerCarouselRecyclerView?.adapter = ownerCarouselAdapter
-        Log.d(TAG, "Adapter set with ${owners.size} owners") // Log the number of owners set in the adapter
+        Log.d(
+            TAG,
+            "Adapter set with ${owners.size} owners"
+        ) // Log the number of owners set in the adapter
     }
 
-    private fun getTrucksByOwner(owner: Owner): MutableList<Truck>{
+    private fun getTrucksByOwner(owner: Owner): MutableList<Truck> {
         if (dbHelper == null) {
             dbHelper = DbHelper(requireContext())
         }
@@ -2021,7 +2386,10 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                             current = if (decimalPlacesCount == 0 && cleanString.endsWith(".")) {
                                 formattedWholePart + "." // Just add the decimal, no zero
                             } else if (decimalPlacesCount > 2) {
-                                formattedWholePart + "." + decimalPart.substring(0, 2) // Limit decimal to 2 digits
+                                formattedWholePart + "." + decimalPart.substring(
+                                    0,
+                                    2
+                                ) // Limit decimal to 2 digits
                             } else {
                                 formattedWholePart + (if (decimalPlacesCount > 0) "." + decimalPart else "")
                             }
@@ -2074,10 +2442,9 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
     // Custom function to format numbers with commas without decimals
     private fun formatNumberWithoutDecimals(value: Double): String {
-        return NumberFormat.getNumberInstance(Locale.US).format(value.toLong()) // Format as whole number
+        return NumberFormat.getNumberInstance(Locale.US)
+            .format(value.toLong()) // Format as whole number
     }
-
-
 
 
     private fun searchTransactors(query: String) {
@@ -2092,12 +2459,15 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                 progressBar?.visibility = View.GONE // Hide spinner when search is done
 
                 // Prepare the list of results and always add "Add new transactor" option at the end
-                val transactorNames = results.map { it.name?.let { it1 -> capitalizeEachWord(it1) } }.toMutableList()
-                val transactorMap = results.associateBy { it.name?.let { it1 ->
-                    capitalizeEachWord(
-                        it1
-                    )
-                } } // Create a map for easy access
+                val transactorNames =
+                    results.map { it.name?.let { it1 -> capitalizeEachWord(it1) } }.toMutableList()
+                val transactorMap = results.associateBy {
+                    it.name?.let { it1 ->
+                        capitalizeEachWord(
+                            it1
+                        )
+                    }
+                } // Create a map for easy access
 
                 // Always add "Add new transactor" option at the end
                 if (!transactorNames.contains("Add a new transactor")) {
@@ -2198,11 +2568,11 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     }
 
     fun isNetworkAvailable(): Boolean {
-        val connectivityManager = requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connectivityManager =
+            requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val activeNetworkInfo = connectivityManager.activeNetworkInfo
         return activeNetworkInfo != null && activeNetworkInfo.isConnected
     }
-
 
 
     // Function to get a new session cookie by making a GET request asynchronously
@@ -2230,7 +2600,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             override fun onFailure(call: Call, e: IOException) {
                 Log.e(TAG, "Failed to get session cookie: ${e.message}")
                 loadingDialog.dismiss()
-                val justification = listOf("Failed to get session cookie: ${e.message}, Please try again.")
+                val justification =
+                    listOf("Failed to get session cookie: ${e.message}, Please try again.")
                 requireActivity().runOnUiThread {
                     createSaveErrorDialog(
                         R.drawable.baseline_warning_amber_white_24dp,
@@ -2282,13 +2653,15 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         }
 
 
-
         // Create OkHttp client
         val client = OkHttpClient()
 
         // Create POST request body
         val requestBody = FormBody.Builder()
-            .add("invNo", invoiceNo)  // This replicates the --data-urlencode part of the cURL command
+            .add(
+                "invNo",
+                invoiceNo
+            )  // This replicates the --data-urlencode part of the cURL command
             .build()
 
         // Build the POST request with all the headers from the cURL command, except the Accept-Encoding (which OkHttp handles)
@@ -2302,11 +2675,17 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             .addHeader("Cookie", sessionCookie)  // Use the session cookie obtained earlier
             .addHeader("Host", "itax.kra.go.ke")
             .addHeader("Origin", "https://itax.kra.go.ke")
-            .addHeader("Referer", "https://itax.kra.go.ke/KRA-Portal/invoiceNumberChecker.htm?actionCode=loadPageInvoiceNumber")
+            .addHeader(
+                "Referer",
+                "https://itax.kra.go.ke/KRA-Portal/invoiceNumberChecker.htm?actionCode=loadPageInvoiceNumber"
+            )
             .addHeader("Sec-Fetch-Dest", "empty")
             .addHeader("Sec-Fetch-Mode", "cors")
             .addHeader("Sec-Fetch-Site", "same-origin")
-            .addHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
+            .addHeader(
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+            )
             .addHeader("X-Requested-With", "XMLHttpRequest")
             .build()
 
@@ -2315,7 +2694,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             override fun onFailure(call: Call, e: IOException) {
                 Log.e(TAG, "Failed to make POST request: ${e.message}")
                 loadingDialog?.dismiss()
-                val justification = listOf("Failed to make POST request: ${e.message}, Please try again.")
+                val justification =
+                    listOf("Failed to make POST request: ${e.message}, Please try again.")
                 requireActivity().runOnUiThread {
                     createSaveErrorDialog(
                         R.drawable.baseline_warning_amber_white_24dp,
@@ -2422,10 +2802,14 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         supportingDocumentTypeAutoCompleteTextView?.setText(invCategory)
         supportingDocumentNumberEditText?.setText(traderSystemInvNo)
         supportingDocumentDateEditText?.setText(invDate)
-        supportingDocumentDateTextInputLayout?.let { supportingDocumentDateEditText?.let { it1 ->
-            showDatePickerCorrespondingToEditText(it,
-                it1, requireActivity().supportFragmentManager)
-        } }
+        supportingDocumentDateTextInputLayout?.let {
+            supportingDocumentDateEditText?.let { it1 ->
+                showDatePickerCorrespondingToEditText(
+                    it,
+                    it1, requireActivity().supportFragmentManager
+                )
+            }
+        }
         supportingDocumentTotalAmountEditText?.setText(totalInvAmt.toString())
         supportingDocumentSupplierName?.setText(supplierName)
         supportingDocumentCuNumberEditText?.setText(mwInvNo)
@@ -2433,12 +2817,6 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         supportingDocumentTotalTaxEditText?.setText(taxAmt.toString())
         //amountEditText.setText(totalInvAmt.toString())
         amountEditText?.let { simulateTyping(it, totalInvAmt) }
-
-
-
-
-
-
 
 
     }
@@ -2463,7 +2841,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         if (existingDateText.isNotBlank()) {
             try {
                 // Parse the existing date string to a Date object
-                val existingDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(existingDateText)
+                val existingDate =
+                    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(existingDateText)
                 Log.d("DatePicker", "Existing date: $existingDate")
 
                 // Adjust for UTC +3 timezone
@@ -2498,7 +2877,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         // Handle the selected date
         datePicker.addOnPositiveButtonClickListener { selection ->
             // Convert the selected date (in milliseconds) to a formatted string
-            val selectedDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selection))
+            val selectedDate =
+                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(selection))
 
             // Set the selected date to the EditText
             dateEditText.setText(selectedDate)
@@ -2508,9 +2888,6 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             Log.d("DatePicker", "Selected date: $selectedDate")
         }
     }
-
-
-
 
 
     private fun simulateTyping(editText: EditText, amount: Double, delay: Long = 100) {
@@ -2542,7 +2919,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
     private fun createLoadingDialog(): AlertDialog {
         // Create a custom view for the loading dialog
-        val customView = LayoutInflater.from(requireContext()).inflate(R.layout.loading_dialog, null)
+        val customView =
+            LayoutInflater.from(requireContext()).inflate(R.layout.loading_dialog, null)
         loadingText = customView.findViewById(R.id.loading_text)
         loadingText?.text = "Loading... Please Wait"
 
@@ -2557,7 +2935,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
     private fun createSaveErrorDialog(iconResId: Int, title: String, justification: List<String>) {
         // Inflate custom view for the save error dialog
-        val customView = LayoutInflater.from(requireContext()).inflate(R.layout.truck_dialog_save_error, null)
+        val customView =
+            LayoutInflater.from(requireContext()).inflate(R.layout.truck_dialog_save_error, null)
 
         // Find and set the icon, title, and message
         val iconImageView = customView.findViewById<ImageView>(R.id.error_icon)
@@ -2571,7 +2950,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         justification.forEach { justificationItem ->
             val bulletPointTextView = TextView(requireContext()).apply {
                 text = "• $justificationItem"
-                val textAppearance = androidx.constraintlayout.widget.R.style.TextAppearance_AppCompat_Body1
+                val textAppearance =
+                    androidx.constraintlayout.widget.R.style.TextAppearance_AppCompat_Body1
                 gravity = Gravity.CENTER_HORIZONTAL
             }
             detailsLinearLayout.addView(bulletPointTextView)
@@ -2589,7 +2969,8 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
     private fun createSaveSuccessfulDialog(successMessage: String) {
         // Inflate custom view for the loading dialog
-        val customView = LayoutInflater.from(requireContext()).inflate(R.layout.save_successful_dialog, null)
+        val customView =
+            LayoutInflater.from(requireContext()).inflate(R.layout.save_successful_dialog, null)
 
         // Set up loading text or any other views if needed
         val saveSuccessfullyText = customView.findViewById<TextView>(R.id.success_message_text)
@@ -2605,12 +2986,23 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     }
 
 
-
     private fun closeDialog() {
         dismiss()
     }
 
     companion object {
+        private const val MAX_IMAGE_SIZE = 800 // Maximum width/height for images
+        private const val PETTY_CASH_ID_KEY = "petty_cash_id"
+
+        fun newInstance(pettyCash: PettyCash, action: String): AddPettyCashFragment {
+            return AddPettyCashFragment().apply {
+                arguments = Bundle().apply {
+                    // Only store the ID and action instead of the entire PettyCash object
+                    putInt(PETTY_CASH_ID_KEY, pettyCash.id ?: -1)
+                    putString("action", action)
+                }
+            }
+        }
     }
 
     override fun onAddTransactor(transactor: Transactor) {
@@ -2638,5 +3030,43 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
     class SignatureViewModel : ViewModel() {
         val signatureBitmap = MutableLiveData<Bitmap?>()
+    }
+
+    private fun loadSignature(signature: String) {
+        try {
+            signature?.let { base64Signature ->
+                if (base64Signature.isNotEmpty()) {
+                    val decodedBytes = Base64.decode(base64Signature, Base64.DEFAULT)
+                    val signatureBitmap =
+                        BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+
+                    // Ensure the SignatureView is properly laid out
+                    binding.signatureView.post {
+                        try {
+                            binding.signatureView.setSignatureBitmap(signatureBitmap)
+                            Log.d("AddPettyCashFragment", "Signature loaded successfully")
+                        } catch (e: Exception) {
+                            Log.e(
+                                "AddPettyCashFragment",
+                                "Error setting signature bitmap: ${e.message}"
+                            )
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AddPettyCashFragment", "Error loading signature: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    private fun byteArrayToBitmap(byteArray: ByteArray): Bitmap? {
+        return try {
+            BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error converting byte array to bitmap: ${e.message}")
+            null
+        }
     }
 }

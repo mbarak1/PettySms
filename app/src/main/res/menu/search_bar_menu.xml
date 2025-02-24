@@ -5,7 +5,6 @@
     <item
         android:id="@+id/search_bar_options"
         android:icon="@drawable/baseline_tune_24"
-        android:title="Sort and Filter"
-        android:iconTint="?attr/colorControlNormal"
+        android:title="Filter"
         app:showAsAction="always" />
 </menu>

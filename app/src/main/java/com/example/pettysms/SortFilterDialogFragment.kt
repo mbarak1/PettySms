@@ -42,6 +42,13 @@ class SortFilterDialogFragment : DialogFragment() {
         super.onCreate(savedInstanceState)
         setStyle(STYLE_NORMAL, R.style.PrefsTheme)
 
+        // Get the map from arguments
+        @Suppress("UNCHECKED_CAST")
+        val mapFromActivity = arguments?.getSerializable("yourMapKey") as? HashMap<String, ArrayList<String>>
+        if (mapFromActivity != null) {
+            // Convert HashMap to MutableMap if needed
+            keyValueMap = mapFromActivity.mapValues { it.value.toMutableList() }.toMutableMap()
+        }
     }
 
 

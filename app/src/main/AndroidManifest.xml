@@ -128,6 +128,12 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <activity
+            android:name=".ViewAllPettyCashActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:label="All Petty Cash"
+            android:theme="@style/Theme.PettySMS" />
 
     </application>
 

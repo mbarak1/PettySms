@@ -5,7 +5,7 @@ import android.util.Log
 import com.example.pettysms.Transactor.Companion.toJson
 
 class PettyCash(
-    val id: Int?,
+    var id: Int?,
     var pettyCashNumber: String?,
     var date: String?,
     var amount: Double? = 0.00,

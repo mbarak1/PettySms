@@ -1,7 +1,11 @@
 package com.example.pettysms
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.graphics.PorterDuff
 import android.os.Bundle
@@ -27,6 +31,7 @@ import androidx.core.view.GravityCompat
 import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
@@ -45,6 +50,10 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import com.google.gson.Gson
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 
 /**
@@ -91,14 +100,73 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     private var accountsButton: Button? = null
     private var pettyCashRecyclerView: RecyclerView? = null
     private var noPettyCashMessageTextView: TextView? = null
+    private var viewAllLink: TextView? = null
 
-
-
+    // Add class level variables to track current filters
+    private var currentDateFilter = "Today"
+    private var currentPaymentModes = emptyList<String>()
+    private var currentSortOption = "Date"
+    private var currentCustomStartDate: String? = null
+    private var currentCustomEndDate: String? = null
 
     var dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
     var db = dbHelper?.writableDatabase
 
-
+    // Add broadcast receiver
+    private val pettyCashDeleteReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "pettycash_deleted_action") {
+                Log.d("PettyCashFragment", "Received petty cash delete broadcast")
+                
+                // Handle both main petty cash and transaction cost deletions
+                val idsToDelete = listOfNotNull(
+                    intent.getIntExtra("deleted_petty_cash_id", -1).takeIf { it != -1 },
+                    intent.getIntExtra("deleted_transaction_cost_id", -1).takeIf { it != -1 }
+                )
+                
+                if (idsToDelete.isNotEmpty()) {
+                    try {
+                        var anyItemRemoved = false
+                        // Remove all deleted items from lists and adapters
+                        idsToDelete.forEach { deletedId ->
+                            Log.d("PettyCashFragment", "Processing deletion for ID: $deletedId")
+                            
+                            // Find position in adapter's list
+                            pettyCashAdapter?.let { adapter ->
+                                val position = adapter.findItemIndexById(deletedId)
+                                Log.d("PettyCashFragment", "Position in adapter: $position")
+                                
+                                if (position != -1) {
+                                    // Remove from adapter
+                                    adapter.removeItem(deletedId)
+                                    anyItemRemoved = true
+                                    Log.d("PettyCashFragment", "Removed item $deletedId from adapter")
+                                }
+                            }
+                            
+                            // Also remove from fragment's list if it exists
+                            val listPosition = pettyCashList?.indexOfFirst { it.id == deletedId }
+                            if (listPosition != -1) {
+                                listPosition?.let {
+                                    pettyCashList?.removeAt(it)
+                                    Log.d("PettyCashFragment", "Removed item $deletedId from fragment list")
+                                }
+                            }
+                        }
+                        
+                        if (anyItemRemoved) {
+                            // Update empty state and related UI only if items were actually removed
+                            updateEmptyState()
+                            Log.d("PettyCashFragment", "Updated UI after deletions, remaining items: ${pettyCashList?.size}")
+                        }
+                        
+                    } catch (e: Exception) {
+                        Log.e("PettyCashFragment", "Error handling deletion: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         setHasOptionsMenu(true) // Enable options menu in fragment
@@ -129,6 +197,7 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         constraintLayout = binding.frameLayout2
         appBarLayout = binding.appBarLayoutPettyCash
         noPettyCashMessageTextView = binding.noPettyCashMessage
+        viewAllLink = binding.viewAllLink
 
         dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
         db = dbHelper?.writableDatabase
@@ -226,11 +295,65 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
             }
         }
 
+        // Set up click listener for view all
+        viewAllLink?.setOnClickListener {
+            val intent = Intent(requireContext(), ViewAllPettyCashActivity::class.java)
+            startActivity(intent)
+        }
 
         // Inflate the layout for this fragment
         return binding.root
     }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        // Register receiver
+        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
+            pettyCashDeleteReceiver,
+            IntentFilter("pettycash_deleted_action")
+        )
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+
+        // Nullify the view binding (if using ViewBinding)
+        _binding = null
+
+        // Nullify other references to prevent memory leaks
+        pettyCashRecyclerView?.adapter = null // This is usually done when clearing references to adapters
+        pettyCashAdapter = null // Nullify the adapter reference
+        notCheckedTransactions = null // Nullify the list or object reference
+
+        constraintLayout = null
+        dbHelper = null
+        db = null
+        floatingActionButton = null
+        nestedScrollView = null
+        toolbar = null
+        appBarLayout = null
+        dotIndicator = null
+        viewPager = null
+        cashImage = null
+        cashLabel= null
+        mpesaImage= null
+        dbDotImageView = null
+        dbStatusTextLabel = null
+        qbImageView = null
+        qbStatusTextLabel= null
+        loadingDialog= null
+        loadingText = null
+        truckButton= null
+        ownerButton= null
+        transactorsButton = null
+        accountsButton= null
+        pettyCashRecyclerView = null
+        viewAllLink = null
+
+        // Unregister receiver
+        LocalBroadcastManager.getInstance(requireContext())
+            .unregisterReceiver(pettyCashDeleteReceiver)
+    }
 
     private fun mainTask() {
         lifecycleScope.launch(Dispatchers.IO) {
@@ -326,43 +449,6 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     override fun onStop() {
         super.onStop()
         FragmentVisibilityTracker.isPettyCashFragmentVisible = false
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-
-        // Nullify the view binding (if using ViewBinding)
-        _binding = null
-
-        // Nullify other references to prevent memory leaks
-        pettyCashRecyclerView?.adapter = null // This is usually done when clearing references to adapters
-        pettyCashAdapter = null // Nullify the adapter reference
-        notCheckedTransactions = null // Nullify the list or object reference
-
-        constraintLayout = null
-        dbHelper = null
-        db = null
-        floatingActionButton = null
-        nestedScrollView = null
-        toolbar = null
-        appBarLayout = null
-        dotIndicator = null
-        viewPager = null
-        cashImage = null
-        cashLabel= null
-        mpesaImage= null
-        dbDotImageView = null
-        dbStatusTextLabel = null
-        qbImageView = null
-        qbStatusTextLabel= null
-        loadingDialog= null
-        loadingText = null
-        truckButton= null
-        ownerButton= null
-        transactorsButton = null
-        accountsButton= null
-        pettyCashRecyclerView = null
-
     }
 
     private fun loadPettyCashData(limit: Int, offset: Int): MutableList<PettyCash> {
@@ -687,6 +773,8 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
 
     companion object {
         const val SERVER_IP = "api.abdulcon.com"
+        const val PETTY_CASH_VIEWER_REQUEST = 1001
+        var updatedPettyCashIds = mutableSetOf<Int>()  // Store updated petty cash IDs
     }
 
     object FragmentVisibilityTracker {
@@ -718,6 +806,185 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         }
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Log.d("PettyCashFragment", "onActivityResult called")
 
+        try {
+            if (requestCode == PETTY_CASH_VIEWER_REQUEST && resultCode == Activity.RESULT_OK) {
+                data?.let { intent ->
+                    val pettyCashId = intent.getIntExtra("updated_petty_cash_id", -1)
+                    val transactionCostId = intent.getIntExtra("transaction_cost_id", -1)
+
+                    if (pettyCashId != -1) {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            try {
+                                // Fetch updated petty cash from database
+                                val updatedPettyCash = dbHelper?.getPettyCashById(pettyCashId)
+                                
+                                // Fetch transaction cost if present
+                                val transactionCost = if (transactionCostId != -1) {
+                                    dbHelper?.getPettyCashById(transactionCostId)
+                                } else null
+
+                                withContext(Dispatchers.Main) {
+                                    // Update UI with fetched data
+                                    updatedPettyCash?.let { pettyCash ->
+                                        pettyCashAdapter?.findItemIndexById(pettyCash.id!!)?.let { index ->
+                                            pettyCashAdapter?.updateItem(index, pettyCash)
+                                            Log.d("PettyCashFragment", "Updated main petty cash at position: $index")
+                                        }
+                                    }
+
+                                    // Update transaction cost if present
+                                    transactionCost?.let { tc ->
+                                        pettyCashAdapter?.findItemIndexById(tc.id!!)?.let { index ->
+                                            pettyCashAdapter?.updateItem(index, tc)
+                                            Log.d("PettyCashFragment", "Updated transaction cost at position: $index")
+                                        }
+                                    }
+
+                                    // Scroll to show the updated item if needed
+                                    updatedPettyCash?.let { pettyCash ->
+                                        pettyCashAdapter?.findItemIndexById(pettyCash.id!!)?.let { index ->
+                                            pettyCashRecyclerView?.scrollToPosition(index)
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e("PettyCashFragment", "Error updating database: ${e.message}")
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        requireContext(),
+                                        "Error updating petty cash: ${e.message}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PettyCashFragment", "Error in onActivityResult: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d("PettyCashFragment", "onResume called")
+        
+        // Refresh the RecyclerView data
+        refreshPettyCashList()
+    }
+
+    private fun refreshPettyCashList() {
+        if (updatedPettyCashIds.isEmpty()) {
+            Log.d("PettyCashFragment", "No items to update")
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Get only the updated petty cash items
+
+
+                val updatedItems = updatedPettyCashIds.mapNotNull { id ->
+                    dbHelper?.getPettyCashById(id)
+                }
+
+                withContext(Dispatchers.Main) {
+                    if (updatedItems.isNotEmpty()) {
+                        // Update each modified item in the adapter
+                        updatedItems.forEach { pettyCash ->
+                            pettyCashAdapter?.findItemIndexById(pettyCash.id!!)?.let { index ->
+                                pettyCashAdapter?.updateItem(index, pettyCash)
+                                Log.d("PettyCashFragment", "Updated item at position: $index")
+                                
+                                // Scroll to the first updated item
+                                if (pettyCash.id == updatedItems.first().id) {
+                                    pettyCashRecyclerView?.scrollToPosition(index)
+                                }
+                            }
+                            // Remove from the update set after updating
+                            updatedPettyCashIds.remove(pettyCash.id)
+                        }
+
+                        // Update view pager and Mpesa card
+                        updateViewPagerData()
+                        updateMpesaCardDetails()
+
+                        Log.d("PettyCashFragment", """
+                            Updated specific items:
+                            Count: ${updatedItems.size}
+                            IDs: ${updatedItems.map { it.id }}
+                            Remaining Updates: ${updatedPettyCashIds.size}
+                        """.trimIndent())
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PettyCashFragment", "Error updating items: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        requireContext(),
+                        "Error updating items: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun updateViewPagerData() {
+        // Update view pager data if it exists
+        viewPager?.let { pager ->
+            pager.adapter?.notifyDataSetChanged()
+        }
+    }
+
+    // Update filter methods to save current state
+    fun updateFilters(
+        dateFilter: String,
+        paymentModes: List<String>,
+        sortOption: String,
+        customStartDate: String? = null,
+        customEndDate: String? = null
+    ) {
+        currentDateFilter = dateFilter
+        currentPaymentModes = paymentModes
+        currentSortOption = sortOption
+        currentCustomStartDate = customStartDate
+        currentCustomEndDate = customEndDate
+        
+        refreshPettyCashList()
+    }
+
+    private fun updateEmptyState() {
+        // Get the actual size from adapter
+        val currentListSize = pettyCashAdapter?.itemCount ?: 0
+        Log.d("PettyCashFragment", "Checking empty state - Adapter list size: $currentListSize")
+
+        if (currentListSize == 0) {
+            // Show empty state
+            noPettyCashMessageTextView?.visibility = View.VISIBLE
+            pettyCashRecyclerView?.visibility = View.GONE
+            viewAllLink?.visibility = View.GONE
+            Log.d("PettyCashFragment", "Showing empty state - list is empty")
+        } else {
+            // Show list
+            noPettyCashMessageTextView?.visibility = View.GONE
+            pettyCashRecyclerView?.visibility = View.VISIBLE
+            viewAllLink?.visibility = View.VISIBLE
+            Log.d("PettyCashFragment", "Showing list - $currentListSize items")
+        }
+
+        // Update UI components that depend on list state
+        updateViewPagerData()
+        updateMpesaCardDetails()
+
+        // No need for additional notifyDataSetChanged since adapter.removeItem already handles notifications
+        Log.d("PettyCashFragment", "Empty state updated, RecyclerView visibility: ${pettyCashRecyclerView?.visibility == View.VISIBLE}")
+    }
 
 }

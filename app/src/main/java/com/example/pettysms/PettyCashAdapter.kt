@@ -1,5 +1,6 @@
 package com.example.pettysms
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -36,7 +37,7 @@ import java.util.Locale
 
 class PettyCashAdapter(
     private val context: Context,
-    private val pettyCashList: MutableList<PettyCash>,
+    private var pettyCashList: MutableList<PettyCash>,
     private val fragmentManager: FragmentManager,
     private val pettyCashFragment: PettyCashFragment
 ) : RecyclerView.Adapter<PettyCashAdapter.PettyCashViewHolder>() {
@@ -70,12 +71,13 @@ class PettyCashAdapter(
         // Set up transactor name
         val formattedTransactorName = capitalizeEachWord(pettyCash.transactor?.name.toString())
         val colorPrimary = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorOnPrimary)
+        val colorSurfaceVariant = MaterialColors.getColor(holder.itemView, com.google.android.material.R.attr.colorSurfaceVariant)
 
         // Set lighter greyed-out style if pettyCashNumber is null or empty
         if (pettyCash.pettyCashNumber.isNullOrEmpty()) {
             holder.pettyCashConstraintLayout.apply {
                 alpha = 0.6f // Reduce opacity //Color.parseColor("#E0E0E0") // Lighter grey color
-                background = ColorDrawable(Color.parseColor("#E0E0E0"))
+                background = ColorDrawable(colorSurfaceVariant)
             }
             if (pettyCash.description?.contains("Mpesa Transaction Cost") == true){
                 holder.pettyCashCard.setOnClickListener{
@@ -118,11 +120,25 @@ class PettyCashAdapter(
 
 
         // Create chips
-        Log.d("PettyCashAdapter", "Petty Cash Trucks Json 3: " + Gson().toJson(pettyCash.trucks))
         createChip(holder.linearLayoutChips, pettyCash.pettyCashNumber ?: "N/A", colorPrimary, R.drawable.chip_gradient_border)
-        pettyCash.trucks?.forEach { truck ->
-            createChip(holder.linearLayoutChips, truck.truckNo ?: "N/A", colorPrimary, R.drawable.chip_gradient_border_truck)
+
+        val ownerTruckCount = pettyCash.owner?.let { owner ->
+            context.let { ctx ->
+                val dbHelper = DbHelper(ctx)
+                pettyCash.owner!!.ownerCode?.let { dbHelper.getTruckCountByOwner(it) }
+            }
+        } ?: 0
+
+
+        if (pettyCash.trucks?.size == ownerTruckCount){
+            createChip(holder.linearLayoutChips, "All Trucks", colorPrimary, R.drawable.chip_gradient_border_truck)
         }
+        else {
+            pettyCash.trucks?.forEach { truck ->
+                createChip(holder.linearLayoutChips, truck.truckNo ?: "N/A", colorPrimary, R.drawable.chip_gradient_border_truck)
+            }
+        }
+
         val chipTextViewUser = TextView(context).apply {
             text = pettyCash.user?.name ?: "N/A"
             setTextColor(colorPrimary)
@@ -335,14 +351,13 @@ class PettyCashAdapter(
         return date?.let { outputFormat.format(it) } ?: inputDate
     }
 
-    private fun openPettyCashViewerActivity(pettyCash: PettyCash){
-        Log.d("PettyCashAdapter", "Petty Cash Number Inside Onlcick 5: " + pettyCash.pettyCashNumber)
-        if (pettyCash.amount!! > 0){
-            Log.d("PettyCashAdapter", "Petty Cash Number Inside Onlcick 6: " + pettyCash.pettyCashNumber)
+    private fun openPettyCashViewerActivity(pettyCash: PettyCash) {
+        Log.d("PettyCashAdapter", "Opening PettyCashViewer for: ${pettyCash.pettyCashNumber}")
+        if (pettyCash.amount!! > 0) {
             val intent = Intent(context, PettyCashViewerActivity::class.java)
-            intent.putExtra("pettyCash", pettyCash.pettyCashNumber)
-            Log.d("PettyCashAdapter", "Petty Cash Number Inside Onlcick 7: " + pettyCash.id)
-            context.startActivity(intent)
+            intent.putExtra("petty_cash_number", pettyCash.pettyCashNumber)
+            Log.d("PettyCashAdapter", "Starting activity for result")
+            pettyCashFragment.startActivityForResult(intent, PettyCashFragment.PETTY_CASH_VIEWER_REQUEST)
         }
     }
 
@@ -361,13 +376,11 @@ class PettyCashAdapter(
             return
         }
 
-        val gson = Gson()
-        val pettyCashJson = gson.toJson(pettyCash)
         val dialogFragment = AddPettyCashFragment()
         dialogFragment.setOnAddPettyCashListener(pettyCashFragment)
 
         val bundle = Bundle().apply {
-            putString("pettyCash", pettyCashJson)  // Pass the PettyCash object
+            pettyCash.id?.let { putInt("pettyCash", it) }  // Pass the PettyCash object
             putString("action", actionType)  // Pass the action as a string (edit or any other value)
         }
 
@@ -391,8 +404,8 @@ class PettyCashAdapter(
     }
 
     // Find the index of an item by its ID
-    fun findItemIndexById(id: Int): Int? {
-        return pettyCashList.indexOfFirst { it.id == id }.takeIf { it >= 0 }
+    fun findItemIndexById(id: Int): Int {
+        return pettyCashList.indexOfFirst { it.id == id }
     }
 
     // Update an item at a specific index
@@ -410,4 +423,28 @@ class PettyCashAdapter(
     }
 
     override fun getItemCount(): Int = pettyCashList.size
+
+    fun removeItem(deletedId: Int) {
+        try {
+            val position = findItemIndexById(deletedId)
+            if (position != -1) {
+                pettyCashList.removeAt(position)
+                notifyItemRemoved(position)
+                // Notify a range to ensure proper animation and binding
+                notifyItemRangeChanged(position, pettyCashList.size)
+                Log.d("PettyCashAdapter", "Removed item at position $position, remaining items: ${pettyCashList.size}")
+            } else {
+                Log.d("PettyCashAdapter", "Item with ID $deletedId not found in current list")
+            }
+        } catch (e: Exception) {
+            Log.e("PettyCashAdapter", "Error removing item: ${e.message}")
+        }
+    }
+
+    fun updateList(newList: List<PettyCash>) {
+        pettyCashList.clear()
+        pettyCashList.addAll(newList)
+        notifyDataSetChanged()
+        Log.d("PettyCashAdapter", "Updated list with ${newList.size} items")
+    }
 }

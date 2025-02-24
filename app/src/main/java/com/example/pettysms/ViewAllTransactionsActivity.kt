@@ -195,6 +195,7 @@ class ViewAllTransactionsActivity : AppCompatActivity(), SortFilterDialogFragmen
                 // Change the status bar color to match the SearchView's surface color
                 this.window.statusBarColor = searchFocusedColor
                 println("is focused")
+                println("is focused")
             }
             else if (newState == SearchView.TransitionState.HIDDEN){
                 // Revert the status bar color to the default color
