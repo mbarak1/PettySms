@@ -854,43 +854,96 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     }
 
     override fun onAddPettyCash(pettyCash: PettyCash, transactionCostPettyCash: PettyCash?) {
-        Log.d("PettyCashFragment", "onAddPettyCash called")
-        println("Petty Cash Saved: ${pettyCash.id}")
+        Log.d("PettyCashFragment", "onAddPettyCash called for ID: ${pettyCash.id}")
         loadingDialog?.show()
 
         lifecycleScope.launch(Dispatchers.IO) {
-            // Retrieve the specific item from the database by its ID (adjust the method if needed)
-            val newOrUpdatedItem = pettyCash
-            val newOrUpdatetransactionCost = transactionCostPettyCash
-
-
-
-            withContext(Dispatchers.Main) {
-                newOrUpdatedItem.let {
-                    // If the adapter already has this item, update it; otherwise, add it to the beginning
-                    val existingIndex = it.id?.let { it1 -> pettyCashAdapter?.findItemIndexById(it1) }
-                    if (existingIndex != null && existingIndex >= 0) {
-                        pettyCashAdapter?.updateItem(existingIndex, it)
-                    } else {
-                        pettyCashAdapter?.addItemToTop(it)
-                        Log.d("PettyCashFragment", "New Petty Cash Added Trucks: " + it.trucks?.size)
-                        pettyCashRecyclerView?.scrollToPosition(0) // Scroll to show the new item
+            try {
+                // First, check if the item is in our current list
+                val existingIndex = pettyCashList?.indexOfFirst { it.id == pettyCash.id } ?: -1
+                val transactionCostIndex = transactionCostPettyCash?.id?.let { id ->
+                    pettyCashList?.indexOfFirst { it.id == id }
+                } ?: -1
+                
+                Log.d("PettyCashFragment", "Existing index: $existingIndex, Transaction cost index: $transactionCostIndex")
+                
+                if (existingIndex != -1 || transactionCostIndex != -1) {
+                    // At least one of the items is in our current list, so update them
+                    withContext(Dispatchers.Main) {
+                        try {
+                            // Update the specific items in our list
+                            if (existingIndex != -1) {
+                                pettyCashList?.set(existingIndex, pettyCash)
+                                pettyCashAdapter?.notifyItemChanged(existingIndex)
+                                Log.d("PettyCashFragment", "Updated item at index $existingIndex")
+                            }
+                            
+                            if (transactionCostIndex != -1 && transactionCostPettyCash != null) {
+                                pettyCashList?.set(transactionCostIndex, transactionCostPettyCash)
+                                pettyCashAdapter?.notifyItemChanged(transactionCostIndex)
+                                Log.d("PettyCashFragment", "Updated transaction cost at index $transactionCostIndex")
+                            }
+                            
+                            // Update UI
+                            updateEmptyState()
+                            updateViewPagerData()
+                            updateMpesaCardDetails()
+                            
+                            loadingDialog?.dismiss()
+                            Log.d("PettyCashFragment", "Successfully updated specific items")
+                        } catch (e: Exception) {
+                            Log.e("PettyCashFragment", "Error updating specific items: ${e.message}", e)
+                            loadingDialog?.dismiss()
+                        }
                     }
-                }
-
-                if (newOrUpdatetransactionCost !=  null){
-                    newOrUpdatetransactionCost.let {
-                        val existingIndex = it.id?.let { it1 -> pettyCashAdapter?.findItemIndexById(it1) }
-                        if (existingIndex != null && existingIndex >= 0) {
-                            pettyCashAdapter?.updateItem(existingIndex, it)
-                        } else {
-                            pettyCashAdapter?.addItemToTop(it)
-                            //pettyCashRecyclerView?.scrollToPosition(0) // Scroll to show the new item
+                } else {
+                    // Items are not in our current list, so refresh the first page
+                    Log.d("PettyCashFragment", "Items not in current list, refreshing first page")
+                    
+                    val freshData = dbHelper?.getAllPettyCash(
+                        1, pageSize, currentSortOption,
+                        currentDateFilter, currentPaymentModes,
+                        currentCustomStartDate, currentCustomEndDate
+                    )
+                    
+                    withContext(Dispatchers.Main) {
+                        try {
+                            // Replace the entire list with fresh data
+                            if (freshData != null && freshData.isNotEmpty()) {
+                                // Create a new list to avoid concurrent modification
+                                pettyCashList = freshData.toMutableList()
+                                
+                                // Update the adapter with the new list
+                                pettyCashAdapter?.updateList(pettyCashList ?: mutableListOf())
+                                
+                                Log.d("PettyCashFragment", "Refreshed entire list with ${pettyCashList?.size} items")
+                            } else {
+                                Log.d("PettyCashFragment", "No data returned from database refresh")
+                            }
+                            
+                            // Update UI
+                            updateEmptyState()
+                            updateViewPagerData()
+                            updateMpesaCardDetails()
+                            
+                            loadingDialog?.dismiss()
+                            Log.d("PettyCashFragment", "Successfully refreshed data after update")
+                        } catch (e: Exception) {
+                            Log.e("PettyCashFragment", "Error updating UI: ${e.message}", e)
+                            loadingDialog?.dismiss()
                         }
                     }
                 }
-
-                loadingDialog?.dismiss()
+            } catch (e: Exception) {
+                Log.e("PettyCashFragment", "Error updating items: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    loadingDialog?.dismiss()
+                    Toast.makeText(
+                        requireContext(),
+                        "Error updating items: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
