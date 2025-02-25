@@ -168,6 +168,113 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         }
     }
 
+    private val pettyCashAddedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d("PettyCashFragment", "Received broadcast with action: ${intent?.action}")
+            
+            // Dump all extras for debugging
+            intent?.extras?.keySet()?.forEach { key ->
+                Log.d("PettyCashFragment", "Intent extra: $key = ${intent.extras?.get(key)}")
+            }
+            
+            if (intent?.action == "petty_cash_added_action") {
+                Log.d("PettyCashFragment", "Processing petty cash added broadcast")
+                
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        // Make sure database is open
+                        dbHelper?.openDatabase()
+                        
+                        // Check if we have JSON data (for null IDs) or regular IDs
+                        val newPettyCashJson = intent.getStringExtra("new_petty_cash_json")
+                        val newTransactionCostJson = intent.getStringExtra("new_transaction_cost_json")
+                        
+                        // Variables to hold the petty cash objects
+                        var newPettyCash: PettyCash? = null
+                        var transactionCost: PettyCash? = null
+                        
+                        if (newPettyCashJson != null) {
+                            // Parse from JSON
+                            try {
+                                newPettyCash = Gson().fromJson(newPettyCashJson, PettyCash::class.java)
+                                Log.d("PettyCashFragment", "Parsed petty cash from JSON: ${newPettyCash?.id}")
+                                
+                                if (newTransactionCostJson != null) {
+                                    transactionCost = Gson().fromJson(newTransactionCostJson, PettyCash::class.java)
+                                    Log.d("PettyCashFragment", "Parsed transaction cost from JSON: ${transactionCost?.id}")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("PettyCashFragment", "Error parsing JSON: ${e.message}", e)
+                            }
+                        } else {
+                            // Get by ID
+                            val newPettyCashId = intent.getIntExtra("new_petty_cash_id", -1)
+                            val newTransactionCostId = intent.getIntExtra("new_transaction_cost_id", -1)
+                            
+                            try {
+                                if (newPettyCashId != -1) {
+                                    newPettyCash = dbHelper?.getPettyCashById(newPettyCashId)
+                                    Log.d("PettyCashFragment", "Retrieved petty cash by ID: $newPettyCashId, result: ${newPettyCash != null}")
+                                }
+                                
+                                if (newTransactionCostId != -1) {
+                                    transactionCost = dbHelper?.getPettyCashById(newTransactionCostId)
+                                    Log.d("PettyCashFragment", "Retrieved transaction cost by ID: $newTransactionCostId, result: ${transactionCost != null}")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("PettyCashFragment", "Error retrieving from database: ${e.message}", e)
+                            }
+                        }
+                        
+                        // Check if we have valid objects before updating UI
+                        if (newPettyCash == null) {
+                            Log.e("PettyCashFragment", "Failed to get valid petty cash object")
+                            return@launch
+                        }
+                        
+                        // Instead of modifying the existing list, let's reload the data
+                        // This avoids index out of bounds errors
+                        val freshData = dbHelper?.getAllPettyCash(1, pageSize, currentSortOption, 
+                            currentDateFilter, currentPaymentModes, 
+                            currentCustomStartDate, currentCustomEndDate)
+                        
+                        withContext(Dispatchers.Main) {
+                            try {
+                                // Replace the entire list with fresh data
+                                if (freshData != null && freshData.isNotEmpty()) {
+                                    // Create a new list to avoid concurrent modification
+                                    pettyCashList = freshData.toMutableList()
+                                    
+                                    // Update the adapter with the new list
+                                    pettyCashAdapter?.updateList(pettyCashList ?: mutableListOf())
+                                    
+                                    Log.d("PettyCashFragment", "Refreshed entire list with ${pettyCashList?.size} items")
+                                    
+                                    // Scroll to top
+                                    pettyCashRecyclerView?.scrollToPosition(0)
+                                } else {
+                                    Log.d("PettyCashFragment", "No data returned from database refresh")
+                                }
+                                
+                                // Update UI
+                                updateEmptyState()
+                                updateViewPagerData()
+                                updateMpesaCardDetails()
+                            } catch (e: Exception) {
+                                Log.e("PettyCashFragment", "Error updating UI: ${e.message}", e)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("PettyCashFragment", "Error handling new petty cash: ${e.message}", e)
+                    } finally {
+                        // Make sure to close database
+                        dbHelper?.closeDatabase()
+                    }
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         setHasOptionsMenu(true) // Enable options menu in fragment
         setRetainInstance(true) // Retain fragment across orientation changes
@@ -308,10 +415,10 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         // Register receiver
-        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
-            pettyCashDeleteReceiver,
-            IntentFilter("pettycash_deleted_action")
-        )
+        LocalBroadcastManager.getInstance(requireContext()).apply {
+            registerReceiver(pettyCashDeleteReceiver, IntentFilter("pettycash_deleted_action"))
+            registerReceiver(pettyCashAddedReceiver, IntentFilter("petty_cash_added_action"))
+        }
     }
 
     override fun onDestroyView() {
@@ -351,8 +458,10 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         viewAllLink = null
 
         // Unregister receiver
-        LocalBroadcastManager.getInstance(requireContext())
-            .unregisterReceiver(pettyCashDeleteReceiver)
+        LocalBroadcastManager.getInstance(requireContext()).apply {
+            unregisterReceiver(pettyCashDeleteReceiver)
+            unregisterReceiver(pettyCashAddedReceiver)
+        }
     }
 
     private fun mainTask() {
@@ -699,10 +808,43 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     }
 
     private fun updateMpesaCardDetails() {
-        cashImage?.visibility = View.GONE
-        cashLabel?.visibility = View.GONE
-        mpesaImage?.visibility = View.VISIBLE
-
+        try {
+            // Safety check for null views
+            if (mpesaImage == null || cashImage == null || cashLabel == null) {
+                Log.d("PettyCashFragment", "Card views not initialized yet")
+                return
+            }
+            
+            // Safety check for empty list
+            if (pettyCashList.isNullOrEmpty()) {
+                Log.d("PettyCashFragment", "Petty cash list is empty, showing default card state")
+                mpesaImage?.visibility = View.VISIBLE
+                cashImage?.visibility = View.VISIBLE
+                cashLabel?.visibility = View.VISIBLE
+                return
+            }
+            
+            // Calculate totals
+            var mpesaTotal = 0.0
+            var cashTotal = 0.0
+            
+            pettyCashList?.forEach { pettyCash ->
+                if (pettyCash.paymentMode == "M-Pesa") {
+                    mpesaTotal += pettyCash.amount ?: 0.0
+                } else if (pettyCash.paymentMode == "Cash") {
+                    cashTotal += pettyCash.amount ?: 0.0
+                }
+            }
+            
+            // Update UI based on totals
+            mpesaImage?.visibility = if (mpesaTotal > 0) View.VISIBLE else View.GONE
+            cashImage?.visibility = if (cashTotal > 0) View.VISIBLE else View.GONE
+            cashLabel?.visibility = if (cashTotal > 0) View.VISIBLE else View.GONE
+            
+            Log.d("PettyCashFragment", "Updated card details - M-Pesa: $mpesaTotal, Cash: $cashTotal")
+        } catch (e: Exception) {
+            Log.e("PettyCashFragment", "Error updating card details: ${e.message}", e)
+        }
     }
 
     private fun updateCashCardDetails() {
@@ -961,30 +1103,42 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     }
 
     private fun updateEmptyState() {
-        // Get the actual size from adapter
-        val currentListSize = pettyCashAdapter?.itemCount ?: 0
-        Log.d("PettyCashFragment", "Checking empty state - Adapter list size: $currentListSize")
+        try {
+            // Get the actual size from adapter
+            val currentListSize = pettyCashAdapter?.itemCount ?: 0
+            Log.d("PettyCashFragment", "Checking empty state - Adapter list size: $currentListSize")
 
-        if (currentListSize == 0) {
-            // Show empty state
-            noPettyCashMessageTextView?.visibility = View.VISIBLE
-            pettyCashRecyclerView?.visibility = View.GONE
-            viewAllLink?.visibility = View.GONE
-            Log.d("PettyCashFragment", "Showing empty state - list is empty")
-        } else {
-            // Show list
-            noPettyCashMessageTextView?.visibility = View.GONE
-            pettyCashRecyclerView?.visibility = View.VISIBLE
-            viewAllLink?.visibility = View.VISIBLE
-            Log.d("PettyCashFragment", "Showing list - $currentListSize items")
+            if (currentListSize == 0) {
+                // Show empty state
+                noPettyCashMessageTextView?.visibility = View.VISIBLE
+                pettyCashRecyclerView?.visibility = View.GONE
+                viewAllLink?.visibility = View.GONE
+                Log.d("PettyCashFragment", "Showing empty state - list is empty")
+            } else {
+                // Show list
+                noPettyCashMessageTextView?.visibility = View.GONE
+                pettyCashRecyclerView?.visibility = View.VISIBLE
+                viewAllLink?.visibility = View.VISIBLE
+                Log.d("PettyCashFragment", "Showing list - $currentListSize items")
+            }
+
+            // Update UI components that depend on list state
+            try {
+                updateViewPagerData()
+            } catch (e: Exception) {
+                Log.e("PettyCashFragment", "Error updating view pager: ${e.message}", e)
+            }
+            
+            try {
+                updateMpesaCardDetails()
+            } catch (e: Exception) {
+                Log.e("PettyCashFragment", "Error updating mpesa card: ${e.message}", e)
+            }
+
+            Log.d("PettyCashFragment", "Empty state updated, RecyclerView visibility: ${pettyCashRecyclerView?.visibility == View.VISIBLE}")
+        } catch (e: Exception) {
+            Log.e("PettyCashFragment", "Error in updateEmptyState: ${e.message}", e)
         }
-
-        // Update UI components that depend on list state
-        updateViewPagerData()
-        updateMpesaCardDetails()
-
-        // No need for additional notifyDataSetChanged since adapter.removeItem already handles notifications
-        Log.d("PettyCashFragment", "Empty state updated, RecyclerView visibility: ${pettyCashRecyclerView?.visibility == View.VISIBLE}")
     }
 
 }

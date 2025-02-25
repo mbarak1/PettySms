@@ -68,7 +68,6 @@ import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
-import com.google.gson.Gson
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
@@ -386,7 +385,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
         if (functionality == "Edit") {
             scanEtr.isVisible = true
-            deleteItem.isVisible = true
+            deleteItem.isVisible = false
         } else {
             scanEtr.isVisible = true
             deleteItem.isVisible = false
@@ -2994,11 +2993,11 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         private const val MAX_IMAGE_SIZE = 800 // Maximum width/height for images
         private const val PETTY_CASH_ID_KEY = "petty_cash_id"
 
-        fun newInstance(pettyCash: PettyCash, action: String): AddPettyCashFragment {
+        fun newInstance(pettyCash: PettyCash?, action: String): AddPettyCashFragment {
             return AddPettyCashFragment().apply {
                 arguments = Bundle().apply {
                     // Only store the ID and action instead of the entire PettyCash object
-                    putInt(PETTY_CASH_ID_KEY, pettyCash.id ?: -1)
+                    putInt(PETTY_CASH_ID_KEY, pettyCash?.id ?: -1)
                     putString("action", action)
                 }
             }

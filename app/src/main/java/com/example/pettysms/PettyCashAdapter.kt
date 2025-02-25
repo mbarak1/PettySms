@@ -416,10 +416,20 @@ class PettyCashAdapter(
 
     // Add a new item at the top of the list
     fun addItemToTop(newItem: PettyCash) {
-
-        pettyCashList.add(0, newItem)
-        notifyItemInserted(0)
-
+        try {
+            // Add to the beginning of the list
+            pettyCashList.add(0, newItem)
+            
+            // Notify adapter about the insertion
+            notifyItemInserted(0)
+            
+            // Notify about potential changes to subsequent items
+            notifyItemRangeChanged(0, minOf(5, pettyCashList.size))
+            
+            Log.d("PettyCashAdapter", "Added new item to top: ID=${newItem.id}, Description=${newItem.description}")
+        } catch (e: Exception) {
+            Log.e("PettyCashAdapter", "Error adding item to top: ${e.message}")
+        }
     }
 
     override fun getItemCount(): Int = pettyCashList.size

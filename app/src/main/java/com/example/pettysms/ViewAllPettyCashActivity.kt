@@ -14,7 +14,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.pettysms.databinding.ActivityViewAllPettyCashBinding
-import com.google.android.material.search.SearchBar
 import com.google.android.material.search.SearchView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,15 +30,16 @@ import com.google.gson.Gson
 import android.content.Intent
 import android.content.BroadcastReceiver
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import androidx.core.os.bundleOf
 import android.content.Context
 import android.content.IntentFilter
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 
 class ViewAllPettyCashActivity : AppCompatActivity(), 
     PettyCashSortFilterDialogFragment.OnApplyClickListener,
     AddPettyCashFragment.OnAddPettyCashListener {
     private var _binding: ActivityViewAllPettyCashBinding? = null
     private val binding get() = _binding!!
+    private var fab: ExtendedFloatingActionButton? = null
 
     private lateinit var dbHelper: DbHelper
     private var pettyCashAdapter: ViewAllPettyCashAdapter? = null
@@ -121,6 +121,8 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
             pettyCashDeleteReceiver,
             IntentFilter("pettycash_deleted_action")
         )
+
+        setupFab()
     }
 
     private fun setupViews() {
@@ -171,12 +173,17 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
                 SearchView.TransitionState.SHOWING -> {
                     binding.suggestionRecycler.visibility = View.VISIBLE
                     binding.pettyCashRecyclerView.visibility = View.GONE
+                    // Hide FAB when search is showing
+                    fab?.hide()
                 }
                 SearchView.TransitionState.HIDDEN -> {
                     binding.suggestionRecycler.visibility = View.GONE
                     binding.noResultsTextView.visibility = View.GONE
                     binding.progressBarSuggestions.visibility = View.GONE
                     binding.pettyCashRecyclerView.visibility = View.VISIBLE
+                    // Show and extend FAB when search is hidden
+                    fab?.show()
+                    fab?.extend()
                 }
                 SearchView.TransitionState.HIDING -> {
                     binding.searchView.editText.text = null
@@ -184,6 +191,9 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
                     pettyCashAdapter?.setSearchQuery("")
                     Log.d("ViewAllPettyCash", "Size of allPettyCash: ${allPettyCash.size}")
                     pettyCashAdapter?.updateData(allPettyCash)
+                    // Show and extend FAB when search is hiding
+                    fab?.show()
+                    fab?.extend()
                 }
                 else -> {}
             }
@@ -426,7 +436,7 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
                             binding.noPettyCashMessage.visibility = View.GONE
                             binding.pettyCashRecyclerView.visibility = View.VISIBLE
                             allPettyCash = sortedList.toMutableList()
-                            pettyCashAdapter?.updateData(allPettyCash)
+                            pettyCashAdapter?.updateData(allPettyCash, true)
                             hasMoreData = pettyCashList.size >= pageSize
                         }
                     }
@@ -697,6 +707,8 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
         // Unregister receiver
         LocalBroadcastManager.getInstance(this)
             .unregisterReceiver(pettyCashDeleteReceiver)
+
+        fab = null
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -750,28 +762,118 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
     }
 
     // Implement all required interface methods
-    override fun onAddPettyCash(newOrUpdatedItem: PettyCash, newOrUpdatetransactionCost: PettyCash?) {
+    override fun onAddPettyCash(newPettyCash: PettyCash, transactionCost: PettyCash?) {
+        Log.d("ViewAllPettyCash", "onAddPettyCash called with ID: ${newPettyCash.id}")
+        
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                withContext(Dispatchers.Main) {
-                    // Update main petty cash
-                    pettyCashAdapter?.updateItem(newOrUpdatedItem)
+                // Skip verification for newly added petty cash (ID will be non-null for updates)
+                if (newPettyCash.id != null) {
+                    // Verify the petty cash exists in the database (only for updates)
+                    val dbHelper = DbHelper(this@ViewAllPettyCashActivity)
+                    val verifiedPettyCash = dbHelper.getPettyCashById(newPettyCash.id!!)
                     
-                    // Update transaction cost if exists
-                    newOrUpdatetransactionCost?.let { tc ->
-                        pettyCashAdapter?.updateItem(tc)
+                    if (verifiedPettyCash == null) {
+                        Log.e("ViewAllPettyCash", "Petty cash with ID ${newPettyCash.id} not found in database")
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(
+                                this@ViewAllPettyCashActivity,
+                                "Error: Petty cash not found in database",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        return@launch
+                    }
+                    
+                    Log.d("ViewAllPettyCash", "Verified petty cash exists in database: ${verifiedPettyCash.id}")
+                } else {
+                    Log.d("ViewAllPettyCash", "New petty cash detected (ID is null), skipping verification")
+                }
+                
+                withContext(Dispatchers.Main) {
+                    // For new petty cash, we'll always add it to the top
+                    if (newPettyCash.id == null) {
+                        Log.d("ViewAllPettyCash", "Adding brand new petty cash to top of list")
+                        allPettyCash.add(0, newPettyCash)
+                        pettyCashAdapter?.addItemToTop(newPettyCash)
+                        
+                        // Add transaction cost if exists
+                        transactionCost?.let { tc ->
+                            Log.d("ViewAllPettyCash", "Adding transaction cost to list")
+                            allPettyCash.add(1, tc)
+                            pettyCashAdapter?.addItemToTop(tc)
+                        }
+
+                        // Scroll to top to show new items
+                        binding.pettyCashRecyclerView.scrollToPosition(0)
+                        
+                        // Notify PettyCashFragment about the new items
+                        val intent = Intent("petty_cash_added_action")
+                        intent.putExtra("new_petty_cash_json", Gson().toJson(newPettyCash))
+                        transactionCost?.let { tc ->
+                            intent.putExtra("new_transaction_cost_json", Gson().toJson(tc))
+                        }
+                        // Actually send the broadcast
+                        LocalBroadcastManager.getInstance(this@ViewAllPettyCashActivity)
+                            .sendBroadcast(intent)
+                        Log.d("ViewAllPettyCash", "Broadcasting new petty cash with null ID as JSON")
+                    } else {
+                        // For existing petty cash, check if it's in our current list
+                        val existingIndex = allPettyCash.indexOfFirst { it.id == newPettyCash.id }
+                        Log.d("ViewAllPettyCash", "Existing index: $existingIndex")
+
+                        if (existingIndex != -1) {
+                            // Update existing petty cash
+                            allPettyCash[existingIndex] = newPettyCash
+                            pettyCashAdapter?.updateItem(newPettyCash)
+                            Log.d("ViewAllPettyCash", "Updated existing petty cash at index $existingIndex")
+                            
+                            // Update transaction cost if exists
+                            transactionCost?.let { tc ->
+                                val tcIndex = allPettyCash.indexOfFirst { it.id == tc.id }
+                                if (tcIndex != -1) {
+                                    allPettyCash[tcIndex] = tc
+                                    pettyCashAdapter?.updateItem(tc)
+                                    Log.d("ViewAllPettyCash", "Updated transaction cost at index $tcIndex")
+                                }
+                            }
+                        } else {
+                            // Add existing petty cash that wasn't in our list
+                            Log.d("ViewAllPettyCash", "Adding existing petty cash to top of list")
+                            allPettyCash.add(0, newPettyCash)
+                            pettyCashAdapter?.addItemToTop(newPettyCash)
+                            
+                            // Add transaction cost if exists
+                            transactionCost?.let { tc ->
+                                Log.d("ViewAllPettyCash", "Adding transaction cost to list")
+                                allPettyCash.add(1, tc)
+                                pettyCashAdapter?.addItemToTop(tc)
+                            }
+
+                            // Scroll to top to show new items
+                            binding.pettyCashRecyclerView.scrollToPosition(0)
+                            
+                            // Notify PettyCashFragment about the new items
+                            val intent = Intent("petty_cash_added_action")
+                            intent.putExtra("new_petty_cash_id", newPettyCash.id)
+                            transactionCost?.let { tc ->
+                                intent.putExtra("new_transaction_cost_id", tc.id)
+                            }
+                            // Actually send the broadcast
+                            LocalBroadcastManager.getInstance(this@ViewAllPettyCashActivity)
+                                .sendBroadcast(intent)
+                            Log.d("ViewAllPettyCash", "Broadcast sent for petty cash")
+                        }
                     }
 
                     // Update suggestion adapter if visible
                     (binding.suggestionRecycler.adapter as? ViewAllPettyCashAdapter)?.let { adapter ->
-                        adapter.updateItem(newOrUpdatedItem)
-                        newOrUpdatetransactionCost?.let { adapter.updateItem(it) }
+                        adapter.updateList(allPettyCash)
+                        Log.d("ViewAllPettyCash", "Updated suggestion adapter")
                     }
-
-                    Log.d("ViewAllPettyCash", "Updated items in adapter")
                 }
             } catch (e: Exception) {
-                Log.e("ViewAllPettyCash", "Error in onAddPettyCash: ${e.message}")
+                Log.e("ViewAllPettyCash", "Error in onAddPettyCash: ${e.message}", e)
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@ViewAllPettyCashActivity,
@@ -899,5 +1001,55 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
     private fun openAddPettyCashFragment(pettyCash: PettyCash, actionType: String) {
         val fragment = AddPettyCashFragment.newInstance(pettyCash, actionType)
         fragment.show(supportFragmentManager, "fragment_add_petty_cash")
+    }
+
+    private fun setupFab() {
+        fab = binding.addPettyCashFab
+        
+        // Handle scroll behavior
+        binding.pettyCashRecyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (dy > 0 && fab?.isExtended == true) {
+                    fab?.shrink()
+                } else if (dy < 0 && fab?.isExtended == false) {
+                    fab?.extend()
+                }
+
+                // Load more data when reaching the end
+                if (!isLoading && hasMoreData) {
+                    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                    val visibleItemCount = layoutManager.childCount
+                    val totalItemCount = layoutManager.itemCount
+                    val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
+
+                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount
+                        && firstVisibleItemPosition >= 0
+                    ) {
+                        currentPage++
+                        loadPettyCash()
+                    }
+                }
+            }
+        })
+
+        fab?.setOnClickListener {
+            // Disable the button to prevent multiple clicks
+            fab?.isClickable = false
+
+            // Show AddPettyCashFragment
+            val addPettyCashFragment = AddPettyCashFragment.newInstance(action = "Add", pettyCash = null)
+            
+            // Explicitly set the listener
+            addPettyCashFragment.setOnAddPettyCashListener(this)
+            Log.d("ViewAllPettyCash", "Setting this activity as the listener for AddPettyCashFragment")
+            
+            addPettyCashFragment.show(supportFragmentManager, "AddPettyCashFragment")
+
+            // Re-enable the button after a delay
+            lifecycleScope.launch {
+                delay(1500)
+                fab?.isClickable = true
+            }
+        }
     }
 } 

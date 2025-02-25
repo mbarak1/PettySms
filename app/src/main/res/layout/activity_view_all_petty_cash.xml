@@ -5,6 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
@@ -91,5 +92,19 @@
         android:layout_gravity="center"
         android:text="No petty cash records found"
         android:visibility="gone" />
+
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/addPettyCashFab"
+        style="@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        app:icon="@drawable/outline_add_24"
+        android:contentDescription="@string/add_petty_cash"
+        android:text="@string/add"
+
+        android:textColor="?attr/colorOnPrimaryContainer"
+        app:iconTint="?attr/colorOnPrimaryContainer"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout> 

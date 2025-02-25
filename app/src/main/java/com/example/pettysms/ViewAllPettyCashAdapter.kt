@@ -211,9 +211,66 @@ class ViewAllPettyCashAdapter(
         notifyDataSetChanged()
     }
 
+    fun updateData(newList: List<PettyCash>, isFilteredData: Boolean = false) {
+        try {
+            Log.d("ViewAllPettyCashAdapter", """
+            Data update starting:
+            Previous size: ${pettyCashList.size}
+            New size: ${newList.size}
+            Is filtered: $isFilteredData
+        """.trimIndent())
+
+            if (isFilteredData) {
+                // For filtered/sorted data, replace the entire list
+                pettyCashList.clear()
+                pettyCashList.addAll(newList)
+                notifyDataSetChanged()
+
+                Log.d("ViewAllPettyCashAdapter", "Updated with filtered data, new size: ${pettyCashList.size}")
+            } else {
+                // For regular updates, use the incremental update logic
+                val oldList = pettyCashList.toList()
+
+                // Update existing items
+                newList.forEach { newItem ->
+                    val existingIndex = pettyCashList.indexOfFirst { it.id == newItem.id }
+                    if (existingIndex != -1) {
+                        pettyCashList[existingIndex] = newItem
+                        notifyItemChanged(existingIndex)
+                    }
+                }
+
+                // Add new items that don't exist in the current list
+                val newItems = newList.filter { newItem ->
+                    !pettyCashList.any { it.id == newItem.id }
+                }
+                if (newItems.isNotEmpty()) {
+                    val startPosition = pettyCashList.size
+                    pettyCashList.addAll(newItems)
+                    notifyItemRangeInserted(startPosition, newItems.size)
+                }
+
+                Log.d("ViewAllPettyCashAdapter", """
+                Regular update completed:
+                Previous size: ${oldList.size}
+                New size: ${pettyCashList.size}
+                Updated/Added items: ${newItems.size}
+            """.trimIndent())
+            }
+        } catch (e: Exception) {
+            Log.e("ViewAllPettyCashAdapter", "Error updating data: ${e.message}")
+        }
+    }
+
     fun updateData(newList: List<PettyCash>) {
         // Keep existing items and update/add only what's necessary
         val oldList = pettyCashList.toList()
+
+        Log.d("ViewAllPettyCashAdapter", """
+            Data update:
+            Previous size: ${oldList.size}
+            New size: ${newList.size}
+        """.trimIndent())
         
         // Update existing items
         newList.forEach { newItem ->
@@ -462,5 +519,30 @@ class ViewAllPettyCashAdapter(
 
     fun setOnAddPettyCashListener(listener: AddPettyCashFragment.OnAddPettyCashListener) {
         this.onAddPettyCashListener = listener
+    }
+
+    /**
+     * Adds a new item to the top of the list
+     */
+    fun addItemToTop(newItem: PettyCash) {
+        try {
+            // Add to the beginning of the list
+            pettyCashList.add(0, newItem)
+            
+            // Also update the filtered items list if it's being used
+            if (items !== pettyCashList) {
+                items.add(0, newItem)
+            }
+            
+            // Notify adapter about the insertion
+            notifyItemInserted(0)
+            
+            // Notify about potential changes to subsequent items
+            notifyItemRangeChanged(0, minOf(5, pettyCashList.size))
+            
+            Log.d("ViewAllPettyCashAdapter", "Added new item to top: ID=${newItem.id}, Description=${newItem.description}")
+        } catch (e: Exception) {
+            Log.e("ViewAllPettyCashAdapter", "Error adding item to top: ${e.message}")
+        }
     }
 } 
