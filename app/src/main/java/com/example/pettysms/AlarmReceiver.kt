@@ -16,9 +16,8 @@ class AlarmReceiver : BroadcastReceiver() {
 
         // Start the foreground service
         if(SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Schedule the SmsWorker to run in the background
-            val workRequest = OneTimeWorkRequestBuilder<SmsWorker>().build()
-            WorkManager.getInstance(context).enqueue(workRequest)
+            // Schedule the SmsWorker to run in the background with proper constraints
+            SmsWorker.schedule(context)
         }else{
             val serviceIntent = Intent(context, SmsForegroundService::class.java)
             ContextCompat.startForegroundService(context, serviceIntent)

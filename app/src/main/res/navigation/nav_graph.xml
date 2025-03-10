@@ -20,6 +20,9 @@
         <action
             android:id="@+id/action_HomeFragment_to_pettyCashFragment"
             app:destination="@id/pettyCashFragment" />
+        <action
+            android:id="@+id/action_HomeFragment_to_TruckRankingsFragment"
+            app:destination="@id/truckRankingsFragment" />
     </fragment>
     <fragment
         android:id="@+id/MpesaFragment"
@@ -65,6 +68,31 @@
         <action
             android:id="@+id/action_pettyCashFragment_to_settingsFragment"
             app:destination="@id/settingsFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/truckRankingsFragment"
+        android:name="com.example.pettysms.TruckRankingsFragment"
+        android:label="Truck Rankings"
+        tools:layout="@layout/fragment_truck_rankings">
+        <action
+            android:id="@+id/action_truckRankingsFragment_to_HomeFragment"
+            app:destination="@id/HomeFragment" />
+        <action
+            android:id="@+id/action_truckRankingsFragment_to_truckExpensesFragment"
+            app:destination="@id/truckExpensesFragment" />
+    </fragment>
+    
+    <fragment
+        android:id="@+id/truckExpensesFragment"
+        android:name="com.example.pettysms.TruckExpensesFragment"
+        android:label="Truck Expenses"
+        tools:layout="@layout/fragment_truck_expenses">
+        <argument
+            android:name="truck_no"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_truckExpensesFragment_to_truckRankingsFragment"
+            app:destination="@id/truckRankingsFragment" />
     </fragment>
 
 </navigation>

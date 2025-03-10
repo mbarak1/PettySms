@@ -26,6 +26,7 @@ import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.StyleSpan
 import android.util.Log
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
@@ -852,36 +853,32 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
     @SuppressLint("RestrictedApi")
     private fun changeStatusBarColorWithAnimation(colorResId: Int) {
-        val activity = requireActivity() as? FragmentActivity ?: return
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            // Retrieve the color from the color resource ID
-            val newStatusBarColor = MaterialColors.getColor(requireContext(), colorResId,"")
-
-            // Get the current status bar color
-            val currentStatusBarColor = activity.window.statusBarColor
-
-            // Create a ValueAnimator to animate the color change
-            val colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentStatusBarColor, newStatusBarColor)
-            colorAnimator.addUpdateListener { animator ->
-                val animatedColor = animator.animatedValue as Int
-                // Set the animated color to the status bar
-                activity.window.statusBarColor = animatedColor
-            }
-
-            // Set up animation duration
-            colorAnimator.duration = 490 // Adjust the duration as needed
-
-            // Start the color animation
-            colorAnimator.start()
-
-            // For a light status bar, you may need to adjust the system UI visibility
-            if (isColorLight(newStatusBarColor)) {
-                activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            } else {
-                activity.window.decorView.systemUiVisibility = 0
-            }
+        val window = activity?.window ?: return
+        val currentStatusBarColor = window.statusBarColor
+        
+        // Get the new color
+        val typedValue = TypedValue()
+        val theme = requireContext().theme
+        theme.resolveAttribute(colorResId, typedValue, true)
+        val newStatusBarColor = typedValue.data
+        
+        // If colors are the same, don't animate
+        if (currentStatusBarColor == newStatusBarColor) {
+            return
         }
+        
+        // Create a ValueAnimator with shorter duration
+        val colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentStatusBarColor, newStatusBarColor)
+        colorAnimator.addUpdateListener { animator ->
+            val animatedColor = animator.animatedValue as Int
+            window.statusBarColor = animatedColor
+        }
+        
+        // Set up animation duration - shorter to reduce rendering load
+        colorAnimator.duration = 300
+        
+        // Start the color animation
+        colorAnimator.start()
     }
 
     private fun isColorLight(color: Int): Boolean {
@@ -1459,49 +1456,6 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
 
                     }
 
-                    if (transaction_cost_string != "none") {
-                        transaction_cost =
-                            removeNonNumericText(transaction_cost_string)?.toDouble()!!
-                        //transaction_cost = transaction_cost_string?.replace("Ksh", "")?.dropLast(1)?.toDouble()!!
-                    }
-
-                    if (amount_string != null) {
-                        if (amount_string.isNullOrBlank()) {
-
-                            requireActivity().runOnUiThread {
-                                Toast.makeText(
-                                    activity,
-                                    "Bad Message Amount @ index Empty String: " + i.toString(),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-
-                            var rejectedList = mutableListOf<String>(msg_str[2][i], msg_txt)
-                            rejectedSmsList.add(rejectedList)
-
-                            continue
-
-                        } else {
-                                amount =
-                                    amount_string?.replace("Ksh", "")?.dropLast(1)?.toDouble()!!
-
-                        }
-
-                    } else {
-
-                        requireActivity().runOnUiThread {
-                            Toast.makeText(
-                                activity,
-                                "Bad Message Amount @ index Empty String: " + i.toString(),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                        var rejectedList = mutableListOf<String>(msg_str[2][i], msg_txt)
-                        rejectedSmsList.add(rejectedList)
-                        continue
-
-                    }
-
 
                     var mpesa_transaction = MpesaTransaction(
                         id = null,
@@ -1752,11 +1706,41 @@ class MpesaFragment : Fragment(), RefreshRecyclerViewCallback  {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        
+        // Cancel any running animations to prevent leaks and rendering issues
+        progressAnimator?.cancel()
+        progressAnimator = null
+        
+        // Ensure we're not leaving animations running when fragment is paused
+        verticalShrinkAnimation?.cancel()
+        fadeInAnimation?.cancel()
+        fadeOutAnimation?.cancel()
+        verticalShrinkFadeOut?.cancel()
+        fadeInselectLayoutAnimation?.cancel()
+    }
 
-
-
-
-
-
+    private fun updateCircularProgress(progressPercentage: Int) {
+        // Check if there's an ongoing animation and cancel it
+        progressAnimator?.cancel()
+        
+        // Only animate if the view is visible
+        if (circularProgressDrawable?.visibility != View.VISIBLE) {
+            circularProgressDrawable?.setProgress(progressPercentage.toDouble(), 100.0)
+            return
+        }
+        
+        // Initialize the animator with the new progress percentage
+        val currentProgress = circularProgressDrawable?.progress?.toFloat() ?: 0f
+        progressAnimator = ValueAnimator.ofFloat(currentProgress, progressPercentage.toFloat()).apply {
+            duration = 500 // Shorter duration to reduce rendering load
+            addUpdateListener { animation ->
+                val animatedValue = animation.animatedValue as Float
+                circularProgressDrawable?.setProgress(animatedValue.toDouble(), 100.0)
+            }
+            start()
+        }
+    }
 
 }

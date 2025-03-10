@@ -8,7 +8,10 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
-import android.widget.Toast
+import androidx.core.database.getDoubleOrNull
+import androidx.core.database.getIntOrNull
+import androidx.core.database.getStringOrNull
+import com.example.pettysms.queue.QueueItem
 import java.sql.SQLException
 import java.text.SimpleDateFormat
 import java.time.LocalDate
@@ -16,6 +19,12 @@ import java.time.DayOfWeek
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
+import java.util.Date
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.example.pettysms.reports.Report
+import com.example.pettysms.reports.ReportType
+import com.example.pettysms.models.PettyCashTransaction
 
 class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION)  {
     override fun onCreate(db: SQLiteDatabase) {
@@ -206,7 +215,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         val SQL_CREATE_ENTRIES_ALL_SMS =
             "CREATE TABLE IF NOT EXISTS $TABLE_ALL_SMS" + "(" +
                     "$COL_ALL_SMS_ID INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    "$COL_ALL_SMS_UNIQUE_ID INTEGER," +  // New column for storing SMS ID
+                    "$COL_ALL_SMS_UNIQUE_ID INTEGER," + // New column for storing SMS ID
                     "$COL_ALL_SMS_BODY TEXT," +
                     "$COL_TIMESTAMP_ALL_SMS INTEGER" +
                     ")".trimIndent()
@@ -318,6 +327,28 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 "$COL_SUPPORTING_DOCUMENT_IMAGE_PATH_3 TEXT" +
                 ")".trimIndent()
 
+        // Create automation_rules table
+        val CREATE_AUTOMATION_RULES_TABLE = """
+            CREATE TABLE IF NOT EXISTS $TABLE_AUTOMATION_RULES (
+                $KEY_AUTOMATION_RULE_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                $KEY_AUTOMATION_RULE_NAME TEXT NOT NULL,
+                $KEY_AUTOMATION_RULE_TRANSACTOR_ID INTEGER,
+                $KEY_AUTOMATION_RULE_ACCOUNT_ID INTEGER,
+                $KEY_AUTOMATION_RULE_OWNER_ID INTEGER,
+                $KEY_AUTOMATION_RULE_TRUCK_ID INTEGER,
+                $KEY_AUTOMATION_RULE_DESCRIPTION_PATTERN TEXT,
+                $KEY_AUTOMATION_RULE_MIN_AMOUNT REAL,
+                $KEY_AUTOMATION_RULE_MAX_AMOUNT REAL,
+                $KEY_AUTOMATION_RULE_CREATED_AT TEXT,
+                $KEY_AUTOMATION_RULE_UPDATED_AT TEXT,
+                FOREIGN KEY ($KEY_AUTOMATION_RULE_TRANSACTOR_ID) REFERENCES $TABLE_TRANSACTORS($COL_TRANSACTOR_ID) ON DELETE SET NULL,
+                FOREIGN KEY ($KEY_AUTOMATION_RULE_ACCOUNT_ID) REFERENCES $TABLE_ACCOUNTS($COL_ACCOUNT_ID) ON DELETE SET NULL,
+                FOREIGN KEY ($KEY_AUTOMATION_RULE_OWNER_ID) REFERENCES $TABLE_OWNERS($COL_OWNER_ID) ON DELETE SET NULL,
+                FOREIGN KEY ($KEY_AUTOMATION_RULE_TRUCK_ID) REFERENCES $TABLE_TRUCKS($COL_ID) ON DELETE SET NULL
+            )
+        """
+        db.execSQL(CREATE_AUTOMATION_RULES_TABLE)
+
 
 
 
@@ -340,6 +371,9 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         db.execSQL(SQL_CREATE_ENTRIES_PETTY_CASH)
         db.execSQL(SQL_CREATE_ENTRIES_SUPPORTING_DOCUMENT)
 
+        // Create queue table
+        createQueueTable(db)
+
 
 
     }
@@ -356,6 +390,103 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         """
         return getTransactionsFromQuery(query)
 
+    }
+    
+    /**
+     * Gets filtered M-Pesa transactions based on date range, transaction type, and transactor
+     * This performs filtering at the database level for better performance with large datasets
+     *
+     * @param startDate The start date in "dd MMM yyyy" format
+     * @param endDate The end date in "dd MMM yyyy" format
+     * @param transactionType The transaction type filter ("All", "Incoming", or "Outgoing")
+     * @param transactor The transactor name filter (empty or "All" for all transactors)
+     * @return A list of filtered M-Pesa transactions
+     */
+    fun getFilteredMpesaTransactions(
+        startDate: String,
+        endDate: String,
+        transactionType: String,
+        transactor: String
+    ): MutableList<MpesaTransaction> {
+        Log.d("DbHelper", "Getting filtered transactions with: startDate=$startDate, endDate=$endDate, type=$transactionType, transactor=$transactor")
+        
+        // Convert dates from "dd MMM yyyy" to "dd/MM/yyyy" format for SQL comparison
+        val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+        val sqlDateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        
+        val startDateObj = try {
+            dateFormat.parse(startDate)
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error parsing start date: $startDate", e)
+            return mutableListOf()
+        }
+        
+        val endDateObj = try {
+            dateFormat.parse(endDate)
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error parsing end date: $endDate", e)
+            return mutableListOf()
+        }
+        
+        // Add one day to end date to include transactions on the end date
+        val calendar = Calendar.getInstance()
+        calendar.time = endDateObj
+        calendar.add(Calendar.DAY_OF_MONTH, 1)
+        val endDatePlusOne = calendar.time
+        
+        val startDateFormatted = sqlDateFormat.format(startDateObj)
+        val endDateFormatted = sqlDateFormat.format(endDatePlusOne)
+        
+        // Build the base query
+        val queryBuilder = StringBuilder()
+        queryBuilder.append("SELECT * FROM $TABLE_TRANSACTIONS WHERE ")
+        
+        // Add date range filter
+        // Compare dates using SQLite's substr function to handle the date format
+        queryBuilder.append("(")
+        queryBuilder.append("substr($COL_TRANSACTIONS_TRANSACTION_DATE, 7, 4) || '-' || ")
+        queryBuilder.append("substr($COL_TRANSACTIONS_TRANSACTION_DATE, 4, 2) || '-' || ")
+        queryBuilder.append("substr($COL_TRANSACTIONS_TRANSACTION_DATE, 1, 2)")
+        queryBuilder.append(" BETWEEN ")
+        queryBuilder.append("'${startDateFormatted.substring(6, 10)}-${startDateFormatted.substring(3, 5)}-${startDateFormatted.substring(0, 2)}'")
+        queryBuilder.append(" AND ")
+        queryBuilder.append("'${endDateFormatted.substring(6, 10)}-${endDateFormatted.substring(3, 5)}-${endDateFormatted.substring(0, 2)}'")
+        queryBuilder.append(")")
+        
+        // Add transaction type filter if not "All"
+        if (transactionType != "All") {
+            queryBuilder.append(" AND (")
+            if (transactionType == "Incoming") {
+                queryBuilder.append("$COL_TRANSACTIONS_TRANSACTION_TYPE IN ('Buy Goods', 'deposit', 'receival')")
+            } else if (transactionType == "Outgoing") {
+                queryBuilder.append("$COL_TRANSACTIONS_TRANSACTION_TYPE IN ('paybill', 'send_money', 'withdraw', 'till', 'topup')")
+            }
+            queryBuilder.append(")")
+        }
+        
+        // Add transactor filter if specified
+        if (transactor.isNotEmpty() && transactor != "All") {
+            // This is a simplified approach - for a complete solution, you would need to 
+            // implement logic similar to MpesaTransaction.getTitleTextByTransactionType
+            // to match transactor names based on transaction type
+            queryBuilder.append(" AND (")
+            queryBuilder.append("$COL_TRANSACTIONS_RECEPIENT_NAME LIKE '%$transactor%' OR ")
+            queryBuilder.append("$COL_TRANSACTIONS_SENDER_NAME LIKE '%$transactor%' OR ")
+            queryBuilder.append("$COL_TRANSACTIONS_MPESA_DEPOSITOR LIKE '%$transactor%'")
+            queryBuilder.append(")")
+        }
+        
+        // Add sorting by date (newest first)
+        queryBuilder.append(" ORDER BY ")
+        queryBuilder.append("substr($COL_TRANSACTIONS_TRANSACTION_DATE, 7, 4) || '-' || ")
+        queryBuilder.append("substr($COL_TRANSACTIONS_TRANSACTION_DATE, 4, 2) || '-' || ")
+        queryBuilder.append("substr($COL_TRANSACTIONS_TRANSACTION_DATE, 1, 2) || ' ' || ")
+        queryBuilder.append("substr($COL_TRANSACTIONS_TRANSACTION_DATE, 12, 8) ASC")
+        
+        val query = queryBuilder.toString()
+        Log.d("DbHelper", "Executing SQL query: $query")
+        
+        return getTransactionsFromQuery(query)
     }
 
     fun getThisMonthMpesaTransactions(): MutableList<MpesaTransaction> {
@@ -1008,7 +1139,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                     COL_TRUCK_ACTIVE_STATUS,
                     COL_IS_DELETED
                 ),
-                "$COL_IS_DELETED = ?",
+                "$COL_IS_DELETED = ?" ,
                 arrayOf("0"),
                 null, null,
                 COL_TRUCK_NO
@@ -1073,7 +1204,7 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
                 COL_TRUCK_ACTIVE_STATUS,
                 COL_IS_DELETED
             ),
-            "$COL_TRUCK_OWNER = ?", // Filter by owner code and is_deleted = 0
+            "$COL_TRUCK_OWNER = ? AND $COL_IS_DELETED = 0 AND $COL_TRUCK_ACTIVE_STATUS = 1" , // Filter by owner code and is_deleted = 0
             arrayOf(owner.ownerCode), // Get trucks matching ownerCode
             null,
             null,
@@ -2206,6 +2337,55 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
 
 
         return accountsList
+    }
+
+    // Add this method to get accounts by owner
+    fun getAccountsByOwner(owner: Owner): List<Account> {
+        val accounts = mutableListOf<Account>()
+        val db = this.readableDatabase
+
+        // Use a more efficient query with JOIN to avoid additional database calls
+        val query = """
+            SELECT a.* 
+            FROM $TABLE_ACCOUNTS a
+            WHERE a.$COL_ACCOUNT_OWNER = ? 
+              AND a.$COL_ACCOUNT_IS_DELETED = 0
+            ORDER BY a.$COL_ACCOUNT_NAME
+        """
+
+        try {
+            val cursor = db.rawQuery(query, arrayOf(owner.ownerCode))
+
+            if (cursor.moveToFirst()) {
+                do {
+                    val accountId = cursor.getInt(cursor.getColumnIndexOrThrow(COL_ACCOUNT_ID))
+                    val accountName = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_NAME))
+                    val accountNumber = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_NUMBER))
+                    val accountType = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_TYPE))
+                    val accountCurrency = cursor.getString(cursor.getColumnIndexOrThrow(COL_ACCOUNT_CURRENCY))
+
+                    // Create an Account object and add it to the list
+                    // We already have the owner object, so no need to fetch it again
+                    val account = Account(
+                        id = accountId,
+                        name = accountName,
+                        accountNumber = accountNumber,
+                        type = accountType,
+                        owner = owner,  // Use the owner that was passed in
+                        currency = accountCurrency,
+                        isDeleted = false  // We're filtering for non-deleted accounts in the query
+                    )
+
+                    accounts.add(account)
+                } while (cursor.moveToNext())
+            }
+
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting accounts by owner: ${e.message}")
+        }
+
+        return accounts
     }
 
     fun getAccountById(accountId: Int): Account? {
@@ -3963,9 +4143,1052 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
         return pettyCash
     }
 
+    // Methods for automation rules
+    fun getAllAutomationRules(): List<AutomationRule> {
+        // Ensure the automation rules table exists
+        ensureAutomationRulesTableExists()
+        
+        val rulesList = mutableListOf<AutomationRule>()
+        val db = this.readableDatabase
+        
+        try {
+            val query = """
+                SELECT ar.*, 
+                       t.${COL_TRANSACTOR_NAME} as transactor_name,
+                       a.${COL_ACCOUNT_NAME} as account_name,
+                       o.${COL_OWNER_NAME} as owner_name,
+                       tr.${COL_TRUCK_NO} as truck_name
+                FROM $TABLE_AUTOMATION_RULES ar
+                LEFT JOIN $TABLE_TRANSACTORS t ON ar.$KEY_AUTOMATION_RULE_TRANSACTOR_ID = t.$COL_TRANSACTOR_ID
+                LEFT JOIN $TABLE_ACCOUNTS a ON ar.$KEY_AUTOMATION_RULE_ACCOUNT_ID = a.$COL_ACCOUNT_ID
+                LEFT JOIN $TABLE_OWNERS o ON ar.$KEY_AUTOMATION_RULE_OWNER_ID = o.$COL_OWNER_ID
+                LEFT JOIN $TABLE_TRUCKS tr ON ar.$KEY_AUTOMATION_RULE_TRUCK_ID = tr.$COL_ID
+                ORDER BY ar.$KEY_AUTOMATION_RULE_UPDATED_AT DESC
+            """
+            
+            val cursor = db.rawQuery(query, null)
+            
+            if (cursor.moveToFirst()) {
+                do {
+                    val id = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_ID))
+                    val name = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_NAME))
+                    val transactorId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_TRANSACTOR_ID))
+                    val accountId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_ACCOUNT_ID))
+                    val ownerId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_OWNER_ID))
+                    val truckId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_TRUCK_ID))
+                    val descriptionPattern = cursor.getStringOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_DESCRIPTION_PATTERN))
+                    val minAmount = cursor.getDoubleOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_MIN_AMOUNT))
+                    val maxAmount = cursor.getDoubleOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_MAX_AMOUNT))
+                    val createdAt = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_CREATED_AT))
+                    val updatedAt = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_UPDATED_AT))
+                    
+                    // Get related entity names from the JOIN
+                    val transactorName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("transactor_name"))
+                    val accountName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("account_name"))
+                    val ownerName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("owner_name"))
+                    val truckName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("truck_name"))
+                    
+                    val rule = AutomationRule(
+                        id = id,
+                        name = name,
+                        transactorId = transactorId,
+                        transactorName = transactorName,
+                        accountId = accountId,
+                        accountName = accountName,
+                        ownerId = ownerId,
+                        ownerName = ownerName,
+                        truckId = truckId,
+                        truckName = truckName,
+                        descriptionPattern = descriptionPattern,
+                        minAmount = minAmount,
+                        maxAmount = maxAmount,
+                        createdAt = createdAt,
+                        updatedAt = updatedAt
+                    )
+                    
+                    rulesList.add(rule)
+                    Log.d("DbHelper", "Loaded rule: ${rule.name} (ID: ${rule.id})")
+                } while (cursor.moveToNext())
+            }
+            
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting automation rules: ${e.message}", e)
+        }
+        
+        Log.d("DbHelper", "Returning ${rulesList.size} automation rules")
+        return rulesList
+    }
 
+    fun getAutomationRuleById(id: Int): AutomationRule? {
+        val db = this.readableDatabase
+
+        val query = """
+            SELECT ar.*, 
+                   t.name as transactor_name, 
+                   a.name as account_name, 
+                   o.name as owner_name, 
+                   tr.truck_no as truck_name
+            FROM $TABLE_AUTOMATION_RULES ar
+            LEFT JOIN $TABLE_TRANSACTORS t ON ar.$KEY_AUTOMATION_RULE_TRANSACTOR_ID = t.$COL_TRANSACTOR_ID
+            LEFT JOIN $TABLE_ACCOUNTS a ON ar.$KEY_AUTOMATION_RULE_ACCOUNT_ID = a.$COL_ACCOUNT_ID
+            LEFT JOIN $TABLE_OWNERS o ON ar.$KEY_AUTOMATION_RULE_OWNER_ID = o.$COL_OWNER_ID
+            LEFT JOIN $TABLE_TRUCKS tr ON ar.$KEY_AUTOMATION_RULE_TRUCK_ID = tr.$COL_ID
+            WHERE ar.$KEY_AUTOMATION_RULE_ID = ?
+        """
+
+        var rule: AutomationRule? = null
+
+        try {
+            val cursor = db.rawQuery(query, arrayOf(id.toString()))
+
+            if (cursor.moveToFirst()) {
+                rule = AutomationRule(
+                    id = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_ID)),
+                    name = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_NAME)),
+                    transactorId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_TRANSACTOR_ID)),
+                    transactorName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("transactor_name")),
+                    accountId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_ACCOUNT_ID)),
+                    accountName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("account_name")),
+                    ownerId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_OWNER_ID)),
+                    ownerName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("owner_name")),
+                    truckId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_TRUCK_ID)),
+                    truckName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("truck_name")),
+                    descriptionPattern = cursor.getStringOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_DESCRIPTION_PATTERN)),
+                    minAmount = cursor.getDoubleOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_MIN_AMOUNT)),
+                    maxAmount = cursor.getDoubleOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_MAX_AMOUNT)),
+                    createdAt = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_CREATED_AT)),
+                    updatedAt = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_UPDATED_AT))
+                )
+            }
+
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting automation rule by ID: ${e.message}")
+        }
+
+        return rule
+    }
+
+    // Add this method to check and create the automation rules table if it doesn't exist
+    private fun ensureAutomationRulesTableExists() {
+        val db = this.writableDatabase
+        
+        // Check if the table exists
+        val cursor = db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='$TABLE_AUTOMATION_RULES'",
+            null
+        )
+        
+        val tableExists = cursor.count > 0
+        cursor.close()
+        
+        if (!tableExists) {
+            // Create the automation rules table
+            val createTableSQL = """
+                CREATE TABLE $TABLE_AUTOMATION_RULES (
+                    $KEY_AUTOMATION_RULE_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    $KEY_AUTOMATION_RULE_NAME TEXT,
+                    $KEY_AUTOMATION_RULE_TRANSACTOR_ID INTEGER,
+                    $KEY_AUTOMATION_RULE_ACCOUNT_ID INTEGER,
+                    $KEY_AUTOMATION_RULE_OWNER_ID INTEGER,
+                    $KEY_AUTOMATION_RULE_TRUCK_ID INTEGER,
+                    $KEY_AUTOMATION_RULE_DESCRIPTION_PATTERN TEXT,
+                    $KEY_AUTOMATION_RULE_MIN_AMOUNT REAL,
+                    $KEY_AUTOMATION_RULE_MAX_AMOUNT REAL,
+                    $KEY_AUTOMATION_RULE_CREATED_AT TEXT,
+                    $KEY_AUTOMATION_RULE_UPDATED_AT TEXT,
+                    FOREIGN KEY ($KEY_AUTOMATION_RULE_TRANSACTOR_ID) REFERENCES $TABLE_TRANSACTORS($COL_TRANSACTOR_ID) ON DELETE SET NULL,
+                    FOREIGN KEY ($KEY_AUTOMATION_RULE_ACCOUNT_ID) REFERENCES $TABLE_ACCOUNTS($COL_ACCOUNT_ID) ON DELETE SET NULL,
+                    FOREIGN KEY ($KEY_AUTOMATION_RULE_OWNER_ID) REFERENCES $TABLE_OWNERS($COL_OWNER_ID) ON DELETE SET NULL,
+                    FOREIGN KEY ($KEY_AUTOMATION_RULE_TRUCK_ID) REFERENCES $TABLE_TRUCKS($COL_ID) ON DELETE SET NULL
+                )
+            """
+            
+            try {
+                db.execSQL(createTableSQL)
+                Log.d("DbHelper", "Created automation rules table")
+            } catch (e: Exception) {
+                Log.e("DbHelper", "Error creating automation rules table: ${e.message}")
+            }
+        }
+    }
+
+    // Update the addAutomationRule method to ensure the table exists
+    fun addAutomationRule(rule: AutomationRule): Long {
+        // Ensure the automation rules table exists
+        ensureAutomationRulesTableExists()
+        
+        val db = this.writableDatabase
+        val values = ContentValues()
+        
+        values.put(KEY_AUTOMATION_RULE_NAME, rule.name)
+        values.put(KEY_AUTOMATION_RULE_TRANSACTOR_ID, rule.transactorId)
+        values.put(KEY_AUTOMATION_RULE_ACCOUNT_ID, rule.accountId)
+        values.put(KEY_AUTOMATION_RULE_OWNER_ID, rule.ownerId)
+        values.put(KEY_AUTOMATION_RULE_TRUCK_ID, rule.truckId)
+        values.put(KEY_AUTOMATION_RULE_DESCRIPTION_PATTERN, rule.descriptionPattern)
+        values.put(KEY_AUTOMATION_RULE_MIN_AMOUNT, rule.minAmount)
+        values.put(KEY_AUTOMATION_RULE_MAX_AMOUNT, rule.maxAmount)
+        values.put(KEY_AUTOMATION_RULE_CREATED_AT, rule.createdAt)
+        values.put(KEY_AUTOMATION_RULE_UPDATED_AT, rule.updatedAt)
+        
+        return db.insert(TABLE_AUTOMATION_RULES, null, values)
+    }
+
+    // Update the updateAutomationRule method to ensure the table exists
+    fun updateAutomationRule(rule: AutomationRule): Boolean {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put("name", rule.name)
+            put("transactor_id", rule.transactorId)
+            put("account_id", rule.accountId)
+            put("owner_id", rule.ownerId)
+            put("truck_id", rule.truckId)  // This will be -1 for "All Trucks"
+            put("description_pattern", rule.descriptionPattern)
+            put("min_amount", rule.minAmount)
+            put("max_amount", rule.maxAmount)
+            put("updated_at", rule.updatedAt)
+        }
+
+        // Begin transaction
+        db.beginTransaction()
+        try {
+            // Update the main rule
+            val success = db.update(
+                TABLE_AUTOMATION_RULES,
+                values,
+                "$KEY_AUTOMATION_RULE_ID = ?",
+                arrayOf(rule.id.toString())
+            ) > 0
+
+            db.setTransactionSuccessful()
+            return success
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error updating automation rule: ${e.message}", e)
+            return false
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    // Update the deleteAutomationRule method to ensure the table exists
+    fun deleteAutomationRule(id: Int): Boolean {
+        // Ensure the automation rules table exists
+        ensureAutomationRulesTableExists()
+        
+        val db = this.writableDatabase
+        val result = db.delete(
+            TABLE_AUTOMATION_RULES,
+            "$KEY_AUTOMATION_RULE_ID = ?",
+            arrayOf(id.toString())
+        )
+        
+        return result > 0
+    }
+
+    fun checkIsAutomated(pettyCash: PettyCash): Boolean {
+        Log.d("DbHelper", "Checking automation for petty cash: amount=${pettyCash.amount}, transactor=${pettyCash.transactor?.name}")
+
+        // Ensure the automation rules table exists
+        ensureAutomationRulesTableExists()
+
+        val amount = pettyCash.amount ?: return false
+        val transactorId = pettyCash.transactor?.id
+        
+        // Log detailed information about the petty cash and transactor
+        Log.d("DbHelper", "Finding automation rule for: amount=$amount")
+        Log.d("DbHelper", "Transactor details: name=${pettyCash.transactor?.name}, id=${pettyCash.transactor?.id}")
+        
+        // First check if there are any automation rules at all
+        val countQuery = "SELECT COUNT(*) FROM $TABLE_AUTOMATION_RULES"
+        val db = this.readableDatabase
+        val cursor = db.rawQuery(countQuery, null)
+        cursor.moveToFirst()
+        val count = cursor.getInt(0)
+        cursor.close()
+        
+        if (count == 0) {
+            Log.d("DbHelper", "No automation rules found in database")
+            return false
+        }
+        
+        Log.d("DbHelper", "Found $count automation rules in database")
+
+        // Query to find matching rules - now checks for both amount range and matching transactor
+        val query = """
+            SELECT * FROM $TABLE_AUTOMATION_RULES 
+            WHERE (
+                (${KEY_AUTOMATION_RULE_MIN_AMOUNT} IS NULL OR ${KEY_AUTOMATION_RULE_MIN_AMOUNT} <= ?) 
+                AND (${KEY_AUTOMATION_RULE_MAX_AMOUNT} IS NULL OR ${KEY_AUTOMATION_RULE_MAX_AMOUNT} >= ?)
+                AND (
+                    ${KEY_AUTOMATION_RULE_TRANSACTOR_ID} IS NULL 
+                    OR ${KEY_AUTOMATION_RULE_TRANSACTOR_ID} = ?
+                )
+            )
+        """.trimIndent()
+
+        var matchingRuleFound = false
+
+        try {
+            val params = arrayOf(
+                amount.toString(),
+                amount.toString(),
+                transactorId?.toString() ?: "-1"  // Use -1 if transactorId is null
+            )
+            
+            Log.d("DbHelper", "Executing query with params: amount=$amount, transactorId=$transactorId")
+            val cursor = db.rawQuery(query, params)
+            
+            Log.d("DbHelper", "Query returned ${cursor.count} results")
+
+            matchingRuleFound = cursor.count > 0
+            
+            if (matchingRuleFound) {
+                cursor.moveToFirst()
+                val ruleName = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_NAME))
+                val ruleId = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_ID))
+                val ruleTransactorId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_TRANSACTOR_ID))
+                Log.d("DbHelper", "Found matching automation rule: $ruleName (ID: $ruleId, TransactorID: $ruleTransactorId)")
+            } else {
+                Log.d("DbHelper", "No matching automation rules found")
+            }
+            
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error checking automation rules: ${e.message}", e)
+            return false
+        }
+
+        Log.d("DbHelper", "Is automated: $matchingRuleFound")
+        return matchingRuleFound
+    }
+
+    /**
+     * Get owner by ID
+     * @param ownerId The ID of the owner to retrieve
+     * @return Owner object if found, null otherwise
+     */
+    fun getOwnerById(ownerId: Int): Owner? {
+        if (ownerId <= 0) return null
+
+        val db = this.readableDatabase
+        var owner: Owner? = null
+
+        try {
+            val query = "SELECT * FROM $TABLE_OWNERS WHERE $COL_OWNER_ID = ?"
+            val cursor = db.rawQuery(query, arrayOf(ownerId.toString()))
+
+            cursor.use { c ->
+                if (c.moveToFirst()) {
+                    owner = Owner(
+                        id = c.getInt(c.getColumnIndexOrThrow(COL_OWNER_ID)),
+                        name = c.getString(c.getColumnIndexOrThrow(COL_OWNER_NAME)),
+                        logoPath = c.getString(c.getColumnIndexOrThrow(COL_OWNER_LOGO_PATH)),
+                        ownerCode = c.getString(c.getColumnIndexOrThrow(COL_OWNER_CODE)),
+                        isDeleted = c.getInt(c.getColumnIndexOrThrow(COL_IS_OWNER_DELETED)) == 1
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting owner by ID: ${e.message}", e)
+        }
+
+        return owner
+    }
+
+    /**
+     * Get truck by ID
+     * @param truckId The ID of the truck to retrieve
+     * @return Truck object if found, null otherwise
+     */
+    fun getTruckById(truckId: Int): Truck? {
+        if (truckId <= 0) return null
+
+        val db = this.readableDatabase
+        var truck: Truck? = null
+
+        try {
+            val query = """
+                    SELECT t.*, o.${COL_OWNER_NAME} as owner_name 
+                    FROM $TABLE_TRUCKS t
+                    LEFT JOIN $TABLE_OWNERS o ON t.${COL_TRUCK_OWNER} = o.${COL_OWNER_CODE}
+                    WHERE t.${COL_ID} = ?
+                """.trimIndent()
+
+            val cursor = db.rawQuery(query, arrayOf(truckId.toString()))
+
+            cursor.use { c ->
+                if (c.moveToFirst()) {
+                    truck = Truck(
+                        id = c.getInt(c.getColumnIndexOrThrow(COL_ID)),
+                        truckNo = c.getString(c.getColumnIndexOrThrow(COL_TRUCK_NO)),
+                        make = c.getString(c.getColumnIndexOrThrow(COL_TRUCK_MAKE)),
+                        owner = getOwnerByCode(c.getString(c.getColumnIndexOrThrow(COL_TRUCK_OWNER))),
+                        activeStatus = c.getInt(c.getColumnIndexOrThrow(COL_TRUCK_ACTIVE_STATUS)) == 1,
+                        isDeleted = c.getInt(c.getColumnIndexOrThrow(COL_IS_DELETED)) == 1
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting truck by ID: ${e.message}", e)
+        }
+
+        return truck
+    }
+
+    fun findMatchingAutomationRule(pettyCash: PettyCash): AutomationRule? {
+        // Ensure the automation rules table exists
+        ensureAutomationRulesTableExists()
+        
+        val amount = pettyCash.amount ?: return null
+        val transactorId = pettyCash.transactor?.id
+        
+        // Log detailed information about the petty cash and transactor
+        Log.d("DbHelper", "Finding automation rule for: amount=$amount, transactorId=$transactorId")
+        Log.d("DbHelper", "Transactor details: name=${pettyCash.transactor?.name}, id=${pettyCash.transactor?.id}")
+        
+        // First check if there are any automation rules at all
+        val countQuery = "SELECT COUNT(*) FROM $TABLE_AUTOMATION_RULES"
+        val db = this.readableDatabase
+        val countCursor = db.rawQuery(countQuery, null)
+        countCursor.moveToFirst()
+        val count = countCursor.getInt(0)
+        countCursor.close()
+        
+        if (count == 0) {
+            Log.d("DbHelper", "No automation rules found in database")
+            return null
+        }
+        
+        Log.d("DbHelper", "Found $count automation rules in database")
+
+        // Query to find matching rules - now checks for both amount range and matching transactor
+        val query = """
+            SELECT ar.*, 
+                   t.${COL_TRANSACTOR_NAME} as transactor_name,
+                   a.${COL_ACCOUNT_NAME} as account_name,
+                   o.${COL_OWNER_NAME} as owner_name,
+                   tr.${COL_TRUCK_NO} as truck_name
+            FROM $TABLE_AUTOMATION_RULES ar
+            LEFT JOIN $TABLE_TRANSACTORS t ON ar.$KEY_AUTOMATION_RULE_TRANSACTOR_ID = t.$COL_TRANSACTOR_ID
+            LEFT JOIN $TABLE_ACCOUNTS a ON ar.$KEY_AUTOMATION_RULE_ACCOUNT_ID = a.$COL_ACCOUNT_ID
+            LEFT JOIN $TABLE_OWNERS o ON ar.$KEY_AUTOMATION_RULE_OWNER_ID = o.$COL_OWNER_ID
+            LEFT JOIN $TABLE_TRUCKS tr ON ar.$KEY_AUTOMATION_RULE_TRUCK_ID = tr.$COL_ID
+            WHERE (
+                (ar.${KEY_AUTOMATION_RULE_MIN_AMOUNT} IS NULL OR ar.${KEY_AUTOMATION_RULE_MIN_AMOUNT} <= ?) 
+                AND (ar.${KEY_AUTOMATION_RULE_MAX_AMOUNT} IS NULL OR ar.${KEY_AUTOMATION_RULE_MAX_AMOUNT} >= ?)
+                AND (
+                    ar.${KEY_AUTOMATION_RULE_TRANSACTOR_ID} IS NULL 
+                    OR ar.${KEY_AUTOMATION_RULE_TRANSACTOR_ID} = ?
+                )
+            )
+            ORDER BY ar.${KEY_AUTOMATION_RULE_UPDATED_AT} DESC
+            LIMIT 1
+        """.trimIndent()
+
+        try {
+            val db = this.readableDatabase
+            val params = arrayOf(
+                amount.toString(),
+                amount.toString(),
+                transactorId?.toString() ?: "-1"  // Use -1 if transactorId is null
+            )
+            
+            Log.d("DbHelper", "Executing query with params: amount=$amount, transactorId=$transactorId")
+            val cursor = db.rawQuery(query, params)
+            
+            Log.d("DbHelper", "Query returned ${cursor.count} results")
+
+            var rule: AutomationRule? = null
+            
+            if (cursor.moveToFirst()) {
+                // Get all column names for debugging
+                val columnNames = cursor.columnNames.joinToString(", ")
+                Log.d("DbHelper", "Cursor columns: $columnNames")
+                
+                try {
+                    val id = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_ID))
+                    val name = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_NAME))
+                    val ruleTransactorId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_TRANSACTOR_ID))
+                    Log.d("DbHelper", "Found rule: id=$id, name=$name, transactorId=$ruleTransactorId")
+                    
+                    rule = AutomationRule(
+                        id = id,
+                        name = name,
+                        transactorId = ruleTransactorId,
+                        transactorName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("transactor_name")),
+                        accountId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_ACCOUNT_ID)),
+                        accountName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("account_name")),
+                        ownerId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_OWNER_ID)),
+                        ownerName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("owner_name")),
+                        truckId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_TRUCK_ID)),
+                        truckName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow("truck_name")),
+                        descriptionPattern = cursor.getStringOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_DESCRIPTION_PATTERN)),
+                        minAmount = cursor.getDoubleOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_MIN_AMOUNT)),
+                        maxAmount = cursor.getDoubleOrNull(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_MAX_AMOUNT)),
+                        createdAt = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_CREATED_AT)),
+                        updatedAt = cursor.getString(cursor.getColumnIndexOrThrow(KEY_AUTOMATION_RULE_UPDATED_AT))
+                    )
+                    Log.d("DbHelper", "Created AutomationRule object: ${rule.name}, accountId=${rule.accountId}, ownerId=${rule.ownerId}, transactorId=${rule.transactorId}")
+                } catch (e: Exception) {
+                    Log.e("DbHelper", "Error creating AutomationRule from cursor: ${e.message}", e)
+                }
+            } else {
+                Log.d("DbHelper", "No matching automation rule found")
+            }
+
+            cursor.close()
+            return rule
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error finding matching automation rule: ${e.message}", e)
+            return null
+        }
+    }
+
+    /**
+     * Adds a PettyCash to the queue for syncing with QuickBooks
+     */
+    fun addToQueue(pettyCash: PettyCash): Long {
+        var db = this.writableDatabase
+        var shouldCloseDb = false
+        
+        try {
+            // Check if the database is open, if not, get a new instance
+            if (!db.isOpen) {
+                Log.d("DbHelper", "Database was closed, opening a new connection")
+                db = this.writableDatabase
+                shouldCloseDb = true
+            }
+            
+            // Ensure queue table exists before proceeding
+            createQueueTable(db)
+
+            // If the PettyCash ID is null but we have a pettyCashNumber, try to retrieve it from the database
+            val pettyCashWithId = if (pettyCash.id == null && !pettyCash.pettyCashNumber.isNullOrEmpty()) {
+                getPettyCashByPettyCashNumber(pettyCash.pettyCashNumber!!) ?: pettyCash
+            } else {
+                pettyCash
+            }
+            
+            // Log the ID for debugging
+            Log.d("DbHelper", "PettyCash ID: ${pettyCashWithId.id}, Number: ${pettyCashWithId.pettyCashNumber}")
+            
+            // Check if we have a valid ID now
+            if (pettyCashWithId.id == null) {
+                Log.e("DbHelper", "PettyCash still has null ID after retrieval attempt")
+                return -1
+            }
+            
+            // Use a local variable for the transaction to avoid issues with the outer db variable
+            var localDb = db
+            if (!localDb.isOpen) {
+                Log.e("DbHelper", "Error getting database instance")
+                localDb = this.writableDatabase
+            }
+            
+            // Begin transaction for better reliability
+            localDb.beginTransaction()
+            try {
+                val values = ContentValues()
+                
+                // Extract truck numbers into a comma-separated string
+                val truckNumbers = pettyCashWithId.trucks?.joinToString(", ") { it.truckNo ?: "" } ?: ""
+                
+                // Populate ContentValues with PettyCash properties
+                values.put(COL_QUEUE_PETTY_CASH_ID, pettyCashWithId.id)
+                values.put(COL_QUEUE_PETTY_CASH_NUMBER, pettyCashWithId.pettyCashNumber)
+                values.put(COL_QUEUE_AMOUNT, pettyCashWithId.amount)
+                values.put(COL_QUEUE_DESCRIPTION, pettyCashWithId.description)
+                values.put(COL_QUEUE_DATE, pettyCashWithId.date)
+                values.put(COL_QUEUE_ACCOUNT_ID, pettyCashWithId.account?.id)
+                values.put(COL_QUEUE_ACCOUNT_NAME, pettyCashWithId.account?.name)
+                values.put(COL_QUEUE_OWNER_ID, pettyCashWithId.owner?.id)
+                values.put(COL_QUEUE_OWNER_NAME, pettyCashWithId.owner?.name)
+                values.put(COL_QUEUE_TRUCK_NUMBERS, truckNumbers)
+                values.put(COL_QUEUE_STATUS, QueueItem.STATUS_PENDING) // Default status
+                values.put(COL_QUEUE_CREATED_AT, getCurrentDateTime())
+                values.put(COL_QUEUE_UPDATED_AT, getCurrentDateTime())
+                
+                // Check if the entry is already in the queue
+                val existingId = getQueueItemIdByPettyCashId(pettyCashWithId.id ?: -1)
+                
+                val queueId = if (existingId != null) {
+                    // Update existing entry
+                    localDb.update(TABLE_QUEUE, values, "$COL_QUEUE_ID = ?", arrayOf(existingId.toString())).toLong()
+                    existingId.toLong()
+                } else {
+                    // Insert new entry
+                    localDb.insertOrThrow(TABLE_QUEUE, null, values)
+                }
+                
+                // Mark transaction as successful
+                localDb.setTransactionSuccessful()
+                return queueId
+            } catch (e: Exception) {
+                Log.e("DbHelper", "Error adding to queue: ${e.message}")
+                return -1
+            } finally {
+                try {
+                    // End transaction
+                    localDb.endTransaction()
+                } catch (e: Exception) {
+                    Log.e("DbHelper", "Error ending transaction: ${e.message}")
+                }
+                
+                // Close the database if we opened it in this method
+                if (shouldCloseDb) {
+                    try {
+                        db.close()
+                    } catch (e: Exception) {
+                        Log.e("DbHelper", "Error closing database: ${e.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error in addToQueue: ${e.message}")
+            return -1
+        }
+    }
+
+    /**
+     * Add related petty cash entries (main and transaction cost) to queue, linking them
+     */
+    fun addRelatedPettyCashToQueue(mainPettyCash: PettyCash, transactionCostPettyCash: PettyCash): Pair<Long, Long> {
+        var db = this.writableDatabase
+        var shouldCloseDb = false
+        
+        try {
+            // Check if the database is open, if not, get a new instance
+            if (!db.isOpen) {
+                Log.d("DbHelper", "Database was closed, opening a new connection")
+                db = this.writableDatabase
+                shouldCloseDb = true
+            }
+            
+            // Ensure queue table exists before proceeding
+            createQueueTable(db)
+            
+            // First, check if the PettyCash objects have valid IDs
+            // If not, try to retrieve them from the database by their pettyCashNumber
+            val mainPettyCashWithId = if (mainPettyCash.id == null && !mainPettyCash.pettyCashNumber.isNullOrEmpty()) {
+                getPettyCashByPettyCashNumber(mainPettyCash.pettyCashNumber!!) ?: mainPettyCash
+            } else {
+                mainPettyCash
+            }
+            
+            val transactionCostPettyCashWithId = if (transactionCostPettyCash.id == null && !transactionCostPettyCash.pettyCashNumber.isNullOrEmpty()) {
+                getPettyCashByPettyCashNumber(transactionCostPettyCash.pettyCashNumber!!) ?: transactionCostPettyCash
+            } else {
+                transactionCostPettyCash
+            }
+            
+            // Log the IDs for debugging
+            Log.d("DbHelper", "Main PettyCash ID: ${mainPettyCashWithId.id}, Number: ${mainPettyCashWithId.pettyCashNumber}")
+            Log.d("DbHelper", "Transaction Cost PettyCash ID: ${transactionCostPettyCashWithId.id}, Number: ${transactionCostPettyCashWithId.pettyCashNumber}")
+            
+            // Check if we have valid IDs now
+            if (mainPettyCashWithId.id == null) {
+                Log.e("DbHelper", "Main PettyCash still has null ID after retrieval attempt")
+                return Pair(-1, -1)
+            }
+            
+            if (transactionCostPettyCashWithId.id == null) {
+                Log.e("DbHelper", "Transaction Cost PettyCash still has null ID after retrieval attempt")
+                return Pair(-1, -1)
+            }
+            
+            // Use a local variable for the transaction to avoid issues with the outer db variable
+            var localDb = db
+            if (!localDb.isOpen) {
+                Log.e("DbHelper", "Error getting database instance")
+                localDb = this.writableDatabase
+            }
+            localDb.beginTransaction()
+            try {
+                // Add main petty cash to queue using a separate method call that doesn't start its own transaction
+                val mainQueueId = addToQueueInternal(localDb, mainPettyCashWithId)
+                
+                // Prepare values for transaction cost petty cash
+                val values = ContentValues()
+                
+                // Extract truck numbers into a comma-separated string
+                val truckNumbers = transactionCostPettyCashWithId.trucks?.joinToString(", ") { it.truckNo ?: "" } ?: ""
+                
+                // Populate ContentValues with transaction cost PettyCash properties
+                values.put(COL_QUEUE_PETTY_CASH_ID, transactionCostPettyCashWithId.id)
+                values.put(COL_QUEUE_PETTY_CASH_NUMBER, transactionCostPettyCashWithId.pettyCashNumber)
+                values.put(COL_QUEUE_AMOUNT, transactionCostPettyCashWithId.amount)
+                values.put(COL_QUEUE_DESCRIPTION, transactionCostPettyCashWithId.description)
+                values.put(COL_QUEUE_DATE, transactionCostPettyCashWithId.date)
+                values.put(COL_QUEUE_ACCOUNT_ID, transactionCostPettyCashWithId.account?.id)
+                values.put(COL_QUEUE_ACCOUNT_NAME, transactionCostPettyCashWithId.account?.name)
+                values.put(COL_QUEUE_OWNER_ID, transactionCostPettyCashWithId.owner?.id)
+                values.put(COL_QUEUE_OWNER_NAME, transactionCostPettyCashWithId.owner?.name)
+                values.put(COL_QUEUE_TRUCK_NUMBERS, truckNumbers)
+                values.put(COL_QUEUE_STATUS, QueueItem.STATUS_PENDING) // Default status
+                values.put(COL_QUEUE_CREATED_AT, getCurrentDateTime())
+                values.put(COL_QUEUE_UPDATED_AT, getCurrentDateTime())
+                values.put(COL_QUEUE_IS_TRANSACTION_COST, 1) // Mark as transaction cost
+                values.put(COL_QUEUE_RELATED_ITEM_ID, mainQueueId) // Link to main queue item
+                
+                // Check if the transaction cost entry is already in the queue
+                val existingId = getQueueItemIdByPettyCashId(transactionCostPettyCashWithId.id ?: -1)
+                
+                val costQueueId = if (existingId != null) {
+                    // Update existing entry
+                    localDb.update(TABLE_QUEUE, values, "$COL_QUEUE_ID = ?", arrayOf(existingId.toString())).toLong()
+                    existingId.toLong()
+                } else {
+                    // Insert new entry
+                    localDb.insertOrThrow(TABLE_QUEUE, null, values)
+                }
+                
+                localDb.setTransactionSuccessful()
+                return Pair(mainQueueId, costQueueId)
+            } catch (e: Exception) {
+                Log.e("DbHelper", "Error adding related petty cash to queue: ${e.message}")
+                return Pair(-1, -1)
+            } finally {
+                try {
+                    localDb.endTransaction()
+                } catch (e: Exception) {
+                    Log.e("DbHelper", "Error ending transaction: ${e.message}")
+                }
+                
+                // Close the database if we opened it in this method
+                if (shouldCloseDb) {
+                    try {
+                        db.close()
+                    } catch (e: Exception) {
+                        Log.e("DbHelper", "Error closing database: ${e.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error in addRelatedPettyCashToQueue: ${e.message}")
+            return Pair(-1, -1)
+        }
+    }
+
+    // Internal helper method to add a petty cash to queue without starting a new transaction
+    private fun addToQueueInternal(db: SQLiteDatabase, pettyCash: PettyCash): Long {
+        // Ensure queue table exists before proceeding
+        var localDb = db
+        createQueueTable(db)
+
+        if (!db.isOpen) {
+            localDb = this.writableDatabase
+        }
+
+        val values = ContentValues()
+        
+        // Extract truck numbers into a comma-separated string
+        val truckNumbers = pettyCash.trucks?.joinToString(", ") { it.truckNo ?: "" } ?: ""
+        
+        // Populate ContentValues with PettyCash properties
+        values.put(COL_QUEUE_PETTY_CASH_ID, pettyCash.id)
+        values.put(COL_QUEUE_PETTY_CASH_NUMBER, pettyCash.pettyCashNumber)
+        values.put(COL_QUEUE_AMOUNT, pettyCash.amount)
+        values.put(COL_QUEUE_DESCRIPTION, pettyCash.description)
+        values.put(COL_QUEUE_DATE, pettyCash.date)
+        values.put(COL_QUEUE_ACCOUNT_ID, pettyCash.account?.id)
+        values.put(COL_QUEUE_ACCOUNT_NAME, pettyCash.account?.name)
+        values.put(COL_QUEUE_OWNER_ID, pettyCash.owner?.id)
+        values.put(COL_QUEUE_OWNER_NAME, pettyCash.owner?.name)
+        values.put(COL_QUEUE_TRUCK_NUMBERS, truckNumbers)
+        values.put(COL_QUEUE_STATUS, QueueItem.STATUS_PENDING) // Default status
+        values.put(COL_QUEUE_CREATED_AT, getCurrentDateTime())
+        values.put(COL_QUEUE_UPDATED_AT, getCurrentDateTime())
+        
+        // Check if the entry is already in the queue
+        val existingId = getQueueItemIdByPettyCashId(pettyCash.id ?: -1)
+        
+        return try {
+            if (existingId != null) {
+                // Update existing entry
+                localDb.update(TABLE_QUEUE, values, "$COL_QUEUE_ID = ?", arrayOf(existingId.toString())).toLong()
+                existingId.toLong()
+            } else {
+                // Insert new entry
+                localDb.insertOrThrow(TABLE_QUEUE, null, values)
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error adding to queue: ${e.message}")
+            -1
+        }
+    }
+
+    /**
+     * Check if a petty cash is already in the queue
+     */
+    fun isPettyCashInQueue(pettyCashId: Int): Boolean {
+        return getQueueItemIdByPettyCashId(pettyCashId) != null
+    }
+
+    /**
+     * Get queue item ID by petty cash ID
+     */
+    fun getQueueItemIdByPettyCashId(pettyCashId: Int): Int? {
+        if (pettyCashId <= 0) return null
+
+        var db = this.readableDatabase
+        var shouldCloseDb = false
+        var id: Int? = null
+
+        try {
+            // Check if the database is open, if not, get a new instance
+            if (!db.isOpen) {
+                Log.d("DbHelper", "Database was closed, opening a new connection")
+                db = this.readableDatabase
+                shouldCloseDb = true
+            }
+
+            try {
+                val cursor = db.query(
+                    TABLE_QUEUE,
+                    arrayOf(COL_QUEUE_ID),
+                    "$COL_QUEUE_PETTY_CASH_ID = ?",
+                    arrayOf(pettyCashId.toString()),
+                    null, null, null
+                )
+
+                cursor.use {
+                    if (it.moveToFirst()) {
+                        id = it.getInt(it.getColumnIndexOrThrow(COL_QUEUE_ID))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("DbHelper", "Error checking if petty cash is in queue: ${e.message}", e)
+            } finally {
+                // Close the database if we opened it in this method
+                if (shouldCloseDb) {
+                    try {
+                        db.close()
+                    } catch (e: Exception) {
+                        Log.e("DbHelper", "Error closing database: ${e.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error in getQueueItemIdByPettyCashId: ${e.message}")
+        }
+
+        return id
+    }
+
+    /**
+     * Update queue item status
+     */
+    fun updateQueueItemStatus(queueItemId: Int, status: String, errorMessage: String? = null): Boolean {
+        val db = this.writableDatabase
+        val values = ContentValues()
+
+        try {
+            values.apply {
+                put(COL_QUEUE_STATUS, status)
+                put(COL_QUEUE_UPDATED_AT, QueueItem.getCurrentDateTime())
+                if (errorMessage != null) {
+                    put(COL_QUEUE_ERROR_MESSAGE, errorMessage)
+                }
+            }
+
+            val rowsAffected = db.update(
+                TABLE_QUEUE,
+                values,
+                "$COL_QUEUE_ID = ?",
+                arrayOf(queueItemId.toString())
+            )
+
+            return rowsAffected > 0
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error updating queue item status: ${e.message}", e)
+            return false
+        }
+    }
+
+    /**
+     * Get queue items by status
+     */
+    fun getQueueItemsByStatus(status: String): List<QueueItem> {
+        val queueItems = mutableListOf<QueueItem>()
+        val db = this.readableDatabase
+
+        try {
+            val cursor = db.query(
+                TABLE_QUEUE,
+                null,
+                "$COL_QUEUE_STATUS = ?",
+                arrayOf(status),
+                null, null,
+                "$COL_QUEUE_CREATED_AT ASC"
+            )
+
+            cursor.use {
+                while (it.moveToNext()) {
+                    queueItems.add(cursorToQueueItem(it))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting queue items by status: ${e.message}", e)
+        }
+
+        return queueItems
+    }
+
+    /**
+     * Get all queue items
+     */
+    fun getAllQueueItems(): List<QueueItem> {
+        val queueItems = mutableListOf<QueueItem>()
+        val db = this.readableDatabase
+
+        try {
+            val cursor = db.query(
+                TABLE_QUEUE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "$COL_QUEUE_CREATED_AT DESC" // Newest first
+            )
+
+            cursor.use {
+                while (it.moveToNext()) {
+                    queueItems.add(cursorToQueueItem(it))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting all queue items: ${e.message}", e)
+        }
+
+        return queueItems
+    }
+    
+    /**
+     * Get summary of queue items by status
+     */
+    fun getQueueSummary(): Map<String, Int> {
+        val summary = mutableMapOf(
+            QueueItem.STATUS_PENDING to 0,
+            QueueItem.STATUS_SENT to 0,
+            QueueItem.STATUS_SYNCED to 0,
+            QueueItem.STATUS_FAILED to 0
+        )
+        
+        val db = this.readableDatabase
+        
+        try {
+            val cursor = db.rawQuery(
+                "SELECT $COL_QUEUE_STATUS, COUNT(*) as count FROM $TABLE_QUEUE GROUP BY $COL_QUEUE_STATUS",
+                null
+            )
+            
+            cursor.use {
+                while (it.moveToNext()) {
+                    val status = it.getString(it.getColumnIndexOrThrow(COL_QUEUE_STATUS))
+                    val count = it.getInt(it.getColumnIndexOrThrow("count"))
+                    summary[status] = count
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting queue summary: ${e.message}", e)
+        }
+        
+        return summary
+    }
+    
+    /**
+     * Search queue items
+     */
+    fun searchQueueItems(query: String): List<QueueItem> {
+        val queueItems = mutableListOf<QueueItem>()
+        val db = this.readableDatabase
+        
+        try {
+            // Search in petty cash number, description, account name, or owner name
+            val searchQuery = "%$query%"
+            val cursor = db.query(
+                TABLE_QUEUE,
+                null,
+                "$COL_QUEUE_PETTY_CASH_NUMBER LIKE ? OR " +
+                "$COL_QUEUE_DESCRIPTION LIKE ? OR " +
+                "$COL_QUEUE_ACCOUNT_NAME LIKE ? OR " +
+                "$COL_QUEUE_OWNER_NAME LIKE ? OR " +
+                "$COL_QUEUE_TRUCK_NUMBERS LIKE ?",
+                arrayOf(searchQuery, searchQuery, searchQuery, searchQuery, searchQuery),
+                null,
+                null,
+                "$COL_QUEUE_CREATED_AT DESC"
+            )
+            
+            cursor.use {
+                while (it.moveToNext()) {
+                    queueItems.add(cursorToQueueItem(it))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error searching queue items: ${e.message}", e)
+        }
+        
+        return queueItems
+    }
+    
+    /**
+     * Convert database cursor to QueueItem object
+     */
+    private fun cursorToQueueItem(cursor: Cursor): QueueItem {
+        return QueueItem(
+            id = cursor.getInt(cursor.getColumnIndexOrThrow(COL_QUEUE_ID)),
+            pettyCashId = cursor.getInt(cursor.getColumnIndexOrThrow(COL_QUEUE_PETTY_CASH_ID)),
+            pettyCashNumber = cursor.getString(cursor.getColumnIndexOrThrow(COL_QUEUE_PETTY_CASH_NUMBER)),
+            amount = cursor.getDouble(cursor.getColumnIndexOrThrow(COL_QUEUE_AMOUNT)),
+            description = cursor.getStringOrNull(cursor.getColumnIndexOrThrow(COL_QUEUE_DESCRIPTION)) ?: "",
+            date = cursor.getString(cursor.getColumnIndexOrThrow(COL_QUEUE_DATE)),
+            accountId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(COL_QUEUE_ACCOUNT_ID)),
+            accountName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow(COL_QUEUE_ACCOUNT_NAME)),
+            ownerId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(COL_QUEUE_OWNER_ID)),
+            ownerName = cursor.getStringOrNull(cursor.getColumnIndexOrThrow(COL_QUEUE_OWNER_NAME)),
+            truckNumbers = cursor.getStringOrNull(cursor.getColumnIndexOrThrow(COL_QUEUE_TRUCK_NUMBERS)),
+            status = cursor.getString(cursor.getColumnIndexOrThrow(COL_QUEUE_STATUS)),
+            errorMessage = cursor.getStringOrNull(cursor.getColumnIndexOrThrow(COL_QUEUE_ERROR_MESSAGE)),
+            createdAt = cursor.getString(cursor.getColumnIndexOrThrow(COL_QUEUE_CREATED_AT)),
+            updatedAt = cursor.getString(cursor.getColumnIndexOrThrow(COL_QUEUE_UPDATED_AT)),
+            isTransactionCost = cursor.getInt(cursor.getColumnIndexOrThrow(COL_QUEUE_IS_TRANSACTION_COST)) == 1,
+            relatedQueueItemId = cursor.getIntOrNull(cursor.getColumnIndexOrThrow(COL_QUEUE_RELATED_ITEM_ID))
+        )
+    }
 
     companion object {
+        private const val TAG = "DbHelper"
+
+        fun dropAllTables(db: SQLiteDatabase) {
+
+            // List all the table names you want to drop
+            val tableNames = arrayOf(
+                TABLE_TRANSACTIONS,
+                TABLE_REJECTED_SMS,
+                TABLE_ALL_SMS,
+                TABLE_SEARCH_HISTORY,
+                TABLE_TRUCKS,
+                TABLE_OWNERS,
+                TABLE_SEARCH_HISTORY_TRUCKS,
+                TABLE_ACCOUNTS,
+                TABLE_SEARCH_HISTORY_ACCOUNTS,
+                TABLE_PETTY_CASH,
+                TABLE_SEARCH_HISTORY_OWNERS,
+                TABLE_TRANSACTORS,
+                TABLE_SUPPORTING_DOCUMENT
+            )
+
+            for (tableName in tableNames) {
+                db.execSQL("DROP TABLE IF EXISTS $tableName;")
+            }
+
+            db.close()
+        }
+
         // If you change the database schema, you must increment the database version.
             const val DATABASE_VERSION = 2
             const val DATABASE_NAME = "PettySms.db"
@@ -4101,32 +5324,1582 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             const val COL_SUPPORTING_DOCUMENT_IMAGE_PATH_2 = "image_path_2"
             const val COL_SUPPORTING_DOCUMENT_IMAGE_PATH_3 = "image_path_3"
 
+        // Queue table constants
+        const val TABLE_QUEUE = "queue_items"
+        const val COL_QUEUE_ID = "id"
+        const val COL_QUEUE_PETTY_CASH_ID = "petty_cash_id"
+        const val COL_QUEUE_PETTY_CASH_NUMBER = "petty_cash_number"
+        const val COL_QUEUE_AMOUNT = "amount"
+        const val COL_QUEUE_DESCRIPTION = "description"
+        const val COL_QUEUE_DATE = "date"
+        const val COL_QUEUE_ACCOUNT_ID = "account_id"
+        const val COL_QUEUE_ACCOUNT_NAME = "account_name"
+        const val COL_QUEUE_OWNER_ID = "owner_id"
+        const val COL_QUEUE_OWNER_NAME = "owner_name"
+        const val COL_QUEUE_TRUCK_NUMBERS = "truck_numbers"
+        const val COL_QUEUE_STATUS = "status"
+        const val COL_QUEUE_ERROR_MESSAGE = "error_message"
+        const val COL_QUEUE_CREATED_AT = "created_at"
+        const val COL_QUEUE_UPDATED_AT = "updated_at"
+        const val COL_QUEUE_IS_TRANSACTION_COST = "is_transaction_cost"
+        const val COL_QUEUE_RELATED_ITEM_ID = "related_queue_item_id"
 
+        // Automation Rules Table
+        private const val TABLE_AUTOMATION_RULES = "automation_rules"
+        private const val KEY_AUTOMATION_RULE_ID = "id"
+        private const val KEY_AUTOMATION_RULE_NAME = "name"
+        private const val KEY_AUTOMATION_RULE_TRANSACTOR_ID = "transactor_id"
+        private const val KEY_AUTOMATION_RULE_ACCOUNT_ID = "account_id"
+        private const val KEY_AUTOMATION_RULE_OWNER_ID = "owner_id"
+        private const val KEY_AUTOMATION_RULE_TRUCK_ID = "truck_id"
+        private const val KEY_AUTOMATION_RULE_DESCRIPTION_PATTERN = "description_pattern"
+        private const val KEY_AUTOMATION_RULE_MIN_AMOUNT = "min_amount"
+        private const val KEY_AUTOMATION_RULE_MAX_AMOUNT = "max_amount"
+        private const val KEY_AUTOMATION_RULE_CREATED_AT = "created_at"
+        private const val KEY_AUTOMATION_RULE_UPDATED_AT = "updated_at"
 
+        // Reports Table
+        private const val REPORTS_TABLE = "reports"
+        private const val REPORT_ID = "id"
+        private const val REPORT_NAME = "name"
+        private const val REPORT_TYPE = "type"
+        private const val REPORT_DATE = "generated_date"
+        private const val REPORT_FILE_PATH = "file_path"
+        private const val REPORT_EXCEL_FILE_PATH = "excel_file_path"
+        private const val REPORT_FILTERS = "filters"
+    }
 
+    fun createQueueTable(db: SQLiteDatabase) {
+        try {
+            // Check if the database is open before proceeding
+            if (!db.isOpen) {
+                Log.e("DbHelper", "Database is closed, cannot create queue table")
+                return
+            }
+            
+            val SQL_CREATE_TABLE_QUEUE = """
+                CREATE TABLE IF NOT EXISTS $TABLE_QUEUE (
+                    $COL_QUEUE_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    $COL_QUEUE_PETTY_CASH_ID INTEGER NOT NULL,
+                    $COL_QUEUE_PETTY_CASH_NUMBER TEXT NOT NULL,
+                    $COL_QUEUE_AMOUNT REAL NOT NULL,
+                    $COL_QUEUE_DESCRIPTION TEXT,
+                    $COL_QUEUE_DATE TEXT NOT NULL,
+                    $COL_QUEUE_ACCOUNT_ID INTEGER,
+                    $COL_QUEUE_ACCOUNT_NAME TEXT,
+                    $COL_QUEUE_OWNER_ID INTEGER,
+                    $COL_QUEUE_OWNER_NAME TEXT,
+                    $COL_QUEUE_TRUCK_NUMBERS TEXT,
+                    $COL_QUEUE_STATUS TEXT NOT NULL,
+                    $COL_QUEUE_ERROR_MESSAGE TEXT,
+                    $COL_QUEUE_CREATED_AT TEXT NOT NULL,
+                    $COL_QUEUE_UPDATED_AT TEXT NOT NULL,
+                    $COL_QUEUE_IS_TRANSACTION_COST INTEGER DEFAULT 0,
+                    $COL_QUEUE_RELATED_ITEM_ID INTEGER,
+                    FOREIGN KEY ($COL_QUEUE_PETTY_CASH_ID) REFERENCES $TABLE_PETTY_CASH($COL_PETTY_CASH_ID) ON DELETE CASCADE
+                )
+            """.trimIndent()
 
-        fun dropAllTables(db: SQLiteDatabase) {
+            db.execSQL(SQL_CREATE_TABLE_QUEUE)
+            
+            // Create indexes for faster lookups
+            try {
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_queue_petty_cash_id ON $TABLE_QUEUE($COL_QUEUE_PETTY_CASH_ID)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_queue_status ON $TABLE_QUEUE($COL_QUEUE_STATUS)")
+            } catch (e: Exception) {
+                Log.e("DbHelper", "Error creating queue table indexes: ${e.message}")
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error creating queue table: ${e.message}")
+        }
+    }
 
-            // List all the table names you want to drop
-            val tableNames = arrayOf(TABLE_TRANSACTIONS, TABLE_REJECTED_SMS, TABLE_ALL_SMS, TABLE_SEARCH_HISTORY, TABLE_TRUCKS, TABLE_OWNERS, TABLE_SEARCH_HISTORY_TRUCKS, TABLE_ACCOUNTS, TABLE_SEARCH_HISTORY_ACCOUNTS, TABLE_PETTY_CASH, TABLE_SEARCH_HISTORY_OWNERS, TABLE_TRANSACTORS, TABLE_SUPPORTING_DOCUMENT)
+    // Helper method to get current date time in the required format
+    private fun getCurrentDateTime(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        return sdf.format(Date())
+    }
 
-            for (tableName in tableNames) {
-                db.execSQL("DROP TABLE IF EXISTS $tableName;")
+    /**
+     * Calculate the total amount of petty cash for the current month filtered by payment mode
+     * @param paymentMode The payment mode to filter by (e.g., "M-Pesa", "Cash")
+     * @return The total amount as a Double
+     */
+    fun getTotalPettyCashAmountForCurrentMonthByPaymentMode(paymentMode: String): Double {
+        val db = this.readableDatabase
+        var totalAmount = 0.0
+
+        try {
+            val calendar = Calendar.getInstance()
+            val currentMonth = String.format("%02d", calendar.get(Calendar.MONTH) + 1) // Months are 0-indexed
+            val currentYear = calendar.get(Calendar.YEAR).toString()
+
+            // Construct SQL query to sum the amount directly in the database
+            val sql = """
+                SELECT SUM($COL_PETTY_CASH_AMOUNT) FROM $TABLE_PETTY_CASH 
+                WHERE (
+                    (SUBSTR($COL_PETTY_CASH_DATE, 7, 4) = '$currentYear' AND SUBSTR($COL_PETTY_CASH_DATE, 4, 2) = '$currentMonth') 
+                    OR 
+                    (SUBSTR($COL_PETTY_CASH_DATE, 7, 4) = '$currentYear' AND LENGTH($COL_PETTY_CASH_DATE) = 10 AND SUBSTR($COL_PETTY_CASH_DATE, 4, 2) = '$currentMonth')
+                )
+                AND $COL_PETTY_CASH_PAYMENT_MODE = ?
+                AND $COL_PETTY_CASH_IS_DELETED = 0
+            """.trimIndent()
+
+            val cursor = db.rawQuery(sql, arrayOf(paymentMode))
+            
+            cursor.use {
+                if (it.moveToFirst()) {
+                    // Check if the result is not null
+                    if (!it.isNull(0)) {
+                        totalAmount = it.getDouble(0)
+                    }
+                }
+            }
+            
+            Log.d("DbHelper", "Total $paymentMode amount for current month: $totalAmount")
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error calculating total amount for $paymentMode: ${e.message}", e)
+        }
+        // Don't close the database here, let the calling method handle it
+        
+        return totalAmount
+    }
+
+    // Add method to get all trucks
+    fun getAllTrucks(): List<String> {
+        val truckNames = mutableListOf<String>()
+        val trucks = getLocalTrucks()
+        
+        for (truck in trucks) {
+            val truckNo = truck.truckNo
+            if (truckNo != null && truckNo.isNotEmpty()) {
+                truckNames.add(truckNo)
+            }
+        }
+        
+        return truckNames
+    }
+    
+    // Add method to get all transactors for M-Pesa
+    fun getAllTransactorsForMpesa(): List<String> {
+        val transactors = mutableListOf<String>()
+        val db = this.readableDatabase
+        
+        try {
+            // Query for transactors that have been involved in M-Pesa transactions
+            val query = """
+                SELECT DISTINCT t.$COL_TRANSACTOR_NAME FROM $TABLE_TRANSACTORS t
+                INNER JOIN $TABLE_TRANSACTIONS tr 
+                ON (t.$COL_TRANSACTOR_NAME = tr.$COL_TRANSACTIONS_RECEPIENT_NAME 
+                    OR t.$COL_TRANSACTOR_NAME = tr.$COL_TRANSACTIONS_SENDER_NAME)
+                WHERE tr.$COL_TRANSACTIONS_TRANSACTION_TYPE LIKE '%M-PESA%'
+                AND t.$COL_IS_TRANSACTOR_DELETED = 0
+                ORDER BY t.$COL_TRANSACTOR_NAME ASC
+            """
+            
+            val cursor = db.rawQuery(query, null)
+            cursor.use {
+                while (it.moveToNext()) {
+                    val name = it.getString(it.getColumnIndexOrThrow(COL_TRANSACTOR_NAME))
+                    if (name != null && name.isNotEmpty()) {
+                        transactors.add(name.trim().replace("  ", " "))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error fetching transactors for M-Pesa", e)
+        } finally {
+            db.close()
+        }
+        
+        return transactors
+    }
+    
+    // Add method to get all account names
+    fun getAllAccountNames(): List<String> {
+        val accounts = mutableListOf<String>()
+        val db = this.readableDatabase
+        
+        try {
+            val query = """
+                SELECT $COL_ACCOUNT_NAME FROM $TABLE_ACCOUNTS
+                WHERE $COL_ACCOUNT_IS_DELETED = 0
+                ORDER BY $COL_ACCOUNT_NAME ASC
+            """
+            
+            val cursor = db.rawQuery(query, null)
+            cursor.use {
+                while (it.moveToNext()) {
+                    val name = it.getString(it.getColumnIndexOrThrow(COL_ACCOUNT_NAME))
+                    if (name != null && name.isNotEmpty()) {
+                        accounts.add(name)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error fetching account names", e)
+        } finally {
+            db.close()
+        }
+        
+        return accounts
+    }
+
+    // Add these methods to handle reports
+    fun saveReport(report: Report): Boolean {
+        try {
+            Log.d("DbHelper", "Saving report: ${report.id}, ${report.name}, ${report.type}")
+            val db = this.writableDatabase
+            
+            // Check if reports table exists
+            val cursor = db.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                arrayOf(REPORTS_TABLE)
+            )
+            val tableExists = cursor.use { it.count > 0 }
+            Log.d("DbHelper", "Reports table exists: $tableExists")
+            
+            // Create table if it doesn't exist
+            if (!tableExists) {
+                Log.d("DbHelper", "Creating reports table")
+                db.execSQL("""
+                    CREATE TABLE $REPORTS_TABLE (
+                        $REPORT_ID TEXT PRIMARY KEY,
+                        $REPORT_NAME TEXT NOT NULL,
+                        $REPORT_TYPE TEXT NOT NULL,
+                        $REPORT_DATE INTEGER NOT NULL,
+                        $REPORT_FILE_PATH TEXT NOT NULL,
+                        $REPORT_EXCEL_FILE_PATH TEXT,
+                        $REPORT_FILTERS TEXT
+                    )
+                """.trimIndent())
+            } else {
+                // Check if the excel_file_path column exists
+                val columnCursor = db.rawQuery("PRAGMA table_info($REPORTS_TABLE)", null)
+                var excelColumnExists = false
+                columnCursor.use {
+                    while (it.moveToNext()) {
+                        val columnName = it.getString(it.getColumnIndexOrThrow("name"))
+                        if (columnName == REPORT_EXCEL_FILE_PATH) {
+                            excelColumnExists = true
+                            break
+                        }
+                    }
+                }
+                
+                // Add the column if it doesn't exist
+                if (!excelColumnExists) {
+                    try {
+                        Log.d("DbHelper", "Adding excel_file_path column to reports table")
+                        db.execSQL("ALTER TABLE $REPORTS_TABLE ADD COLUMN $REPORT_EXCEL_FILE_PATH TEXT")
+                    } catch (e: Exception) {
+                        Log.e("DbHelper", "Error adding excel_file_path column: ${e.message}")
+                    }
+                }
+            }
+            
+            val values = ContentValues().apply {
+                put(REPORT_ID, report.id)
+                put(REPORT_NAME, report.name)
+                put(REPORT_TYPE, report.type.name)
+                put(REPORT_DATE, report.generatedDate.time)
+                put(REPORT_FILE_PATH, report.filePath)
+                put(REPORT_FILTERS, Gson().toJson(report.filters))
+                // Add excel file path if available
+                if (report.excelFilePath != null) {
+                    put(REPORT_EXCEL_FILE_PATH, report.excelFilePath)
+                }
+            }
+            
+            val result = db.insertWithOnConflict(REPORTS_TABLE, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+            Log.d("DbHelper", "Report saved with result: $result")
+            return result != -1L
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error saving report: ${e.message}", e)
+            return false
+        }
+    }
+
+    fun getReportsByType(type: ReportType): List<Report> {
+        try {
+            Log.d("DbHelper", "Getting reports of type: ${type.name}")
+            val reports = mutableListOf<Report>()
+            val db = this.readableDatabase
+            
+            // Check if reports table exists
+            val tableCheckCursor = db.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                arrayOf(REPORTS_TABLE)
+            )
+            val tableExists = tableCheckCursor.use { it.count > 0 }
+            if (!tableExists) {
+                Log.d("DbHelper", "Reports table does not exist yet")
+                return emptyList()
+            }
+            
+            val cursor = db.query(
+                REPORTS_TABLE,
+                null,
+                "$REPORT_TYPE = ?",
+                arrayOf(type.name),
+                null,
+                null,
+                "$REPORT_DATE DESC"
+            )
+            
+            Log.d("DbHelper", "Found ${cursor.count} reports of type ${type.name}")
+            
+            cursor.use {
+                while (it.moveToNext()) {
+                    reports.add(cursor.toReport())
+                }
+            }
+            
+            Log.d("DbHelper", "Returning ${reports.size} reports")
+            return reports
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting reports by type: ${e.message}", e)
+            return emptyList()
+        }
+    }
+
+    private fun Cursor.toReport(): Report {
+        val excelFilePathIndex = getColumnIndex(REPORT_EXCEL_FILE_PATH)
+        val excelFilePath = if (excelFilePathIndex != -1 && !isNull(excelFilePathIndex)) {
+            getString(excelFilePathIndex)
+        } else {
+            null
+        }
+        
+        return Report(
+            id = getString(getColumnIndexOrThrow(REPORT_ID)),
+            name = getString(getColumnIndexOrThrow(REPORT_NAME)),
+            type = ReportType.valueOf(getString(getColumnIndexOrThrow(REPORT_TYPE))),
+            generatedDate = Date(getLong(getColumnIndexOrThrow(REPORT_DATE))),
+            filePath = getString(getColumnIndexOrThrow(REPORT_FILE_PATH)),
+            excelFilePath = excelFilePath,
+            filters = Gson().fromJson(
+                getString(getColumnIndexOrThrow(REPORT_FILTERS)),
+                object : TypeToken<Map<String, String>>() {}.type
+            )
+        )
+    }
+
+    /**
+     * Deletes a report from the database by its ID
+     */
+    fun deleteReport(reportId: String): Boolean {
+        val db = this.writableDatabase
+        return db.delete(REPORTS_TABLE, "$REPORT_ID = ?", arrayOf(reportId)) > 0
+    }
+
+    /**
+     * Get filtered petty cash transactions based on various parameters
+     */
+    fun getFilteredPettyCashTransactions(
+        startDate: String,
+        endDate: String,
+        transactor: String = "",
+        paymentMode: String = "",
+        owner: String = "",
+        truck: String = "",
+        account: String = ""
+    ): List<PettyCashTransaction> {
+        val transactions = mutableListOf<PettyCashTransaction>()
+        
+        try {
+            // Format the dates for SQLite date comparison
+            // Input dates are in yyyy-MM-dd format, but database dates are in dd/MM/yyyy HH:mm:ss format
+            val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val dbFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            
+            // Parse the input dates
+            val parsedStartDate = inputFormat.parse(startDate)
+            val parsedEndDate = inputFormat.parse(endDate)
+            
+            if (parsedStartDate == null || parsedEndDate == null) {
+                Log.e("DbHelper", "Error parsing dates: startDate=$startDate, endDate=$endDate")
+                return emptyList()
+            }
+            
+            // Format to match the database date format
+            val formattedStartDate = dbFormat.format(parsedStartDate)
+            // Add 23:59:59 to the end date to include the entire day
+            val formattedEndDate = dbFormat.format(parsedEndDate) + " 23:59:59"
+            
+            Log.d("DbHelper", "Formatted dates for query: start=$formattedStartDate, end=$formattedEndDate")
+            
+            // Build the query with a simpler approach
+            val query = StringBuilder("""
+                SELECT pc.*, 
+                       t.name as transactor_name, 
+                       o.name as owner_name,
+                       a.name as account_name
+                FROM $TABLE_PETTY_CASH pc
+                LEFT JOIN transactors t ON pc.$COL_PETTY_CASH_TRANSACTOR = t.id
+                LEFT JOIN owners o ON pc.$COL_PETTY_CASH_OWNER = o.owner_code
+                LEFT JOIN accounts a ON pc.$COL_PETTY_CASH_ACCOUNT = a.id
+                WHERE pc.$COL_PETTY_CASH_IS_DELETED = 0
+                AND pc.$COL_PETTY_CASH_NUMBER IS NOT NULL
+                AND pc.$COL_PETTY_CASH_NUMBER != ''
+            """)
+
+            // Add date filtering - we'll handle this in the code instead of complex SQL
+            val args = mutableListOf<String>()
+
+            if (transactor.isNotEmpty() && transactor != "All") {
+                query.append(" AND t.name = ?")
+                args.add(transactor)
             }
 
+            if (paymentMode.isNotEmpty() && paymentMode != "All") {
+                query.append(" AND pc.$COL_PETTY_CASH_PAYMENT_MODE = ?")
+                args.add(paymentMode)
+            }
+
+            if (owner.isNotEmpty() && owner != "All") {
+                query.append(" AND o.name = ?")
+                args.add(owner)
+            }
+
+            // Store the truck filter value but don't apply it in SQL
+            val truckFilter = if (truck.isNotEmpty() && truck != "All") truck else ""
+            
+            // We don't add truck filter to SQL query - we'll filter in memory
+
+            if (account.isNotEmpty() && account != "All") {
+                query.append(" AND a.name = ?")
+                args.add(account)
+            }
+
+            query.append(" ORDER BY pc.$COL_PETTY_CASH_DATE ASC")
+
+            Log.d("DbHelper", "Executing query: $query")
+            Log.d("DbHelper", "With args: $args")
+
+            val cursor = readableDatabase.rawQuery(query.toString(), args.toTypedArray())
+            cursor.use {
+                if (cursor.count > 0) {
+                    Log.d("DbHelper", "Found ${cursor.count} transactions before date filtering")
+                    while (it.moveToNext()) {
+                        try {
+                            // Get the date from the database
+                            val dateStr = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_DATE))
+                            
+                            // Check if the date is within the range
+                            if (isDateInRange(dateStr, formattedStartDate, formattedEndDate)) {
+                                val trucksString = it.getStringOrNull(it.getColumnIndex(COL_PETTY_CASH_TRUCKS))?.replace(" ", "") ?: ""
+                                val trucksList = trucksString.split(",").filter { t -> t.isNotEmpty() }
+                                val truckCount = trucksList.size.coerceAtLeast(1) // At least 1 to avoid division by zero
+
+                                Log.d("DbHelper", "Trucks for transaction: $trucksString")
+                                Log.d("DbHelper", "Truck list: $trucksList")
+                                Log.d("DbHelper", "Truck filter: $truckFilter")
+                                
+                                // Check if we should include this transaction based on truck filter
+                                val shouldInclude = trucksList.contains(truckFilter)
+
+                                Log.d("DbHelper", "Should include: $shouldInclude")
+                                
+                                // Only include transactions that match the truck filter
+                                if (truckFilter.isEmpty() || shouldInclude) {
+                                    var amount = it.getDouble(it.getColumnIndexOrThrow(COL_PETTY_CASH_AMOUNT))
+                                    
+                                    // If filtering by a specific truck and the transaction has multiple trucks,
+                                    // divide the amount by the number of trucks
+                                    if (truckFilter.isNotEmpty() && truckCount > 1) {
+                                        amount /= truckCount
+                                    }
+                                    
+                                    val transaction = PettyCashTransaction(
+                                        id = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_ID)),
+                                        pettyCashNumber = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_NUMBER)),
+                                        date = dateStr,
+                                        amount = amount,
+                                        description = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_DESCRIPTION)),
+                                        paymentMode = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_PAYMENT_MODE)),
+                                        transactorId = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_TRANSACTOR)),
+                                        transactorName = it.getStringOrNull(it.getColumnIndex("transactor_name")),
+                                        ownerId = it.getIntOrNull(it.getColumnIndex(COL_PETTY_CASH_OWNER)),
+                                        ownerName = it.getStringOrNull(it.getColumnIndex("owner_name")),
+                                        truckNumber = trucksString,
+                                        accountId = it.getIntOrNull(it.getColumnIndex(COL_PETTY_CASH_ACCOUNT)),
+                                        accountName = it.getStringOrNull(it.getColumnIndex("account_name"))
+                                    )
+                                    transactions.add(transaction)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e("DbHelper", "Error parsing transaction: ${e.message}", e)
+                            // Continue to next transaction instead of failing the whole query
+                        }
+                    }
+                    Log.d("DbHelper", "After date filtering: ${transactions.size} transactions")
+                } else {
+                    Log.d("DbHelper", "No transactions found for the given filters")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting filtered petty cash transactions: ${e.message}", e)
+            // Return empty list instead of throwing exception
+        }
+
+        Log.d("DbHelper", "Returning ${transactions.size} transactions")
+        return transactions
+    }
+    
+    /**
+     * Helper method to check if a date string is within a given range
+     */
+    private fun isDateInRange(dateStr: String?, startDateStr: String, endDateStr: String): Boolean {
+        if (dateStr.isNullOrEmpty()) {
+            return false
+        }
+        
+        try {
+            // Parse the date formats
+            val dbFormat = if (dateStr.length > 10) {
+                SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+            } else {
+                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            }
+            
+            val startFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val endFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+            
+            // Parse the dates
+            val date = dbFormat.parse(dateStr) ?: return false
+            val start = startFormat.parse(startDateStr) ?: return false
+            val end = endFormat.parse(endDateStr) ?: return false
+            
+            // Check if the date is within the range
+            return !date.before(start) && !date.after(end)
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error parsing date for range check: $dateStr, $startDateStr, $endDateStr", e)
+            return false
+        }
+    }
+
+    // Add this method to check if the database is open
+    fun isOpen(): Boolean {
+        return try {
+            val db = writableDatabase
+            db.isOpen
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error checking if database is open: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Updates an existing report in the database
+     * @param report The report to update
+     * @return true if the update was successful, false otherwise
+     */
+    fun updateReport(report: Report): Boolean {
+        try {
+            Log.d("DbHelper", "Updating report: ${report.id}, ${report.name}, ${report.type}")
+            val db = this.writableDatabase
+            
+            val values = ContentValues().apply {
+                put(REPORT_NAME, report.name)
+                put(REPORT_TYPE, report.type.name)
+                put(REPORT_DATE, report.generatedDate.time)
+                put(REPORT_FILE_PATH, report.filePath)
+                put(REPORT_FILTERS, Gson().toJson(report.filters))
+                // Add excel file path if available
+                if (report.excelFilePath != null) {
+                    put(REPORT_EXCEL_FILE_PATH, report.excelFilePath)
+                }
+            }
+            
+            val whereClause = "$REPORT_ID = ?"
+            val whereArgs = arrayOf(report.id)
+            
+            val result = db.update(REPORTS_TABLE, values, whereClause, whereArgs)
+            Log.d("DbHelper", "Report updated with result: $result")
+            return result > 0
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error updating report: ${e.message}", e)
+            return false
+        }
+    }
+
+    fun getAllPettyCashNumbers(): List<String> {
+        val pettyCashNumbers = mutableListOf<String>()
+        val db = this.readableDatabase
+        
+        try {
+            val sql = """
+                SELECT $COL_PETTY_CASH_NUMBER FROM $TABLE_PETTY_CASH 
+                WHERE $COL_PETTY_CASH_IS_DELETED = 0
+                ORDER BY $COL_PETTY_CASH_ID DESC
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(sql, null)
+            
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    do {
+                        val pettyCashNumber = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_NUMBER))
+                        pettyCashNumber?.let { number -> pettyCashNumbers.add(number) }
+                    } while (it.moveToNext())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting petty cash numbers: ${e.message}")
+        } finally {
+            db.close()
+        }
+        
+        return pettyCashNumbers
+    }
+
+    fun getPettyCashByDateRange(startDate: String, endDate: String): List<PettyCash> {
+        val pettyCashList = mutableListOf<PettyCash>()
+        val db = this.readableDatabase
+
+        try {
+            val sql = """
+                SELECT * FROM $TABLE_PETTY_CASH 
+                WHERE $COL_PETTY_CASH_IS_DELETED = 0
+                AND (
+                    date(
+                        substr($COL_PETTY_CASH_DATE, 7, 4) || '-' ||
+                        substr($COL_PETTY_CASH_DATE, 4, 2) || '-' ||
+                        substr($COL_PETTY_CASH_DATE, 1, 2)
+                    ) >= date('${startDate.substring(6, 10)}-${startDate.substring(3, 5)}-${startDate.substring(0, 2)}')
+                    AND 
+                    date(
+                        substr($COL_PETTY_CASH_DATE, 7, 4) || '-' ||
+                        substr($COL_PETTY_CASH_DATE, 4, 2) || '-' ||
+                        substr($COL_PETTY_CASH_DATE, 1, 2)
+                    ) <= date('${endDate.substring(6, 10)}-${endDate.substring(3, 5)}-${endDate.substring(0, 2)}')
+                )
+                ORDER BY 
+                datetime(
+                    substr($COL_PETTY_CASH_DATE, 7, 4) || '-' ||
+                    substr($COL_PETTY_CASH_DATE, 4, 2) || '-' ||
+                    substr($COL_PETTY_CASH_DATE, 1, 2) || ' ' ||
+                    COALESCE(substr($COL_PETTY_CASH_DATE, 12), '00:00:00')
+                ) DESC
+            """.trimIndent()
+
+            val cursor = db.rawQuery(sql, null)
+
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    do {
+                        val id = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_ID))
+                        val pettyCashNo = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_NUMBER))
+                        val amount = it.getDouble(it.getColumnIndexOrThrow(COL_PETTY_CASH_AMOUNT))
+                        val date = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_DATE))
+                        val description = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_DESCRIPTION))
+                        val transactorId = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_TRANSACTOR))
+                        val accountId = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_ACCOUNT))
+                        val paymentMode = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_PAYMENT_MODE))
+                        val ownerCode = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_OWNER))
+                        val mpesaTransactionCode = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_MPESA_TRANSACTION))
+                        val trucks = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                        val signature = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_SIGNATURE))
+                        val supportingDocumentId = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_SUPPORTING_DOCUMENT))
+                        val user = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_USER))
+                        val isDeleted = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_IS_DELETED)) == 1
+
+                        var ownerObject: Owner? = null
+                        var truckList: List<Truck>? = null
+
+                        // Fetch related data
+                        if (ownerCode != null) {
+                            ownerObject = getOwnerByCode(ownerCode)
+                        }
+                        val mpesaTransactionObject = mpesaTransactionCode?.let { getMpesaTransactionByCode(it) }
+                        val transactorObject = getTransactorById(transactorId)
+                        val accountObject = getAccountById(accountId)
+                        val supportingDocument = getSupportingDocumentById(supportingDocumentId)
+
+                        // Split trucks and get their objects
+                        if (trucks != null) {
+                            truckList = trucks.split(", ").mapNotNull { getTruckByTruckNumber(it) }
+                        }
+
+                        // Create PettyCash object
+                        val pettyCash = PettyCash(
+                            id = id,
+                            pettyCashNumber = pettyCashNo,
+                            amount = amount,
+                            date = date,
+                            description = description,
+                            transactor = transactorObject,
+                            account = accountObject,
+                            paymentMode = paymentMode,
+                            owner = ownerObject,
+                            mpesaTransaction = mpesaTransactionObject,
+                            trucks = truckList?.toMutableList(),
+                            signature = signature,
+                            supportingDocument = supportingDocument,
+                            user = User(1, user, UserTypes(1, "admin")),
+                            isDeleted = isDeleted
+                        )
+                        pettyCashList.add(pettyCash)
+                    } while (it.moveToNext())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting petty cash by date range: ${e.message}")
+        } finally {
             db.close()
         }
 
-
-
-
-
-
-
-
-
-
-
-
+        return pettyCashList
     }
+
+    fun getPettyCashByDateRangeAndOwner(startDate: String, endDate: String, ownerId: String): List<PettyCash> {
+        val pettyCashList = mutableListOf<PettyCash>()
+        val db = this.readableDatabase
+
+        try {
+            val sql = """
+                SELECT * FROM $TABLE_PETTY_CASH 
+                WHERE $COL_PETTY_CASH_IS_DELETED = 0
+                AND $COL_PETTY_CASH_OWNER = ?
+                AND (
+                    date(
+                        substr($COL_PETTY_CASH_DATE, 7, 4) || '-' ||
+                        substr($COL_PETTY_CASH_DATE, 4, 2) || '-' ||
+                        substr($COL_PETTY_CASH_DATE, 1, 2)
+                    ) >= date('${startDate.substring(6, 10)}-${startDate.substring(3, 5)}-${startDate.substring(0, 2)}')
+                    AND 
+                    date(
+                        substr($COL_PETTY_CASH_DATE, 7, 4) || '-' ||
+                        substr($COL_PETTY_CASH_DATE, 4, 2) || '-' ||
+                        substr($COL_PETTY_CASH_DATE, 1, 2)
+                    ) <= date('${endDate.substring(6, 10)}-${endDate.substring(3, 5)}-${endDate.substring(0, 2)}')
+                )
+                ORDER BY 
+                datetime(
+                    substr($COL_PETTY_CASH_DATE, 7, 4) || '-' ||
+                    substr($COL_PETTY_CASH_DATE, 4, 2) || '-' ||
+                    substr($COL_PETTY_CASH_DATE, 1, 2) || ' ' ||
+                    COALESCE(substr($COL_PETTY_CASH_DATE, 12), '00:00:00')
+                ) DESC
+            """.trimIndent()
+
+            val cursor = db.rawQuery(sql, arrayOf(ownerId))
+
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    do {
+                        val id = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_ID))
+                        val pettyCashNo = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_NUMBER))
+                        val amount = it.getDouble(it.getColumnIndexOrThrow(COL_PETTY_CASH_AMOUNT))
+                        val date = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_DATE))
+                        val description = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_DESCRIPTION))
+                        val transactorId = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_TRANSACTOR))
+                        val accountId = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_ACCOUNT))
+                        val paymentMode = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_PAYMENT_MODE))
+                        val ownerCode = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_OWNER))
+                        val mpesaTransactionCode = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_MPESA_TRANSACTION))
+                        val trucks = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                        val signature = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_SIGNATURE))
+                        val supportingDocumentId = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_SUPPORTING_DOCUMENT))
+                        val user = it.getString(it.getColumnIndexOrThrow(COL_PETTY_CASH_USER))
+                        val isDeleted = it.getInt(it.getColumnIndexOrThrow(COL_PETTY_CASH_IS_DELETED)) == 1
+
+                        var ownerObject: Owner? = null
+                        var truckList: List<Truck>? = null
+
+                        // Fetch related data
+                        if (ownerCode != null) {
+                            ownerObject = getOwnerByCode(ownerCode)
+                        }
+                        val mpesaTransactionObject = mpesaTransactionCode?.let { getMpesaTransactionByCode(it) }
+                        val transactorObject = getTransactorById(transactorId)
+                        val accountObject = getAccountById(accountId)
+                        val supportingDocument = getSupportingDocumentById(supportingDocumentId)
+
+                        // Split trucks and get their objects
+                        if (trucks != null) {
+                            truckList = trucks.split(", ").mapNotNull { getTruckByTruckNumber(it) }
+                        }
+
+                        // Create PettyCash object
+                        val pettyCash = PettyCash(
+                            id = id,
+                            pettyCashNumber = pettyCashNo,
+                            amount = amount,
+                            date = date,
+                            description = description,
+                            transactor = transactorObject,
+                            account = accountObject,
+                            paymentMode = paymentMode,
+                            owner = ownerObject,
+                            mpesaTransaction = mpesaTransactionObject,
+                            trucks = truckList?.toMutableList(),
+                            signature = signature,
+                            supportingDocument = supportingDocument,
+                            user = User(1, user, UserTypes(1, "admin")),
+                            isDeleted = isDeleted
+                        )
+                        pettyCashList.add(pettyCash)
+                    } while (it.moveToNext())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting petty cash by date range and owner: ${e.message}")
+        } finally {
+            db.close()
+        }
+
+        return pettyCashList
+    }
+
+    /**
+     * Get all petty cash entries with pagination and filtering
+     */
+    fun getAllPettyCash(
+        page: Int = 1,
+        pageSize: Int = 20,
+        sortBy: String? = "Date",
+        dateFilter: String? = "Any Time",
+        paymentModes: List<String> = emptyList(),
+        customStartDate: String? = null,
+        customEndDate: String? = null,
+        filterUnconverted: Boolean = false
+    ): List<PettyCash> {
+        val pettyCashList = mutableListOf<PettyCash>()
+        val db = this.readableDatabase
+        
+        // Calculate offset for pagination
+        val offset = (page - 1) * pageSize
+        
+        try {
+            // Build the base query
+            var query = """
+                SELECT * FROM $TABLE_PETTY_CASH 
+                WHERE $COL_PETTY_CASH_IS_DELETED = 0
+            """
+            
+            // Add filter for unconverted petty cash if needed
+            if (filterUnconverted) {
+                query += " AND ($COL_PETTY_CASH_NUMBER IS NULL OR $COL_PETTY_CASH_NUMBER = '')"
+            }
+            
+            // Add date filter if applicable
+            if (dateFilter != "Any Time" || (customStartDate != null && customEndDate != null)) {
+                val calendar = Calendar.getInstance()
+                val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                
+                val (startDate, endDate) = when (dateFilter) {
+                    "Today" -> {
+                        val today = dateFormat.format(calendar.time)
+                        Pair(today, today)
+                    }
+                    "This Week" -> {
+                        val currentDay = calendar.get(Calendar.DAY_OF_WEEK)
+                        calendar.add(Calendar.DAY_OF_YEAR, -currentDay + 1) // Move to beginning of week (Sunday)
+                        val startDate = dateFormat.format(calendar.time)
+                        calendar.add(Calendar.DAY_OF_YEAR, 6) // Move to end of week (Saturday)
+                        val endDate = dateFormat.format(calendar.time)
+                        Pair(startDate, endDate)
+                    }
+                    "This Month" -> {
+                        calendar.set(Calendar.DAY_OF_MONTH, 1)
+                        val startDate = dateFormat.format(calendar.time)
+                        calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
+                        val endDate = dateFormat.format(calendar.time)
+                        Pair(startDate, endDate)
+                    }
+                    "Last Month" -> {
+                        calendar.add(Calendar.MONTH, -1)
+                        calendar.set(Calendar.DAY_OF_MONTH, 1)
+                        val startDate = dateFormat.format(calendar.time)
+                        calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
+                        val endDate = dateFormat.format(calendar.time)
+                        Pair(startDate, endDate)
+                    }
+                    "Last Six Months" -> {
+                        calendar.add(Calendar.MONTH, -6)
+                        val startDate = dateFormat.format(calendar.time)
+                        calendar.add(Calendar.MONTH, 6)
+                        val endDate = dateFormat.format(calendar.time)
+                        Pair(startDate, endDate)
+                    }
+                    "Custom Range" -> {
+                        Pair(customStartDate ?: "", customEndDate ?: "")
+                    }
+                    else -> Pair("", "")
+                }
+                
+                if (startDate.isNotEmpty() && endDate.isNotEmpty()) {
+                    query += " AND $COL_PETTY_CASH_DATE BETWEEN '$startDate' AND '$endDate'"
+                }
+            }
+            
+            // Add payment mode filter if applicable
+            if (paymentModes.isNotEmpty()) {
+                val paymentModesList = paymentModes.joinToString("','", "'", "'")
+                query += " AND $COL_PETTY_CASH_PAYMENT_MODE IN ($paymentModesList)"
+            }
+            
+            // Add sorting
+            query += when (sortBy) {
+                "Date" -> " ORDER BY $COL_PETTY_CASH_DATE DESC"
+                "Amount" -> " ORDER BY $COL_PETTY_CASH_AMOUNT DESC"
+                "Petty Cash Number" -> " ORDER BY $COL_PETTY_CASH_NUMBER ASC"
+                else -> " ORDER BY $COL_PETTY_CASH_DATE DESC"
+            }
+            
+            // Add pagination
+            query += " LIMIT $pageSize OFFSET $offset"
+            
+            // Execute the query
+            val cursor = db.rawQuery(query, null)
+            
+            cursor.use { c ->
+                if (c.moveToFirst()) {
+                    do {
+                        val id = c.getInt(c.getColumnIndexOrThrow(COL_PETTY_CASH_ID))
+                        val pettyCashNo = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_NUMBER))
+                        val amount = c.getDouble(c.getColumnIndexOrThrow(COL_PETTY_CASH_AMOUNT))
+                        val date = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_DATE))
+                        val description = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_DESCRIPTION))
+                        val transactorId = c.getInt(c.getColumnIndexOrThrow(COL_PETTY_CASH_TRANSACTOR))
+                        val accountId = c.getInt(c.getColumnIndexOrThrow(COL_PETTY_CASH_ACCOUNT))
+                        val paymentMode = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_PAYMENT_MODE))
+                        val ownerCode = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_OWNER))
+                        val mpesaTransactionCode = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_MPESA_TRANSACTION))
+                        val trucks = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                        val signature = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_SIGNATURE))
+                        val supportingDocumentId = c.getInt(c.getColumnIndexOrThrow(COL_PETTY_CASH_SUPPORTING_DOCUMENT))
+                        val user = c.getString(c.getColumnIndexOrThrow(COL_PETTY_CASH_USER))
+                        val isDeleted = c.getInt(c.getColumnIndexOrThrow(COL_PETTY_CASH_IS_DELETED)) == 1
+                        
+                        // Fetch related data
+                        val ownerObject = getOwnerByCode(ownerCode)
+                        val mpesaTransactionObject = mpesaTransactionCode?.let { getMpesaTransactionByCode(it) }
+                        val transactorObject = getTransactorById(transactorId)
+                        val accountObject = getAccountById(accountId)
+                        val supportingDocument = getSupportingDocumentById(supportingDocumentId)
+                        
+                        // Split trucks and get their objects
+                        val truckList = trucks.split(", ").mapNotNull { getTruckByTruckNumber(it) }
+                        
+                        // Create PettyCash object
+                        val pettyCash = PettyCash(
+                            id = id,
+                            pettyCashNumber = pettyCashNo,
+                            amount = amount,
+                            date = date,
+                            description = description,
+                            transactor = transactorObject,
+                            account = accountObject,
+                            paymentMode = paymentMode,
+                            owner = ownerObject,
+                            mpesaTransaction = mpesaTransactionObject,
+                            trucks = truckList.toMutableList(),
+                            signature = signature,
+                            supportingDocument = supportingDocument,
+                            user = User(1, user, UserTypes(1, "admin")),
+                            isDeleted = isDeleted
+                        )
+                        
+                        pettyCashList.add(pettyCash)
+                    } while (c.moveToNext())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting petty cash: ${e.message}", e)
+        }
+        
+        return pettyCashList
+    }
+
+    // Get count of petty cash entries that have been converted (have a petty cash number)
+    fun getConvertedPettyCashCount(): Int {
+        val db = this.readableDatabase
+        var count = 0
+        
+        try {
+            val query = "SELECT COUNT(*) FROM $TABLE_PETTY_CASH WHERE $COL_PETTY_CASH_NUMBER IS NOT NULL AND $COL_PETTY_CASH_NUMBER != '' AND $COL_PETTY_CASH_IS_DELETED = 0"
+            val cursor = db.rawQuery(query, null)
+            
+            if (cursor.moveToFirst()) {
+                count = cursor.getInt(0)
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting converted petty cash count", e)
+        }
+        
+        return count
+    }
+    
+    // Get all trucks with their total expenses
+    fun getTruckExpenses(): List<Pair<String, Double>> {
+        val db = this.readableDatabase
+        val truckExpenses = mutableListOf<Pair<String, Double>>()
+        
+        try {
+            val query = """
+                SELECT $COL_PETTY_CASH_TRUCKS, SUM($COL_PETTY_CASH_AMOUNT) as total_expense
+                FROM $TABLE_PETTY_CASH
+                WHERE $COL_PETTY_CASH_TRUCKS IS NOT NULL AND $COL_PETTY_CASH_TRUCKS != '' AND $COL_PETTY_CASH_IS_DELETED = 0
+                GROUP BY $COL_PETTY_CASH_TRUCKS
+                ORDER BY total_expense ASC
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(query, null)
+            
+            while (cursor.moveToNext()) {
+                val truckNo = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                val totalExpense = cursor.getDouble(cursor.getColumnIndexOrThrow("total_expense"))
+                truckExpenses.add(Pair(truckNo, totalExpense))
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting truck expenses", e)
+        }
+        
+        return truckExpenses
+    }
+    
+    // Get spending per company for a date range
+    fun getSpendingPerCompanyForDateRange(startDate: String, endDate: String): List<Triple<String, String, Double>> {
+        val db = this.readableDatabase
+        val spendingData = mutableListOf<Triple<String, String, Double>>()
+        
+        try {
+            val query = """
+                SELECT $COL_PETTY_CASH_OWNER, $COL_PETTY_CASH_DATE, SUM($COL_PETTY_CASH_AMOUNT) as daily_amount
+                FROM $TABLE_PETTY_CASH
+                WHERE $COL_PETTY_CASH_DATE BETWEEN ? AND ? AND $COL_PETTY_CASH_IS_DELETED = 0
+                GROUP BY $COL_PETTY_CASH_OWNER, $COL_PETTY_CASH_DATE
+                ORDER BY $COL_PETTY_CASH_OWNER, $COL_PETTY_CASH_DATE
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(query, arrayOf(startDate, endDate))
+            
+            while (cursor.moveToNext()) {
+                val ownerCode = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_OWNER))
+                val date = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_DATE))
+                val amount = cursor.getDouble(cursor.getColumnIndexOrThrow("daily_amount"))
+                spendingData.add(Triple(ownerCode, date, amount))
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting spending per company for date range", e)
+        }
+        
+        return spendingData
+    }
+
+    // Get spending per company for a date range with non-null petty cash numbers only
+    fun getSpendingPerCompanyForDateRangeWithPettyCashNumber(startDate: String, endDate: String): List<Triple<String, String, Double>> {
+        val db = this.readableDatabase
+        val spendingData = mutableListOf<Triple<String, String, Double>>()
+        
+        try {
+            val query = """
+                SELECT $COL_PETTY_CASH_OWNER, $COL_PETTY_CASH_DATE, SUM($COL_PETTY_CASH_AMOUNT) as daily_amount
+                FROM $TABLE_PETTY_CASH
+                WHERE $COL_PETTY_CASH_DATE BETWEEN ? AND ? 
+                AND $COL_PETTY_CASH_IS_DELETED = 0
+                AND $COL_PETTY_CASH_NUMBER IS NOT NULL
+                AND $COL_PETTY_CASH_NUMBER != ''
+                GROUP BY $COL_PETTY_CASH_OWNER, $COL_PETTY_CASH_DATE
+                ORDER BY $COL_PETTY_CASH_OWNER, $COL_PETTY_CASH_DATE
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(query, arrayOf(startDate, endDate))
+            
+            while (cursor.moveToNext()) {
+                val ownerCode = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_OWNER))
+                val date = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_DATE))
+                val amount = cursor.getDouble(cursor.getColumnIndexOrThrow("daily_amount"))
+                spendingData.add(Triple(ownerCode, date, amount))
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting spending per company for date range with petty cash number", e)
+        }
+        
+        return spendingData
+    }
+
+    // Get owner name by owner code
+    fun getOwnerNameByCode(ownerCode: String?): String {
+        if (ownerCode == null) return "Unknown Owner"
+        
+        val db = this.readableDatabase
+        var ownerName = ""
+        
+        try {
+            val query = "SELECT $COL_OWNER_NAME FROM $TABLE_OWNERS WHERE $COL_OWNER_CODE = ? AND $COL_IS_OWNER_DELETED = 0"
+            val cursor = db.rawQuery(query, arrayOf(ownerCode))
+            
+            if (cursor.moveToFirst()) {
+                ownerName = cursor.getString(cursor.getColumnIndexOrThrow(COL_OWNER_NAME))
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting owner name by code", e)
+        }
+        
+        return ownerName
+    }
+
+    // Get truck expenses filtered by owner
+    fun getTruckExpensesByOwner(ownerCode: String): List<Pair<String, Double>> {
+        val db = this.readableDatabase
+        val truckExpenses = mutableListOf<Pair<String, Double>>()
+        
+        try {
+            val query = """
+                SELECT $COL_PETTY_CASH_TRUCKS, SUM($COL_PETTY_CASH_AMOUNT) as total_expense
+                FROM $TABLE_PETTY_CASH
+                WHERE $COL_PETTY_CASH_TRUCKS IS NOT NULL 
+                AND $COL_PETTY_CASH_TRUCKS != '' 
+                AND $COL_PETTY_CASH_OWNER = ?
+                AND $COL_PETTY_CASH_IS_DELETED = 0
+                GROUP BY $COL_PETTY_CASH_TRUCKS
+                ORDER BY total_expense ASC
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(query, arrayOf(ownerCode))
+            
+            while (cursor.moveToNext()) {
+                val truckNo = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                val totalExpense = cursor.getDouble(cursor.getColumnIndexOrThrow("total_expense"))
+                truckExpenses.add(Pair(truckNo, totalExpense))
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting truck expenses by owner", e)
+        }
+        
+        return truckExpenses
+    }
+
+    // Get truck expenses with support for multiple trucks in a single petty cash entry
+    fun getTruckExpensesWithMultipleTrucks(): List<Pair<String, Double>> {
+        val db = this.readableDatabase
+        val truckExpensesMap = mutableMapOf<String, Double>()
+        
+        try {
+            val query = """
+                SELECT $COL_PETTY_CASH_TRUCKS, $COL_PETTY_CASH_AMOUNT
+                FROM $TABLE_PETTY_CASH
+                WHERE $COL_PETTY_CASH_TRUCKS IS NOT NULL 
+                AND $COL_PETTY_CASH_TRUCKS != '' 
+                AND $COL_PETTY_CASH_IS_DELETED = 0
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(query, null)
+            
+            while (cursor.moveToNext()) {
+                val trucksString = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                val amount = cursor.getDouble(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_AMOUNT))
+                
+                // Split the trucks string by comma and trim each truck number
+                val trucks = trucksString.split(",").map { it.trim() }
+                
+                // Divide the amount equally among all trucks
+                val amountPerTruck = amount / trucks.size
+                
+                // Add the divided amount to each truck's total
+                for (truck in trucks) {
+                    if (truck.isNotEmpty()) {
+                        truckExpensesMap[truck] = truckExpensesMap.getOrDefault(truck, 0.0) + amountPerTruck
+                    }
+                }
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting truck expenses with multiple trucks", e)
+        }
+        
+        // Convert the map to a list of pairs and sort by expense (ascending)
+        return truckExpensesMap.toList().sortedBy { it.second }
+    }
+
+    // Get truck expenses by owner with support for multiple trucks
+    fun getTruckExpensesByOwnerWithMultipleTrucks(ownerCode: String): List<Pair<String, Double>> {
+        val db = this.readableDatabase
+        val truckExpensesMap = mutableMapOf<String, Double>()
+        
+        try {
+            val query = """
+                SELECT $COL_PETTY_CASH_TRUCKS, $COL_PETTY_CASH_AMOUNT
+                FROM $TABLE_PETTY_CASH
+                WHERE $COL_PETTY_CASH_TRUCKS IS NOT NULL 
+                AND $COL_PETTY_CASH_TRUCKS != '' 
+                AND $COL_PETTY_CASH_OWNER = ?
+                AND $COL_PETTY_CASH_IS_DELETED = 0
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(query, arrayOf(ownerCode))
+            
+            while (cursor.moveToNext()) {
+                val trucksString = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                val amount = cursor.getDouble(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_AMOUNT))
+                
+                // Split the trucks string by comma and trim each truck number
+                val trucks = trucksString.split(",").map { it.trim() }
+                
+                // Divide the amount equally among all trucks
+                val amountPerTruck = amount / trucks.size
+                
+                // Add the divided amount to each truck's total
+                for (truck in trucks) {
+                    if (truck.isNotEmpty()) {
+                        truckExpensesMap[truck] = truckExpensesMap.getOrDefault(truck, 0.0) + amountPerTruck
+                    }
+                }
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting truck expenses by owner with multiple trucks", e)
+        }
+        
+        // Convert the map to a list of pairs and sort by expense (ascending)
+        return truckExpensesMap.toList().sortedBy { it.second }
+    }
+
+    // Get truck expenses with pagination
+    fun getTruckExpensesPaginated(limit: Int, offset: Int): List<Pair<String, Double>> {
+        val db = this.readableDatabase
+        val truckExpenses = mutableListOf<Pair<String, Double>>()
+        
+        try {
+            val query = """
+                SELECT $COL_PETTY_CASH_TRUCKS, SUM($COL_PETTY_CASH_AMOUNT) as total_expense
+                FROM $TABLE_PETTY_CASH
+                WHERE $COL_PETTY_CASH_TRUCKS IS NOT NULL AND $COL_PETTY_CASH_TRUCKS != '' AND $COL_PETTY_CASH_IS_DELETED = 0
+                GROUP BY $COL_PETTY_CASH_TRUCKS
+                ORDER BY total_expense ASC
+                LIMIT ? OFFSET ?
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(query, arrayOf(limit.toString(), offset.toString()))
+            
+            while (cursor.moveToNext()) {
+                val truckNo = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                val totalExpense = cursor.getDouble(cursor.getColumnIndexOrThrow("total_expense"))
+                truckExpenses.add(Pair(truckNo, totalExpense))
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting paginated truck expenses", e)
+        }
+        
+        return truckExpenses
+    }
+    
+    // Get truck expenses filtered by owner with pagination
+    fun getTruckExpensesByOwnerPaginated(ownerCode: String, limit: Int, offset: Int): List<Pair<String, Double>> {
+        val db = this.readableDatabase
+        val truckExpenses = mutableListOf<Pair<String, Double>>()
+        
+        try {
+            val query = """
+                SELECT $COL_PETTY_CASH_TRUCKS, SUM($COL_PETTY_CASH_AMOUNT) as total_expense
+                FROM $TABLE_PETTY_CASH
+                WHERE $COL_PETTY_CASH_TRUCKS IS NOT NULL 
+                AND $COL_PETTY_CASH_TRUCKS != '' 
+                AND $COL_PETTY_CASH_OWNER = ?
+                AND $COL_PETTY_CASH_IS_DELETED = 0
+                GROUP BY $COL_PETTY_CASH_TRUCKS
+                ORDER BY total_expense ASC
+                LIMIT ? OFFSET ?
+            """.trimIndent()
+            
+            val cursor = db.rawQuery(query, arrayOf(ownerCode, limit.toString(), offset.toString()))
+            
+            while (cursor.moveToNext()) {
+                val truckNo = cursor.getString(cursor.getColumnIndexOrThrow(COL_PETTY_CASH_TRUCKS))
+                val totalExpense = cursor.getDouble(cursor.getColumnIndexOrThrow("total_expense"))
+                truckExpenses.add(Pair(truckNo, totalExpense))
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting paginated truck expenses by owner", e)
+        }
+        
+        return truckExpenses
+    }
+
+// ... existing code ...
+
+    /**
+     * Gets a page of unconverted petty cash entries (those with null or empty petty cash number)
+     */
+    // ... existing code ...
+    /**
+     * Gets a page of unconverted petty cash entries (those with null or empty petty cash number)
+     * Using SQL JOINs to load related data in a single query
+     */
+    fun getUnconvertedPettyCash(
+        page: Int,
+        pageSize: Int,
+        sortBy: String? = "Date",
+        dateFilter: String? = "This Month",
+        paymentModes: List<String>? = null,
+        customStartDate: String? = null,
+        customEndDate: String? = null
+    ): List<PettyCash> {
+        val offset = (page - 1) * pageSize
+        val pettyCashList = mutableListOf<PettyCash>()
+        val db = this.readableDatabase
+
+        try {
+            val queryBuilder = StringBuilder()
+            // Use JOIN to get transactor data in a single query
+            queryBuilder.append("SELECT p.*, t.* FROM $TABLE_PETTY_CASH p ")
+            queryBuilder.append("LEFT JOIN $TABLE_TRANSACTORS t ON p.$COL_PETTY_CASH_TRANSACTOR = t.$COL_TRANSACTOR_ID ")
+            queryBuilder.append("WHERE p.$COL_PETTY_CASH_IS_DELETED = 0 ")
+
+            // Filter for unconverted petty cash (null or empty petty cash number)
+            queryBuilder.append("AND (p.$COL_PETTY_CASH_NUMBER IS NULL OR p.$COL_PETTY_CASH_NUMBER = '') ")
+
+            // Add date filtering if needed
+            when (dateFilter) {
+                "Today" -> {
+                    val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                    queryBuilder.append("AND p.$COL_PETTY_CASH_DATE LIKE '$today%' ")
+                }
+                "This Week" -> {
+                    val calendar = Calendar.getInstance()
+                    calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+                    val startDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(calendar.time)
+
+                    calendar.add(Calendar.DAY_OF_WEEK, 6)
+                    val endDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(calendar.time)
+
+                    queryBuilder.append("AND p.$COL_PETTY_CASH_DATE BETWEEN '$startDate' AND '$endDate' ")
+                }
+                "This Month" -> {
+                    val calendar = Calendar.getInstance()
+                    val currentMonth = String.format("%02d", calendar.get(Calendar.MONTH) + 1)
+                    val currentYear = calendar.get(Calendar.YEAR).toString()
+
+                    queryBuilder.append("AND (SUBSTR(p.$COL_PETTY_CASH_DATE, 7, 4) = '$currentYear' AND SUBSTR(p.$COL_PETTY_CASH_DATE, 4, 2) = '$currentMonth') ")
+                }
+                "Last Month" -> {
+                    val calendar = Calendar.getInstance()
+                    calendar.add(Calendar.MONTH, -1)
+                    val lastMonth = String.format("%02d", calendar.get(Calendar.MONTH) + 1)
+                    val year = calendar.get(Calendar.YEAR).toString()
+
+                    queryBuilder.append("AND (SUBSTR(p.$COL_PETTY_CASH_DATE, 7, 4) = '$year' AND SUBSTR(p.$COL_PETTY_CASH_DATE, 4, 2) = '$lastMonth') ")
+                }
+                "Last Six Months" -> {
+                    val calendar = Calendar.getInstance()
+                    val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(calendar.time)
+
+                    calendar.add(Calendar.MONTH, -6)
+                    val sixMonthsAgo = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(calendar.time)
+
+                    queryBuilder.append("AND p.$COL_PETTY_CASH_DATE BETWEEN '$sixMonthsAgo' AND '$currentDate' ")
+                }
+                "Custom Range" -> {
+                    if (customStartDate != null && customEndDate != null) {
+                        queryBuilder.append("AND p.$COL_PETTY_CASH_DATE BETWEEN '$customStartDate' AND '$customEndDate' ")
+                    }
+                }
+            }
+
+            // Add payment mode filter if specified
+            if (!paymentModes.isNullOrEmpty()) {
+                queryBuilder.append("AND (")
+                paymentModes.forEachIndexed { index, paymentMode ->
+                    if (index > 0) queryBuilder.append(" OR ")
+                    queryBuilder.append("p.$COL_PETTY_CASH_PAYMENT_MODE = '$paymentMode'")
+                }
+                queryBuilder.append(") ")
+            }
+
+            // Add sorting
+            queryBuilder.append("ORDER BY ")
+            when (sortBy) {
+                "Amount" -> queryBuilder.append("p.$COL_PETTY_CASH_AMOUNT DESC ")
+                "Transactor" -> queryBuilder.append("t.$COL_TRANSACTOR_NAME ") // Sort by transactor name directly
+                else -> queryBuilder.append("p.$COL_PETTY_CASH_DATE DESC ")
+            }
+
+            // Add pagination
+            queryBuilder.append("LIMIT $pageSize OFFSET $offset")
+
+            val cursor = db.rawQuery(queryBuilder.toString(), null)
+
+            cursor.use {
+                while (it.moveToNext()) {
+                    val pettyCash = getPettyCashFromCursor(it)
+
+                    // Create transactor object directly from the joined data
+                    if (pettyCash != null && it.getColumnIndex(COL_TRANSACTOR_ID) != -1) {
+                        try {
+                            val transactorId = it.getInt(it.getColumnIndexOrThrow(COL_TRANSACTOR_ID))
+                            if (transactorId > 0) {
+                                val transactorName = it.getString(it.getColumnIndexOrThrow(COL_TRANSACTOR_NAME))
+                                val phoneNo = it.getString(it.getColumnIndexOrThrow(COL_TRANSACTOR_PHONE_NO))
+                                val address = it.getString(it.getColumnIndexOrThrow(COL_TRANSACTOR_ADDRESS))
+                                val transactorType = it.getString(it.getColumnIndexOrThrow(COL_TRANSACTOR_TYPE))
+                                val idCardNo = it.getInt(it.getColumnIndexOrThrow(COL_TRANSACTOR_ID_CARD_NO))
+                                val isDeleted = it.getInt(it.getColumnIndexOrThrow(COL_IS_TRANSACTOR_DELETED)) > 0
+                                val isImported = it.getInt(it.getColumnIndexOrThrow(COL_IS_IMPORTED)) > 0
+                                val logoPath = it.getString(it.getColumnIndexOrThrow(COL_TRANSACTOR_LOGO_PATH))
+                                val kraPinString = it.getString(it.getColumnIndexOrThrow(COL_TRANSACTOR_KRA_PIN))
+                                val interactions = it.getInt(it.getColumnIndexOrThrow(COL_TRANSACTOR_INTERACTIONS))
+                                val avatarColor = it.getString(it.getColumnIndexOrThrow(COL_TRANSACTOR_AVATAR_COLOR))
+
+                                // Create transactor directly from cursor data
+                                pettyCash.transactor = Transactor(
+                                    id = transactorId,
+                                    name = transactorName,
+                                    phoneNumber = phoneNo,
+                                    idCard = idCardNo,
+                                    address = address,
+                                    transactorType = transactorType,
+                                    transactorProfilePicturePath = logoPath,
+                                    interactions = interactions,
+                                    kraPin = kraPinString,
+                                    isDeleted = isDeleted,
+                                    isImported = isImported,
+                                    avatarColor = avatarColor
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e("DbHelper", "Error creating transactor from cursor: ${e.message}")
+                        }
+                    }
+
+                    if (pettyCash != null) {
+                        pettyCashList.add(pettyCash)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error getting unconverted petty cash: ${e.message}")
+            e.printStackTrace()
+        }
+
+        return pettyCashList
+    }
+    /**
+     * Searches for unconverted petty cash entries based on a query
+     */
+    fun searchUnconvertedPettyCash(query: String): List<PettyCash> {
+        val pettyCashList = mutableListOf<PettyCash>()
+        val db = this.readableDatabase
+
+        val likeQuery = "%$query%"
+
+        try {
+            val queryBuilder = StringBuilder()
+            // Get all fields from both petty cash and transactor tables
+            queryBuilder.append("SELECT p.*, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_ID as t_id, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_NAME as t_name, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_PHONE_NO as t_phone, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_ADDRESS as t_address, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_TYPE as t_type, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_ID_CARD_NO as t_id_card, ")
+            queryBuilder.append("t.$COL_IS_TRANSACTOR_DELETED as t_is_deleted, ")
+            queryBuilder.append("t.$COL_IS_IMPORTED as t_is_imported, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_LOGO_PATH as t_logo_path, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_KRA_PIN as t_kra_pin, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_INTERACTIONS as t_interactions, ")
+            queryBuilder.append("t.$COL_TRANSACTOR_AVATAR_COLOR as t_avatar_color ")
+            queryBuilder.append("FROM $TABLE_PETTY_CASH p ")
+            queryBuilder.append("LEFT JOIN $TABLE_TRANSACTORS t ON p.$COL_PETTY_CASH_TRANSACTOR = t.$COL_TRANSACTOR_ID ")
+            queryBuilder.append("WHERE p.$COL_PETTY_CASH_IS_DELETED = 0 ")
+
+            // Filter for unconverted petty cash (null or empty petty cash number)
+            queryBuilder.append("AND (p.$COL_PETTY_CASH_NUMBER IS NULL OR p.$COL_PETTY_CASH_NUMBER = '') ")
+
+            // Add current month filter
+            val calendar = Calendar.getInstance()
+            val currentMonth = String.format("%02d", calendar.get(Calendar.MONTH) + 1)
+            val currentYear = calendar.get(Calendar.YEAR).toString()
+            queryBuilder.append("AND (SUBSTR(p.$COL_PETTY_CASH_DATE, 7, 4) = '$currentYear' AND SUBSTR(p.$COL_PETTY_CASH_DATE, 4, 2) = '$currentMonth') ")
+
+            // Search criteria
+            queryBuilder.append("AND (")
+            queryBuilder.append("p.$COL_PETTY_CASH_DATE LIKE ? OR ")
+            queryBuilder.append("p.$COL_PETTY_CASH_AMOUNT LIKE ? OR ")
+            queryBuilder.append("p.$COL_PETTY_CASH_DESCRIPTION LIKE ? OR ")
+            queryBuilder.append("p.$COL_PETTY_CASH_PAYMENT_MODE LIKE ? OR ")
+            queryBuilder.append("t.$COL_TRANSACTOR_NAME LIKE ? OR ")
+            queryBuilder.append("p.$COL_PETTY_CASH_TRUCKS LIKE ?")
+            queryBuilder.append(") ")
+
+            // Order by date descending
+            queryBuilder.append("ORDER BY p.$COL_PETTY_CASH_DATE DESC ")
+
+            // Limit results to 100
+            queryBuilder.append("LIMIT 100")
+
+            val args = arrayOf(likeQuery, likeQuery, likeQuery, likeQuery, likeQuery, likeQuery)
+            val cursor = db.rawQuery(queryBuilder.toString(), args)
+
+            cursor.use {
+                while (it.moveToNext()) {
+                    val pettyCash = getPettyCashFromCursor(it)
+
+                    // Create transactor object directly from the joined data
+                    if (pettyCash != null && it.getColumnIndex("t_id") != -1) {
+                        try {
+                            if (!it.isNull(it.getColumnIndex("t_id"))) {
+                                val transactorId = it.getInt(it.getColumnIndex("t_id"))
+                                val transactorName = it.getString(it.getColumnIndex("t_name"))
+                                val phoneNo = it.getString(it.getColumnIndex("t_phone"))
+                                val address = it.getString(it.getColumnIndex("t_address"))
+                                val transactorType = it.getString(it.getColumnIndex("t_type"))
+                                val idCardNo = it.getInt(it.getColumnIndex("t_id_card"))
+                                val isDeleted = it.getInt(it.getColumnIndex("t_is_deleted")) > 0
+                                val isImported = it.getInt(it.getColumnIndex("t_is_imported")) > 0
+                                val logoPath = it.getString(it.getColumnIndex("t_logo_path"))
+                                val kraPinString = it.getString(it.getColumnIndex("t_kra_pin"))
+                                val interactions = it.getInt(it.getColumnIndex("t_interactions"))
+                                val avatarColor = it.getString(it.getColumnIndex("t_avatar_color"))
+
+                                // Create transactor directly from cursor data
+                                pettyCash.transactor = Transactor(
+                                    id = transactorId,
+                                    name = transactorName,
+                                    phoneNumber = phoneNo,
+                                    idCard = idCardNo,
+                                    address = address,
+                                    transactorType = transactorType,
+                                    transactorProfilePicturePath = logoPath,
+                                    interactions = interactions,
+                                    kraPin = kraPinString,
+                                    isDeleted = isDeleted,
+                                    isImported = isImported,
+                                    avatarColor = avatarColor
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e("DbHelper", "Error creating transactor from cursor: ${e.message}")
+                        }
+                    }
+
+                    if (pettyCash != null) {
+                        pettyCashList.add(pettyCash)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("DbHelper", "Error searching unconverted petty cash: ${e.message}")
+            e.printStackTrace()
+        }
+
+        return pettyCashList
+    }
+
+
+
 }
+

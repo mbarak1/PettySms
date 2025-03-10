@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/automationCardView"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="8dp"
+    style="@style/Widget.Material3.CardView.Elevated"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="2dp"
+    app:cardPreventCornerOverlap="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <!-- Owner Image with colored background -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/ownerImage"
+            android:layout_width="70dp"
+            android:layout_height="70dp"
+            android:padding="8dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:shapeAppearance="@style/ShapeAppearanceOverlay.Material3.Chip"
+            tools:src="@drawable/baseline_auto_awesome_24" />
+
+        <!-- Rule Name with Material 3 typography -->
+        <TextView
+            android:id="@+id/ruleName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+            android:textColor="?attr/colorPrimary"
+            app:layout_constraintEnd_toStartOf="@+id/actionsLayout"
+            app:layout_constraintStart_toEndOf="@+id/ownerImage"
+            app:layout_constraintTop_toTopOf="@+id/ownerImage"
+            tools:text="Fuel Rule" />
+
+        <!-- Amount Range with accent color -->
+        <TextView
+            android:id="@+id/amountRange"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+            android:textColor="?attr/colorPrimary"
+            app:layout_constraintBottom_toBottomOf="@+id/ownerImage"
+            app:layout_constraintEnd_toStartOf="@+id/actionsLayout"
+            app:layout_constraintStart_toEndOf="@+id/ownerImage"
+            app:layout_constraintTop_toBottomOf="@+id/ruleName"
+            tools:text="Amount: $1,000 - $5,000" />
+
+        <!-- Actions Layout with Material 3 icon buttons -->
+        <LinearLayout
+            android:id="@+id/actionsLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/editButton"
+                style="@style/Widget.Material3.Button.TonalButton.Icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Edit Rule"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="6dp"
+                app:cornerRadius="18dp"
+                app:icon="@drawable/material_3_edit_24px"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="18dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/deleteButton"
+                style="@style/Widget.Material3.Button.TonalButton.Icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:contentDescription="Delete Rule"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="6dp"
+                app:backgroundTint="?attr/colorErrorContainer"
+                app:cornerRadius="18dp"
+                app:icon="@drawable/ic_baseline_material_3_delete"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="18dp"
+                app:iconTint="?attr/colorOnErrorContainer" />
+        </LinearLayout>
+
+        <!-- Material 3 Divider -->
+        <com.google.android.material.divider.MaterialDivider
+            android:id="@+id/divider"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            style="@style/Widget.Material3.MaterialDivider"
+            app:dividerColor="?attr/colorPrimary"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/ownerImage" />
+
+        <!-- Rule Details with Material 3 typography and colored labels -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/detailsContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/divider">
+
+            <!-- Chips ScrollView -->
+            <HorizontalScrollView
+                android:id="@+id/chipsScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:fadeScrollbars="true"
+                android:overScrollMode="never"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroup"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:singleLine="true"
+                    app:chipSpacingHorizontal="8dp">
+
+                    <!-- Transactor Chip -->
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/transactorChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        style="@style/Widget.Material3.Chip.Assist.Elevated"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        app:chipIcon="@drawable/outline_person_black_24dp"
+                        app:chipIconTint="?attr/colorPrimary"
+                        tools:text="Shell" />
+
+                    <!-- Account Chip -->
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/accountChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        style="@style/Widget.Material3.Chip.Assist.Elevated"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        app:chipIcon="@drawable/account_tree_24px"
+                        app:chipIconTint="?attr/colorPrimary"
+                        tools:text="Fuel Account" />
+
+                    <!-- Truck Chip -->
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/truckChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        style="@style/Widget.Material3.Chip.Assist.Elevated"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        app:chipIcon="@drawable/outline_local_shipping_black_24dp"
+                        app:chipIconTint="?attr/colorPrimary"
+                        tools:text="KAB 123Z" />
+
+                </com.google.android.material.chip.ChipGroup>
+
+            </HorizontalScrollView>
+
+            <!-- Description Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/descriptionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:layout_constraintTop_toBottomOf="@id/chipsScrollView"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Description Pattern"
+                        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                        android:textColor="?attr/colorPrimary" />
+
+                    <TextView
+                        android:id="@+id/descriptionPattern"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        tools:text="Contains 'fuel'" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView> 

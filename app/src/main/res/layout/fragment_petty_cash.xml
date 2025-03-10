@@ -231,6 +231,7 @@
                         app:iconSize="30dp" />
 
                     <com.google.android.material.button.MaterialButton
+                        android:id="@+id/reportsButton"
                         style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="82dp"
                         android:layout_height="80dp"
@@ -290,6 +291,7 @@
                         app:iconSize="30dp" />
 
                     <com.google.android.material.button.MaterialButton
+                        android:id="@+id/queueButton"
                         style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="82dp"
                         android:layout_height="80dp"
@@ -301,7 +303,7 @@
                         android:text="Queue"
                         android:textAlignment="center"
                         android:textSize="6sp"
-                        app:icon="@drawable/list_alt_24px"
+                        app:icon="@drawable/ic_queue"
                         app:iconGravity="top"
                         app:iconSize="30dp" />
 
@@ -321,7 +323,76 @@
                         app:iconGravity="top"
                         app:iconSize="30dp" />
 
+
+
                 </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="30dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/automationButton"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="82dp"
+                    android:layout_height="80dp"
+                    android:layout_marginStart="20dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/pc_button_background"
+                    android:fontFamily="@font/montserrat_medium"
+                    android:text="Automation"
+                    app:iconTint="?attr/colorControlNormal"
+                    app:icon="@drawable/baseline_auto_awesome_24"
+                    app:iconGravity="top"
+                    app:iconSize="30dp"
+                    android:textSize="6sp"
+
+                    />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/account2Button"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="82dp"
+                    android:layout_height="80dp"
+                    android:layout_marginStart="45dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/pc_button_background"
+                    android:fontFamily="@font/montserrat_medium"
+                    android:text="Accounts"
+                    android:textAlignment="center"
+                    android:textSize="6sp"
+                    app:icon="@drawable/account_tree_24px"
+                    app:iconGravity="top"
+                    android:visibility="invisible"
+                    app:iconSize="30dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/trucks2Button"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="82dp"
+                    android:layout_height="80dp"
+                    android:layout_marginStart="40dp"
+                    android:layout_marginEnd="20dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/pc_button_background"
+                    android:fontFamily="@font/montserrat_medium"
+                    android:text="Trucks"
+                    android:textSize="6sp"
+                    android:visibility="invisible"
+                    app:icon="@drawable/outline_local_shipping_black_24dp"
+                    app:iconGravity="top"
+                    app:iconSize="30dp" />
+
+            </LinearLayout>
+
+
+
+
 
 
             </LinearLayout>

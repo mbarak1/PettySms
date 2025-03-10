@@ -22,4 +22,10 @@
     <color name="colorOverlay">#78ffffff</color>
     <color name="new_green_color">#57ff3d</color>
     <color name="semi_transparent_light_gray">#40CCCCCC</color>
+    <!-- Queue Status Colors -->
+    <color name="pendingColor">#FFF9C4</color>
+    <color name="sentColor">#81C784</color>
+    <color name="syncedColor">#64B5F6</color>
+    <color name="failedColor">#FFCDD2</color>
+    <color name="defaultColor">#E0E0E0</color>
 </resources>

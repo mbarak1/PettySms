@@ -32,11 +32,12 @@ import android.content.BroadcastReceiver
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import android.content.Context
 import android.content.IntentFilter
+import com.example.pettysms.PettyCashFragment.CallbackSingleton
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 
 class ViewAllPettyCashActivity : AppCompatActivity(), 
     PettyCashSortFilterDialogFragment.OnApplyClickListener,
-    AddPettyCashFragment.OnAddPettyCashListener {
+    AddPettyCashFragment.OnAddPettyCashListener, RefreshRecyclerViewCallback {
     private var _binding: ActivityViewAllPettyCashBinding? = null
     private val binding get() = _binding!!
     private var fab: ExtendedFloatingActionButton? = null
@@ -54,8 +55,17 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
     private var currentPaymentModes: List<String> = emptyList()
     private var customStartDate: String? = null
     private var customEndDate: String? = null
+    private var filterUnconverted: Boolean = false
 
     private var searchJob: Job? = null
+
+    companion object {
+        var isActivityVisible = false
+    }
+
+    object CallbackSingleton {
+        var refreshCallback: RefreshRecyclerViewCallback? = null
+    }
 
     // Add broadcast receiver
     private val pettyCashDeleteReceiver = object : BroadcastReceiver() {
@@ -109,9 +119,20 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
         // Add toolbar setup
         setSupportActionBar(binding.searchBar)
 
+        // Check if we should filter for unconverted petty cash
+        filterUnconverted = intent.getBooleanExtra("FILTER_UNCONVERTED", false)
+        
+        // Update title if filtering unconverted
+        if (filterUnconverted) {
+            binding.searchBar.title = "Unconverted Petty Cash"
+        }
+
         dbHelper = DbHelper(this)
         setupViews()
         loadPettyCash()
+
+        CallbackSingleton.refreshCallback = this
+
 
         // Register for petty cash updates
         registerForPettyCashUpdates()
@@ -392,7 +413,8 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
                     dateFilter = dateFilter ?: "Any Time",
                     paymentModes = currentPaymentModes ?: emptyList(), // Get all payment modes, we'll filter in memory
                     customStartDate = customStartDate,
-                    customEndDate = customEndDate
+                    customEndDate = customEndDate,
+                    filterUnconverted = filterUnconverted // Pass the filter flag
                 )
 
                 withContext(Dispatchers.Main) {
@@ -695,6 +717,16 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        isActivityVisible = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isActivityVisible = false
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         // Safely cleanup binding and adapter
@@ -826,12 +858,14 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
                             // Update existing petty cash
                             allPettyCash[existingIndex] = newPettyCash
                             pettyCashAdapter?.updateItem(newPettyCash)
+                            PettyCashFragment.updatedPettyCashIds.add(newPettyCash.id!!)
                             Log.d("ViewAllPettyCash", "Updated existing petty cash at index $existingIndex")
                             
                             // Update transaction cost if exists
                             transactionCost?.let { tc ->
                                 val tcIndex = allPettyCash.indexOfFirst { it.id == tc.id }
                                 if (tcIndex != -1) {
+                                    PettyCashFragment.updatedPettyCashIds.add(tc.id!!)
                                     allPettyCash[tcIndex] = tc
                                     pettyCashAdapter?.updateItem(tc)
                                     Log.d("ViewAllPettyCash", "Updated transaction cost at index $tcIndex")
@@ -935,6 +969,7 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
                     if (pettyCashId != -1) {
                         // Record updated IDs in PettyCashFragment
                         PettyCashFragment.updatedPettyCashIds.add(pettyCashId)
+                        Log.d("ViewAllPettyCash", "Added petty cash ID $pettyCashId to updated list")
                         if (transactionCostId != -1) {
                             PettyCashFragment.updatedPettyCashIds.add(transactionCostId)
                         }
@@ -1051,5 +1086,13 @@ class ViewAllPettyCashActivity : AppCompatActivity(),
                 fab?.isClickable = true
             }
         }
+    }
+
+    override fun onRefresh() {
+
+        Log.d("ViewAllPettyCash", "onRefresh called")
+        // Refresh the data
+        PettyCashFragment.isRefreshSingletonFromViewAllPettyCashActivity = true
+        loadPettyCash()
     }
 } 

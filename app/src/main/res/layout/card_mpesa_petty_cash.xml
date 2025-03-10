@@ -102,7 +102,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="24dp"
             android:fontFamily="@font/montserrat_medium"
-            android:text="15000.00"
+            android:text="0.00"
             android:textSize="35sp"
             app:layout_constraintStart_toEndOf="@+id/textView4"
             app:layout_constraintTop_toBottomOf="@+id/textView3" />

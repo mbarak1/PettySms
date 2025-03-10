@@ -4,15 +4,25 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import android.util.Log
+import com.example.pettysms.queue.QuickBooksWorker
 import com.google.android.material.color.DynamicColors
 //import leakcanary.LeakCanary
 
 class App: Application() {
+    companion object {
+        private const val TAG = "App"
+    }
+    
     override fun onCreate() {
         super.onCreate()
         DynamicColors.applyToActivitiesIfAvailable(this)
         // Create notification channel
         createNotificationChannel()
+        
+        // Initialize QuickBooksWorker at application startup
+        QuickBooksWorker.initializeAtStartup(this)
+        Log.d(TAG, "QuickBooks sync worker initialized at application startup")
     }
 
     private fun createNotificationChannel() {

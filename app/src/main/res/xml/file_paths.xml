@@ -6,5 +6,8 @@
     <!-- Path for shared PDFs -->
     <external-path name="external_files" path="." />
 
+    <!-- Path for app's internal files directory where reports are stored -->
+    <files-path name="reports" path="." />
+
     <cache-path name="cache" path="." />
 </paths>

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="4dp"
+    style="?attr/materialCardViewElevatedStyle"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <!-- Ranking Position -->
+        <TextView
+            android:id="@+id/textRankingPosition"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/circle_background"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceHeadline6"
+            android:textColor="@android:color/white"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="1" />
+
+        <!-- Truck Icon -->
+        <ImageView
+            android:id="@+id/imageTruck"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="16dp"
+            android:contentDescription="Truck icon"
+            android:src="@drawable/ic_truck_24dp"
+            app:layout_constraintBottom_toBottomOf="@id/textTruckNumber"
+            app:layout_constraintStart_toEndOf="@id/textRankingPosition"
+            app:layout_constraintTop_toTopOf="@id/textTruckNumber"
+            app:tint="?attr/colorPrimary" />
+
+        <!-- Truck Number -->
+        <TextView
+            android:id="@+id/textTruckNumber"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:textAppearance="?attr/textAppearanceHeadline6"
+            app:layout_constraintEnd_toStartOf="@id/textExpenses"
+            app:layout_constraintStart_toEndOf="@id/imageTruck"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="KBZ 123A" />
+
+        <!-- Truck Make -->
+        <TextView
+            android:id="@+id/textTruckMake"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="?attr/textAppearanceBody2"
+            android:textColor="?android:attr/textColorSecondary"
+            app:layout_constraintEnd_toEndOf="@id/textTruckNumber"
+            app:layout_constraintStart_toStartOf="@id/textTruckNumber"
+            app:layout_constraintTop_toBottomOf="@id/textTruckNumber"
+            tools:text="Isuzu" />
+
+        <!-- Expenses -->
+        <TextView
+            android:id="@+id/textExpenses"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceHeadline6"
+            android:textColor="@color/green"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="KES 25,000" />
+
+        <!-- Expenses Label -->
+        <TextView
+            android:id="@+id/textExpensesLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Total Expenses"
+            android:textAppearance="?attr/textAppearanceCaption"
+            android:textColor="?android:attr/textColorSecondary"
+            app:layout_constraintEnd_toEndOf="@id/textExpenses"
+            app:layout_constraintTop_toBottomOf="@id/textExpenses" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView> 

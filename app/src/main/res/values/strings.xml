@@ -100,4 +100,10 @@
     <string name="search_transactors">Search Transactors</string>
     <string name="transactor_name">Transactor Name</string>
     <string name="no_accounts_to_show">No accounts to show!</string>
+    <string name="reports">Reports</string>
+    <string name="generate_report">Generate Report</string>
+    <string name="generate_mpesa_statement">Generate M-Pesa Statement</string>
+    <string name="generate_petty_cash_statement">Generate PettyCash Statement</string>
+    <string name="generate_petty_cash_copy">Generate PettyCash Copy</string>
+    <string name="generate_schedule">Generate Schedule</string>
 </resources>

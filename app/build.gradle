@@ -33,6 +33,11 @@ android {
         viewBinding true
     }
     namespace 'com.example.pettysms'
+
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = false
+    }
 }
 
 dependencies {
@@ -86,5 +91,7 @@ dependencies {
     implementation 'com.gu.android:toolargetool:0.3.0'
     //debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.14'
 
-
+    // Apache POI for Excel file generation
+    // implementation 'org.apache.poi:poi:5.4.0'
+    // implementation 'org.apache.poi:poi-ooxml:5.4.0'
 }

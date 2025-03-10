@@ -6,7 +6,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ActivityInfo
 import android.graphics.PorterDuff
 import android.os.Bundle
 import android.util.Log
@@ -44,16 +43,16 @@ import com.tbuonomo.viewpagerdotsindicator.WormDotsIndicator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
 import com.google.gson.Gson
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
+import com.google.android.material.button.MaterialButton
+import android.database.sqlite.SQLiteDatabase
+import com.example.pettysms.queue.QueueActivity
+import kotlinx.coroutines.Job
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.isActive
 
 
 /**
@@ -97,13 +96,17 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     private var truckButton: Button? = null
     private var ownerButton: Button? = null
     private var transactorsButton: Button? = null
+    private var reportsButton: Button? = null
     private var accountsButton: Button? = null
     private var pettyCashRecyclerView: RecyclerView? = null
     private var noPettyCashMessageTextView: TextView? = null
     private var viewAllLink: TextView? = null
+    private var automationButton: MaterialButton? = null
+    private var queueButton: MaterialButton? = null
+    private var totalAmountCard: TextView? = null
 
     // Add class level variables to track current filters
-    private var currentDateFilter = "Today"
+    private var currentDateFilter = "This Month"
     private var currentPaymentModes = emptyList<String>()
     private var currentSortOption = "Date"
     private var currentCustomStartDate: String? = null
@@ -157,6 +160,8 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
                         if (anyItemRemoved) {
                             // Update empty state and related UI only if items were actually removed
                             updateEmptyState()
+                            // Update card totals when items are removed
+                            updateCardTotals()
                             Log.d("PettyCashFragment", "Updated UI after deletions, remaining items: ${pettyCashList?.size}")
                         }
                         
@@ -275,6 +280,9 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         }
     }
 
+    // Add this variable to store the periodic ping job
+    private var dbStatusCheckJob: Job? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         setHasOptionsMenu(true) // Enable options menu in fragment
         setRetainInstance(true) // Retain fragment across orientation changes
@@ -305,6 +313,9 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         appBarLayout = binding.appBarLayoutPettyCash
         noPettyCashMessageTextView = binding.noPettyCashMessage
         viewAllLink = binding.viewAllLink
+        queueButton = binding.queueButton
+        reportsButton = binding.reportsButton
+        automationButton = binding.automationButton
 
         dbHelper = this.activity?.applicationContext?.let { DbHelper(it) }
         db = dbHelper?.writableDatabase
@@ -347,12 +358,10 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
             cashImage = viewPager?.rootView?.findViewById<ImageView>(R.id.cashImage)
             cashLabel = viewPager?.rootView?.findViewById<TextView>(R.id.cashLabel)
             mpesaImage = viewPager?.rootView?.findViewById<ImageView>(R.id.mpesaImage)
+            totalAmountCard = viewPager?.rootView?.findViewById<TextView>(R.id.total_spend_text)
             updateMpesaCardDetails()
         }
 
-
-        checkDbStatus()
-        checkQbStatus()
 
         nestedScrollView?.setOnScrollChangeListener(NestedScrollView.OnScrollChangeListener { v, scrollX, scrollY, oldScrollX, oldScrollY -> // the delay of the extension of the FAB is set for 12 items
             if (scrollY > oldScrollY + 12 && floatingActionButton!!.isExtended) {
@@ -390,10 +399,13 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         loadingDialog?.show()
         syncMenuItem?.isEnabled = false
 
+        checkDbStatus()
+        checkQbStatus()
+
 
         val task = lifecycleScope.launch(Dispatchers.IO) {
             mainTask()
-
+            loadingDialog?.dismiss()
         } // Execute the main task in the background
 
         task.invokeOnCompletion {
@@ -423,6 +435,10 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
 
     override fun onDestroyView() {
         super.onDestroyView()
+
+        // Cancel the periodic ping job
+        dbStatusCheckJob?.cancel()
+        dbStatusCheckJob = null
 
         // Nullify the view binding (if using ViewBinding)
         _binding = null
@@ -456,6 +472,9 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         accountsButton= null
         pettyCashRecyclerView = null
         viewAllLink = null
+        automationButton = null
+        queueButton = null
+        totalAmountCard = null
 
         // Unregister receiver
         LocalBroadcastManager.getInstance(requireContext()).apply {
@@ -469,7 +488,6 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
             initializeButtons() // Can stay in IO thread
             loadingDataTask(currentPage) // Move loading entirely to IO thread
             requireActivity().runOnUiThread{
-                loadingDialog?.dismiss()
                 syncMenuItem?.isEnabled = true
             }
         }
@@ -663,8 +681,32 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         accountsButton?.setOnClickListener {
             accountsButtonAction()
         }
+        queueButton?.setOnClickListener {
+            queueButtonAction()
+        }
+        reportsButton?.setOnClickListener {
+            reportsButtonAction()
+        }
+        automationButton?.setOnClickListener {
+            automationButtonAction()
+        }
+
+    }
+
+    private fun automationButtonAction() {
+        val intent = Intent(requireContext(), AutomationActivity::class.java)
+        startActivity(intent)
+    }
 
 
+    private fun reportsButtonAction() {
+        val intent = Intent(requireContext(), com.example.pettysms.reports.ReportsActivity::class.java)
+        startActivity(intent)
+    }
+
+    private fun queueButtonAction() {
+        val intent = Intent(requireContext(), QueueActivity::class.java)
+        startActivity(intent)
     }
 
     private fun accountsButtonAction() {
@@ -722,26 +764,67 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
 
 
     private fun checkQbStatus() {
-        qbStatus = true
+        qbStatus = false
         qbStatusTextLabel?.let { updateStatus(qbStatus, qbImageView!!, it) }
-
-        // Use lifecycleScope to handle the delay
-        lifecycleScope.launch {
-            delay(10000) // Wait for 10 seconds
-            qbStatus = false
-            qbImageView?.let { qbStatusTextLabel?.let { it1 -> updateStatus(qbStatus, it, it1) } }
-        }
     }
 
 
     private fun checkDbStatus() {
-        dbStatus = true
+        // Initial status is offline until we confirm connectivity
+        dbStatus = false
         dbDotImageView?.let { dbStatusTextLabel?.let { it1 -> updateStatus(dbStatus, it, it1) } }
-
-        lifecycleScope.launch {
-            delay(5000)
-            dbStatus = false
-            dbDotImageView?.let { dbStatusTextLabel?.let { it1 -> updateStatus(dbStatus, it, it1) } }
+        
+        // Cancel any existing job
+        dbStatusCheckJob?.cancel()
+        
+        // Start a new periodic job to check server status every 5 minutes
+        dbStatusCheckJob = lifecycleScope.launch {
+            while (isActive) {
+                pingServer()
+                // Wait for 5 minutes before pinging again
+                delay(5 * 60 * 1000) // 5 minutes in milliseconds
+            }
+        }
+    }
+    
+    private fun pingServer() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                Log.d("PettyCashFragment", "Pinging server at api.abdulcon.com...")
+                
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .build()
+                
+                val request = Request.Builder()
+                    .url("https://${SERVER_IP}")
+                    .build()
+                
+                val response = client.newCall(request).execute()
+                
+                // Update UI on main thread
+                withContext(Dispatchers.Main) {
+                    if (response.isSuccessful) {
+                        Log.d("PettyCashFragment", "Server ping successful: ${response.code}")
+                        dbStatus = true
+                    } else {
+                        Log.d("PettyCashFragment", "Server ping failed with code: ${response.code}")
+                        dbStatus = false
+                    }
+                    
+                    // Update the UI
+                    dbDotImageView?.let { dbStatusTextLabel?.let { it1 -> updateStatus(dbStatus, it, it1) } }
+                }
+            } catch (e: Exception) {
+                Log.e("PettyCashFragment", "Error pinging server: ${e.message}", e)
+                
+                // Update UI on main thread
+                withContext(Dispatchers.Main) {
+                    dbStatus = false
+                    dbDotImageView?.let { dbStatusTextLabel?.let { it1 -> updateStatus(dbStatus, it, it1) } }
+                }
+            }
         }
     }
 
@@ -810,47 +893,93 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     private fun updateMpesaCardDetails() {
         try {
             // Safety check for null views
-            if (mpesaImage == null || cashImage == null || cashLabel == null) {
+            if (mpesaImage == null || cashImage == null || cashLabel == null || totalAmountCard == null) {
                 Log.d("PettyCashFragment", "Card views not initialized yet")
                 return
             }
             
-            // Safety check for empty list
-            if (pettyCashList.isNullOrEmpty()) {
-                Log.d("PettyCashFragment", "Petty cash list is empty, showing default card state")
-                mpesaImage?.visibility = View.VISIBLE
-                cashImage?.visibility = View.VISIBLE
-                cashLabel?.visibility = View.VISIBLE
-                return
-            }
+            // Set UI to M-Pesa mode
+            mpesaImage?.visibility = View.VISIBLE
+            cashImage?.visibility = View.GONE
+            cashLabel?.visibility = View.GONE
             
-            // Calculate totals
-            var mpesaTotal = 0.0
-            var cashTotal = 0.0
-            
-            pettyCashList?.forEach { pettyCash ->
-                if (pettyCash.paymentMode == "M-Pesa") {
-                    mpesaTotal += pettyCash.amount ?: 0.0
-                } else if (pettyCash.paymentMode == "Cash") {
-                    cashTotal += pettyCash.amount ?: 0.0
+            // Calculate M-Pesa total for current month using optimized database query
+            lifecycleScope.launch(Dispatchers.IO) {
+                var db: SQLiteDatabase? = null
+                try {
+                    // Ensure we have a valid dbHelper
+                    if (dbHelper == null) {
+                        dbHelper = DbHelper(requireContext())
+                    }
+                    
+                    // Open the database explicitly
+                    db = dbHelper?.writableDatabase
+                    
+                    // Get total directly from database without loading all records
+                    val mpesaTotal = dbHelper?.getTotalPettyCashAmountForCurrentMonthByPaymentMode("M-Pesa") ?: 0.0
+                    
+                    withContext(Dispatchers.Main) {
+                        // Format the amount as a simple number with commas
+                        val formattedAmount = String.format("%,.0f", mpesaTotal)
+                        
+                        // Update the total amount text
+                        totalAmountCard?.text = formattedAmount
+                        
+                        Log.d("PettyCashFragment", "Updated M-Pesa card with total: $mpesaTotal")
+                    }
+                } catch (e: Exception) {
+                    Log.e("PettyCashFragment", "Error calculating M-Pesa total: ${e.message}", e)
                 }
             }
-            
-            // Update UI based on totals
-            mpesaImage?.visibility = if (mpesaTotal > 0) View.VISIBLE else View.GONE
-            cashImage?.visibility = if (cashTotal > 0) View.VISIBLE else View.GONE
-            cashLabel?.visibility = if (cashTotal > 0) View.VISIBLE else View.GONE
-            
-            Log.d("PettyCashFragment", "Updated card details - M-Pesa: $mpesaTotal, Cash: $cashTotal")
         } catch (e: Exception) {
-            Log.e("PettyCashFragment", "Error updating card details: ${e.message}", e)
+            Log.e("PettyCashFragment", "Error updating M-Pesa card details: ${e.message}", e)
         }
     }
 
     private fun updateCashCardDetails() {
-        cashImage?.visibility = View.VISIBLE
-        cashLabel?.visibility = View.VISIBLE
-        mpesaImage?.visibility = View.GONE
+        try {
+            // Safety check for null views
+            if (mpesaImage == null || cashImage == null || cashLabel == null || totalAmountCard == null) {
+                Log.d("PettyCashFragment", "Card views not initialized yet")
+                return
+            }
+            
+            // Set UI to Cash mode
+            cashImage?.visibility = View.VISIBLE
+            cashLabel?.visibility = View.VISIBLE
+            mpesaImage?.visibility = View.GONE
+            
+            // Calculate Cash total for current month using optimized database query
+            lifecycleScope.launch(Dispatchers.IO) {
+                var db: SQLiteDatabase? = null
+                try {
+                    // Ensure we have a valid dbHelper
+                    if (dbHelper == null) {
+                        dbHelper = DbHelper(requireContext())
+                    }
+                    
+                    // Open the database explicitly
+                    db = dbHelper?.writableDatabase
+                    
+                    // Get total directly from database without loading all records
+                    val cashTotal = dbHelper?.getTotalPettyCashAmountForCurrentMonthByPaymentMode("Cash") ?: 0.0
+                    
+                    withContext(Dispatchers.Main) {
+                        // Format the amount as a simple number with commas
+                        val formattedAmount = String.format("%,.0f", cashTotal)
+                        
+                        // Update the total amount text
+                        totalAmountCard?.text = formattedAmount
+                        
+                        Log.d("PettyCashFragment", "Updated Cash card with total: $cashTotal")
+                    }
+                } catch (e: Exception) {
+                    Log.e("PettyCashFragment", "Error calculating Cash total: ${e.message}", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PettyCashFragment", "Error updating Cash card details: ${e.message}", e)
+        }
     }
 
     override fun onAddPettyCash(pettyCash: PettyCash, transactionCostPettyCash: PettyCash?) {
@@ -859,88 +988,59 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // First, check if the item is in our current list
-                val existingIndex = pettyCashList?.indexOfFirst { it.id == pettyCash.id } ?: -1
-                val transactionCostIndex = transactionCostPettyCash?.id?.let { id ->
-                    pettyCashList?.indexOfFirst { it.id == id }
-                } ?: -1
-                
-                Log.d("PettyCashFragment", "Existing index: $existingIndex, Transaction cost index: $transactionCostIndex")
-                
-                if (existingIndex != -1 || transactionCostIndex != -1) {
-                    // At least one of the items is in our current list, so update them
-                    withContext(Dispatchers.Main) {
-                        try {
-                            // Update the specific items in our list
-                            if (existingIndex != -1) {
-                                pettyCashList?.set(existingIndex, pettyCash)
-                                pettyCashAdapter?.notifyItemChanged(existingIndex)
-                                Log.d("PettyCashFragment", "Updated item at index $existingIndex")
-                            }
+                // Refresh the entire first page of data
+                val freshData = dbHelper?.getAllPettyCash(
+                    1, pageSize, currentSortOption,
+                    currentDateFilter, currentPaymentModes,
+                    currentCustomStartDate, currentCustomEndDate
+                )
+
+                withContext(Dispatchers.Main) {
+                    try {
+                        // Replace the entire list with fresh data
+                        if (freshData != null) {
+                            // Create a new list to avoid concurrent modification
+                            pettyCashList = freshData.toMutableList()
                             
-                            if (transactionCostIndex != -1 && transactionCostPettyCash != null) {
-                                pettyCashList?.set(transactionCostIndex, transactionCostPettyCash)
-                                pettyCashAdapter?.notifyItemChanged(transactionCostIndex)
-                                Log.d("PettyCashFragment", "Updated transaction cost at index $transactionCostIndex")
-                            }
+                            // Update the adapter with the new list
+                            pettyCashAdapter?.updateList(pettyCashList ?: mutableListOf())
                             
-                            // Update UI
-                            updateEmptyState()
-                            updateViewPagerData()
-                            updateMpesaCardDetails()
+                            // Reset current page to 1 since we're refreshing
+                            currentPage = 1
                             
-                            loadingDialog?.dismiss()
-                            Log.d("PettyCashFragment", "Successfully updated specific items")
-                        } catch (e: Exception) {
-                            Log.e("PettyCashFragment", "Error updating specific items: ${e.message}", e)
-                            loadingDialog?.dismiss()
+                            // Scroll to top
+                            pettyCashRecyclerView?.scrollToPosition(0)
+                            
+                            Log.d("PettyCashFragment", "Refreshed list with ${pettyCashList?.size} items")
+                    } else {
+                            Log.d("PettyCashFragment", "No data returned from database refresh")
                         }
-                    }
-                } else {
-                    // Items are not in our current list, so refresh the first page
-                    Log.d("PettyCashFragment", "Items not in current list, refreshing first page")
-                    
-                    val freshData = dbHelper?.getAllPettyCash(
-                        1, pageSize, currentSortOption,
-                        currentDateFilter, currentPaymentModes,
-                        currentCustomStartDate, currentCustomEndDate
-                    )
-                    
-                    withContext(Dispatchers.Main) {
-                        try {
-                            // Replace the entire list with fresh data
-                            if (freshData != null && freshData.isNotEmpty()) {
-                                // Create a new list to avoid concurrent modification
-                                pettyCashList = freshData.toMutableList()
-                                
-                                // Update the adapter with the new list
-                                pettyCashAdapter?.updateList(pettyCashList ?: mutableListOf())
-                                
-                                Log.d("PettyCashFragment", "Refreshed entire list with ${pettyCashList?.size} items")
-                            } else {
-                                Log.d("PettyCashFragment", "No data returned from database refresh")
-                            }
-                            
-                            // Update UI
-                            updateEmptyState()
-                            updateViewPagerData()
-                            updateMpesaCardDetails()
-                            
-                            loadingDialog?.dismiss()
-                            Log.d("PettyCashFragment", "Successfully refreshed data after update")
-                        } catch (e: Exception) {
-                            Log.e("PettyCashFragment", "Error updating UI: ${e.message}", e)
-                            loadingDialog?.dismiss()
-                        }
+                        
+                        // Update UI states
+                        updateEmptyState()
+                        updateViewPagerData()
+                        // Update card totals based on current view
+                        updateCardTotals()
+                        
+                        loadingDialog?.dismiss()
+                        Log.d("PettyCashFragment", "Successfully refreshed data after update")
+                    } catch (e: Exception) {
+                        Log.e("PettyCashFragment", "Error updating UI: ${e.message}", e)
+                        loadingDialog?.dismiss()
+                        Toast.makeText(
+                            requireContext(),
+                            "Error updating display: ${e.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             } catch (e: Exception) {
-                Log.e("PettyCashFragment", "Error updating items: ${e.message}", e)
+                Log.e("PettyCashFragment", "Error refreshing data: ${e.message}", e)
                 withContext(Dispatchers.Main) {
-                    loadingDialog?.dismiss()
+                loadingDialog?.dismiss()
                     Toast.makeText(
                         requireContext(),
-                        "Error updating items: ${e.message}",
+                        "Error refreshing data: ${e.message}",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -970,6 +1070,7 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         const val SERVER_IP = "api.abdulcon.com"
         const val PETTY_CASH_VIEWER_REQUEST = 1001
         var updatedPettyCashIds = mutableSetOf<Int>()  // Store updated petty cash IDs
+        var isRefreshSingletonFromViewAllPettyCashActivity = false
     }
 
     object FragmentVisibilityTracker {
@@ -986,11 +1087,62 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
         syncMenuItem?.isEnabled = false
 
         // Launch a coroutine in the lifecycleScope to reload data
-        val task = lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
-            } catch (e: Exception) {
+                Log.d("PettyCashFragment", "Starting full data refresh...")
+                
+                // Get fresh data from database
+                val freshData = dbHelper?.getAllPettyCash(
+                    1, pageSize, currentSortOption,
+                    currentDateFilter, currentPaymentModes,
+                    currentCustomStartDate, currentCustomEndDate
+                )
+
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "Error refreshing data: ${e.message}", Toast.LENGTH_SHORT).show()
+                    try {
+                        // Replace the entire list with fresh data
+                        if (freshData != null) {
+                            // Create a new list to avoid concurrent modification
+                            pettyCashList = freshData.toMutableList()
+                            
+                            // Update the adapter with the new list
+                            pettyCashAdapter?.updateList(pettyCashList ?: mutableListOf())
+                            
+                            // Reset current page to 1 since we're refreshing
+                            currentPage = 1
+                            
+                            // Scroll to top
+                            pettyCashRecyclerView?.scrollToPosition(0)
+                            
+                            Log.d("PettyCashFragment", "Refreshed list with ${pettyCashList?.size} items")
+                        } else {
+                            Log.d("PettyCashFragment", "No data returned from database refresh")
+                        }
+                        
+                        // Update UI states
+                        updateEmptyState()
+                        updateViewPagerData()
+                        // Update card totals based on current view
+                        updateCardTotals()
+                        
+                        Log.d("PettyCashFragment", "Successfully completed full data refresh")
+                    } catch (e: Exception) {
+                        Log.e("PettyCashFragment", "Error updating UI during refresh: ${e.message}", e)
+                        Toast.makeText(
+                            requireContext(),
+                            "Error updating display: ${e.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PettyCashFragment", "Error during full refresh: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        requireContext(),
+                        "Error refreshing data: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             } finally {
                 withContext(Dispatchers.Main) {
@@ -1045,6 +1197,9 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
                                             pettyCashRecyclerView?.scrollToPosition(index)
                                         }
                                     }
+                                    
+                                    // Update card totals after updating items
+                                    updateCardTotals()
                                 }
                             } catch (e: Exception) {
                                 Log.e("PettyCashFragment", "Error updating database: ${e.message}")
@@ -1069,10 +1224,68 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
     override fun onResume() {
         super.onResume()
         Log.d("PettyCashFragment", "onResume called")
+
         
         // Refresh the RecyclerView data
         refreshPettyCashList()
+        if (isRefreshSingletonFromViewAllPettyCashActivity){
+            this.onRefresh()
+            isRefreshSingletonFromViewAllPettyCashActivity = false
+        }
     }
+
+    private fun refreshPettyCashListOnRefresh(){
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Get only the updated petty cash items
+
+
+                val updatedItems = updatedPettyCashIds.mapNotNull { id ->
+                    dbHelper?.getPettyCashById(id)
+                }
+
+                withContext(Dispatchers.Main) {
+                    if (updatedItems.isNotEmpty()) {
+                        // Update each modified item in the adapter
+                        updatedItems.forEach { pettyCash ->
+                            pettyCashAdapter?.findItemIndexById(pettyCash.id!!)?.let { index ->
+                                pettyCashAdapter?.updateItem(index, pettyCash)
+                                Log.d("PettyCashFragment", "Updated item at position: $index")
+
+                                // Scroll to the first updated item
+                                if (pettyCash.id == updatedItems.first().id) {
+                                    pettyCashRecyclerView?.scrollToPosition(index)
+                                }
+                            }
+                            // Remove from the update set after updating
+                            updatedPettyCashIds.remove(pettyCash.id)
+                        }
+
+                        // Update view pager and Mpesa card
+                        updateViewPagerData()
+                        updateMpesaCardDetails()
+
+                        Log.d("PettyCashFragment", """
+                            Updated specific items:
+                            Count: ${updatedItems.size}
+                            IDs: ${updatedItems.map { it.id }}
+                            Remaining Updates: ${updatedPettyCashIds.size}
+                        """.trimIndent())
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PettyCashFragment", "Error updating items: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        requireContext(),
+                        "Error updating items: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
 
     private fun refreshPettyCashList() {
         if (updatedPettyCashIds.isEmpty()) {
@@ -1183,14 +1396,24 @@ class PettyCashFragment : Fragment(), AddPettyCashFragment.OnAddPettyCashListene
             }
             
             try {
-                updateMpesaCardDetails()
+                // Update card totals when empty state changes
+                updateCardTotals()
             } catch (e: Exception) {
-                Log.e("PettyCashFragment", "Error updating mpesa card: ${e.message}", e)
+                Log.e("PettyCashFragment", "Error updating card totals: ${e.message}", e)
             }
 
             Log.d("PettyCashFragment", "Empty state updated, RecyclerView visibility: ${pettyCashRecyclerView?.visibility == View.VISIBLE}")
         } catch (e: Exception) {
             Log.e("PettyCashFragment", "Error in updateEmptyState: ${e.message}", e)
+        }
+    }
+
+    private fun updateCardTotals() {
+        // Check which card is currently visible and update accordingly
+        if (mpesaImage?.visibility == View.VISIBLE) {
+            updateMpesaCardDetails()
+        } else {
+            updateCashCardDetails()
         }
     }
 

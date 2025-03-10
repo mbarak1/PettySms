@@ -58,6 +58,7 @@ import cdflynn.android.library.checkview.CheckView
 import com.example.pettysms.MpesaTransaction.Companion.getTitleTextByTransactionTypeWithoutFormatting
 import com.example.pettysms.Transactor.Companion.toJson
 import com.example.pettysms.databinding.FragmentAddPettyCashBinding
+import com.example.pettysms.queue.QuickBooksWorker
 import com.google.android.material.carousel.CarouselLayoutManager
 import com.google.android.material.carousel.CarouselSnapHelper
 import com.google.android.material.chip.Chip
@@ -145,6 +146,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
     private var signatureViewModel: SignatureViewModel? = null
     private var horizontalScrollView: HorizontalScrollView? = null
     private var linearLayoutImages: LinearLayout? = null
+    private var automatePettyCash: Boolean? = true
 
 
     private val binding get() = _binding!!
@@ -374,7 +376,9 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         println("Functionality: $functionality")
         inflater.inflate(R.menu.add_or_edit_petty_cash_menu, menu)
         val scanEtr = menu.findItem(R.id.scanEtr)
-        val deleteItem = menu.findItem(R.id.deletePettyCash)
+        val automateItem = menu.findItem(R.id.automatePettyCash)
+        automateItem.isChecked = true // Default state ON
+        automateItem.icon?.alpha = 255 // Fully visible icon (ON)
         val syncMenu = menu.findItem(R.id.syncPettyCash)
 
         if (syncMenu != null) {
@@ -385,10 +389,10 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
         if (functionality == "Edit") {
             scanEtr.isVisible = true
-            deleteItem.isVisible = false
+            automateItem.isVisible = true
         } else {
             scanEtr.isVisible = true
-            deleteItem.isVisible = false
+            automateItem.isVisible = true
         }
 
     }
@@ -398,6 +402,19 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             R.id.scanEtr -> {
                 if (item.isEnabled) {
                     scanEtr()
+                }
+                true
+            }
+            R.id.automatePettyCash -> {
+                val isToggledOn = item.isChecked.not() // Toggle state
+                item.isChecked = isToggledOn
+
+                if (isToggledOn) {
+                    item.icon?.alpha = 255 // Fully visible icon (ON)
+                    automatePettyCash = true
+                } else {
+                    item.icon?.alpha = 100 // Greyed-out icon (OFF)
+                    automatePettyCash = false
                 }
                 true
             }
@@ -615,6 +632,21 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                         markTransactionAsConverted(pettyCash.mpesaTransaction)
                     }
 
+                    // Add to queue if petty cash number is not null or empty
+                    if (!pettyCash.pettyCashNumber.isNullOrEmpty()) {
+                        Log.d("AddPettyCashFragment", "Adding petty cash to QuickBooks queue: ${pettyCash.pettyCashNumber}")
+                        if (transactionCostPettyCash != null) {
+                            dbHelper?.addRelatedPettyCashToQueue(pettyCash, transactionCostPettyCash)
+                        } else {
+                            dbHelper?.addToQueue(pettyCash)
+                        }
+                        activity?.applicationContext?.let { it1 ->
+                            QuickBooksWorker.startWorkerIfNeeded(
+                                it1
+                            )
+                        }
+                    }
+
                     println("running onAdd Petty cash")
                     this.onAddPettyCashListener?.onAddPettyCash(pettyCash, transactionCostPettyCash)
                     closeDialog()
@@ -632,6 +664,25 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
                             println(transactionCostPettyCash.toJson())
                         }
                     }
+
+                    // Add or update in queue if petty cash number is not null or empty
+                    // AND if the previous petty cash number is not null
+                    if (!pettyCash.pettyCashNumber.isNullOrEmpty() && this.pettyCash?.pettyCashNumber == null) {
+                        Log.d("AddPettyCashFragment", "Updating petty cash in QuickBooks queue: ${pettyCash.pettyCashNumber}")
+                        if (transactionCostPettyCash != null) {
+                            dbHelper?.addRelatedPettyCashToQueue(pettyCash, transactionCostPettyCash)
+                        } else {
+                            dbHelper?.addToQueue(pettyCash)
+                        }
+                        activity?.applicationContext?.let { it1 ->
+                            QuickBooksWorker.startWorkerIfNeeded(
+                                it1
+                            )
+                        }
+                    } else {
+                        Log.d("AddPettyCashFragment", "Not adding to queue - previous petty cash number was null")
+                    }
+
                     Log.d("AddPettyCashFragment", "In Edit Petty Cash")
                     println("OnAddPettyCashListener" + onAddPettyCashListener)
                     if (onAddPettyCashListener == null) {
@@ -763,6 +814,7 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
         globalMpesaTransaction = null
         onAddPettyCashListener = null
         pettyCash = null
+        automatePettyCash = null
         MpesaFragment.CallbackSingleton.refreshCallback = null
 
         // Clean up temporary image files
@@ -1373,6 +1425,9 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
 
         return if (overallValidation) {
             createSaveSuccessfulDialog("Petty Cash Saved Successfully")
+            if (automatePettyCash == true){
+                checkForConflictingRule()
+            }
             successfulDialog?.show()
             true
         } else {
@@ -1383,6 +1438,135 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             )
             saveErrorDialog?.show()
             false
+        }
+    }
+
+    private fun checkForConflictingRule() {
+        // Create an automation rule based on the petty cash entry
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Get the current date for created/updated timestamps
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                val currentDate = dateFormat.format(Date())
+                
+                // Make sure selectedTrucks is initialized
+                if (selectedTrucks == null || selectedTrucks.isEmpty()) {
+                    selectedTrucks = getSelectedTrucks()
+                }
+                
+                // Create a name for the automation rule based on the petty cash
+                val ruleName = "Auto: ${globalTransactor?.name?.trim()
+                    ?.let { capitalizeEachWord(it) } ?: "Unknown"} - ${globalAccount?.name?.trim() ?: "Unknown"}"
+
+                Log.d("AddPettyCashFragment", "Creating automation rule with ${selectedTrucks.size} trucks")
+                Log.d("AddPettyCashFragment", "First truck ID: ${selectedTrucks.firstOrNull()?.id}")
+                
+                // Create the automation rule
+                val rule = AutomationRule(
+                    id = null, // New rule
+                    name = ruleName,
+                    transactorId = globalTransactor?.id,
+                    transactorName = globalTransactor?.name,
+                    accountId = globalAccount?.id,
+                    accountName = globalAccount?.name,
+                    ownerId = globalSelectedOwner.id,
+                    ownerName = globalSelectedOwner.name,
+                    truckId = if (selectedTrucks.size > 1) -1 else selectedTrucks.firstOrNull()?.id, // -1 for multiple trucks
+                    truckName = if (selectedTrucks.size > 1) "All Trucks" else selectedTrucks.firstOrNull()?.truckNo,
+                    descriptionPattern = binding.descriptionTextInputEditText.text.toString().takeIf { it.isNotBlank() },
+                    minAmount = try {
+                        amountEditText?.text.toString().substringBefore(" KES").replace(",", "").toDouble()
+                    } catch (e: Exception) {
+                        Log.e("AddPettyCashFragment", "Error parsing amount: ${e.message}")
+                        null
+                    },
+                    maxAmount = try {
+                        amountEditText?.text.toString().substringBefore(" KES").replace(",", "").toDouble()
+                    } catch (e: Exception) {
+                        Log.e("AddPettyCashFragment", "Error parsing amount: ${e.message}")
+                        null
+                    },
+                    createdAt = currentDate,
+                    updatedAt = currentDate
+                )
+                
+                // Check for conflicts before saving
+                val dbHelper = DbHelper(requireContext())
+                val allRules = dbHelper.getAllAutomationRules()
+                
+                // Check if a similar rule already exists
+                val conflictingRule = allRules.find { existingRule ->
+                    
+                    // Check if key fields match
+                    val transactorMatch = existingRule.transactorId == rule.transactorId
+                    val accountMatch = existingRule.accountId == rule.accountId
+                    val ownerMatch = existingRule.ownerId == rule.ownerId
+                    
+                    // Special handling for truck - consider "All Trucks" (-1) as a potential conflict
+                    val truckMatch = when {
+                        // If either rule has "All Trucks", consider it a match if owners match
+                        existingRule.truckId == -1 && ownerMatch -> true
+                        rule.truckId == -1 && ownerMatch -> true
+                        // Otherwise, check for exact truck match
+                        else -> existingRule.truckId == rule.truckId
+                    }
+                    
+                    // Check description pattern match - null patterns are considered wildcards
+                    val descriptionMatch = when {
+                        existingRule.descriptionPattern.isNullOrBlank() && rule.descriptionPattern.isNullOrBlank() -> true
+                        existingRule.descriptionPattern.isNullOrBlank() || rule.descriptionPattern.isNullOrBlank() -> false
+                        else -> existingRule.descriptionPattern == rule.descriptionPattern
+                    }
+                    
+                    // Check amount range overlap
+                    val minAmountOverlap = when {
+                        existingRule.minAmount == null && rule.minAmount == null -> true
+                        existingRule.minAmount == null -> true
+                        rule.minAmount == null -> true
+                        else -> existingRule.minAmount!! <= (rule.maxAmount ?: Double.MAX_VALUE)
+                    }
+                    
+                    val maxAmountOverlap = when {
+                        existingRule.maxAmount == null && rule.maxAmount == null -> true
+                        existingRule.maxAmount == null -> true
+                        rule.maxAmount == null -> true
+                        else -> existingRule.maxAmount!! >= (rule.minAmount ?: 0.0)
+                    }
+                    
+                    // Rule is considered a conflict if all criteria match or overlap
+                    transactorMatch && accountMatch && ownerMatch && truckMatch && minAmountOverlap && maxAmountOverlap
+                }
+
+                Log.d("AddPettyCashFragment", "Conflicting rule: $conflictingRule")
+                
+                // If no conflict, save the rule
+                if (conflictingRule == null) {
+                    val newId = dbHelper.addAutomationRule(rule)
+                    if (newId > 0) {
+                        withContext(Dispatchers.Main) {
+                            Log.d("AddPettyCashFragment", "Created automation rule: $ruleName (ID: $newId)")
+                            requireActivity().runOnUiThread {
+                                Toast.makeText(
+                                    requireContext(),
+                                    "Created automation rule: $ruleName (ID: $newId)",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                } else {
+                    Log.d("AddPettyCashFragment", "Skipped creating automation rule due to conflict with: ${conflictingRule.name} (ID: ${conflictingRule.id})")
+                    requireActivity().runOnUiThread {
+                        Toast.makeText(
+                            requireContext(),
+                            "Skipped creating automation rule due to conflict with: ${conflictingRule.name} (ID: ${conflictingRule.id})",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("AddPettyCashFragment", "Error creating automation rule: ${e.message}", e)
+            }
         }
     }
 
@@ -3068,4 +3252,5 @@ class AddPettyCashFragment : DialogFragment(), AddOrEditTransactorDialog.OnAddTr
             null
         }
     }
+
 }

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="0dp"
+    android:layout_marginVertical="8dp"
+    style="@style/Widget.Material3.CardView.Elevated"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="2dp"
+    app:cardPreventCornerOverlap="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <!-- Report Icon with colored background -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/reportIcon"
+            android:layout_width="70dp"
+            android:layout_height="70dp"
+            android:padding="12dp"
+            android:background="?attr/colorPrimaryContainer"
+            android:scaleType="centerInside"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:shapeAppearance="@style/ShapeAppearanceOverlay.Material3.Chip"
+            app:srcCompat="@drawable/description_24px"
+            app:tint="?attr/colorPrimary" />
+
+        <!-- Report Title with Material 3 typography -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/textReportTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
+            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+            android:textColor="?attr/colorPrimary"
+            android:maxLines="1"
+            android:ellipsize="end"
+            app:layout_constraintEnd_toStartOf="@+id/actionsLayout"
+            app:layout_constraintStart_toEndOf="@+id/reportIcon"
+            app:layout_constraintTop_toTopOf="@+id/reportIcon"
+            tools:text="Mpesa Statement" />
+
+        <!-- Report Date with accent color -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/textReportDate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
+            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+            android:textColor="?attr/colorPrimary"
+            app:layout_constraintEnd_toStartOf="@+id/actionsLayout"
+            app:layout_constraintStart_toEndOf="@+id/reportIcon"
+            app:layout_constraintTop_toBottomOf="@+id/textReportTitle"
+            tools:text="21 Jun 2023, 14:30" />
+
+        <!-- Actions Layout with Material 3 icon buttons -->
+        <LinearLayout
+            android:id="@+id/actionsLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnShare"
+                style="@style/Widget.Material3.Button.TonalButton.Icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Share Report"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="6dp"
+                app:cornerRadius="18dp"
+                app:icon="@drawable/share_24px"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="18dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDelete"
+                style="@style/Widget.Material3.Button.TonalButton.Icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:contentDescription="Delete Report"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="6dp"
+                app:backgroundTint="?attr/colorErrorContainer"
+                app:cornerRadius="18dp"
+                app:icon="@drawable/ic_baseline_material_3_delete_action_button"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="18dp"
+                app:iconTint="?attr/colorOnErrorContainer" />
+        </LinearLayout>
+
+        <!-- Report Details -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/textReportDetails"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/reportIcon"
+            tools:text="Transaction Type: All • Transactor: John Doe • Date Range: 01 Jun 2023 - 30 Jun 2023" />
+
+        <!-- Material 3 Divider -->
+        <com.google.android.material.divider.MaterialDivider
+            android:id="@+id/divider"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="12dp"
+            style="@style/Widget.Material3.MaterialDivider"
+            app:dividerColor="?attr/colorPrimary"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/textReportDetails" />
+
+        <!-- Actions Chip Group -->
+        <HorizontalScrollView
+            android:id="@+id/actionsScrollView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:scrollbars="none"
+            android:fadeScrollbars="true"
+            android:overScrollMode="never"
+            app:layout_constraintTop_toBottomOf="@+id/divider">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/actionsChipGroup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:singleLine="true"
+                app:chipSpacingHorizontal="8dp">
+
+                <!-- View Report Chip -->
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btnViewReport"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.Material3.Chip.Assist.Elevated"
+                    android:text="View"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    app:chipIcon="@drawable/visibility_24px"
+                    app:chipIconTint="?attr/colorPrimary" />
+
+                <!-- Download PDF Chip -->
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btnDownloadPdf"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.Material3.Chip.Assist.Elevated"
+                    android:text="PDF"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    app:chipIcon="@drawable/baseline_download_black_24dp"
+                    app:chipIconTint="?attr/colorPrimary" />
+
+                <!-- Download CSV Chip -->
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btnDownloadExcel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.Material3.Chip.Assist.Elevated"
+                    android:text="CSV"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    app:chipIcon="@drawable/baseline_download_black_24dp"
+                    app:chipIconTint="?attr/colorPrimary" />
+
+            </com.google.android.material.chip.ChipGroup>
+        </HorizontalScrollView>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView> 

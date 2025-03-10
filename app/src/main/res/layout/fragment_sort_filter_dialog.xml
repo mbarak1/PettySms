@@ -233,8 +233,7 @@
                 android:layout_height="wrap_content"
                 android:text="Select Custom Range"
                 android:textColor="?attr/colorPrimary"
-                android:clickable="true"
-                android:onClick="onCustomRangeLinkClicked"/>
+                android:clickable="true"/>
         </LinearLayout>
 
         <!-- Add EditText or other UI elements for entering date range -->

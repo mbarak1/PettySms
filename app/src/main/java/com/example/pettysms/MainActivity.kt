@@ -3,14 +3,10 @@ package com.example.pettysms
 import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
-import android.app.job.JobInfo
-import android.app.job.JobScheduler
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.telephony.SmsMessage
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -21,13 +17,10 @@ import androidx.navigation.Navigation
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
-import androidx.navigation.ui.setupActionBarWithNavController
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import com.example.pettysms.databinding.ActivityMainBinding
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.color.DynamicColors
-import java.util.concurrent.TimeUnit
+import com.example.pettysms.queue.QuickBooksWorker
 
 
 class MainActivity : AppCompatActivity(), OnActionModeInteraction {
@@ -82,6 +75,14 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
         //Toast.makeText(this,dynamic_available,100).show()
 
         //DynamicColors.isDynamicColorAvailable()
+
+        setContentView(binding.root)
+
+        // Initialize the navController and appBarConfiguration
+        val navController = findNavController(R.id.nav_host_fragment_content_main)
+        appBarConfiguration = AppBarConfiguration(
+            setOf(R.id.HomeFragment, R.id.MpesaFragment, R.id.settingsFragment, R.id.pettyCashFragment)
+        )
 
         // Check and request runtime permissions
         /*if (ContextCompat.checkSelfPermission(
@@ -226,15 +227,6 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
 
         println("Mpesa First Launch: " + isFirstLaunch)
 
-        setContentView(binding.root)
-
-
-
-
-
-
-
-
     }
 
     private fun scheduleSyncMainPettyCashValues() {
@@ -307,7 +299,18 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
     }
 
     private fun proceedWithAppLogic() {
-        // Your logic when permissions are granted
+        // Schedule the SMS service
+        if (!isServiceScheduled) {
+            scheduleJob()
+            isServiceScheduled = true
+        }
+        
+        // Initialize the QuickBooks sync worker at startup
+        QuickBooksWorker.initializeAtStartup(this)
+        Log.d(activityName, "QuickBooks sync worker initialized at startup")
+        
+        // Schedule the sync values service
+        scheduleSyncMainPettyCashValues()
     }
 
     private fun showPermissionDeniedMessage() {
@@ -342,8 +345,11 @@ class MainActivity : AppCompatActivity(), OnActionModeInteraction {
 
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.nav_host_fragment_content_main)
-        return navController.navigateUp(appBarConfiguration)
-                || super.onSupportNavigateUp()
+        return if (::appBarConfiguration.isInitialized) {
+            navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+        } else {
+            navController.navigateUp() || super.onSupportNavigateUp()
+        }
     }
 
     override fun onResume() {

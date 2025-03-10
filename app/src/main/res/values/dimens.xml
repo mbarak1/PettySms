@@ -8,4 +8,7 @@
     <dimen name="header_padding">10dp</dimen>
     <dimen name="index_width">40dp</dimen>
     <dimen name="index_text_size">16sp</dimen>
+    <dimen name="recycler_view_min_height">500dp</dimen>
+    <dimen name="item_margin">8dp</dimen>
+    <dimen name="last_item_margin">88dp</dimen>
 </resources>
