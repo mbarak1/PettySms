@@ -3,7 +3,7 @@
 // Database configuration
 $servername = "127.0.0.1";
 $username = "u490247366_mbarak";
-$password = "Wanted10";
+$password = "";
 $database = "u490247366_trucks1";
 
 // Create connection
